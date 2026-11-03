@@ -9,7 +9,7 @@ la máscara pública de MediaPlayer y el código interno del catálogo MediaLibr
 Es un error del lector. Las pruebas anteriores tenían el mismo error en sus
 datos sintéticos: daban a una canción el tipo 1.
 
-La versión 0.2.0-preview.10 selecciona `item.media_type = 8`, por igualdad,
+La versión 0.2.0-preview.11 selecciona `item.media_type = 8`, por igualdad,
 en la consulta y en todos los recuentos de música. No aplica una máscara de bits
 ni acepta cualquier tipo como canción. El informe expone el código/comparación
 empleados y conserva los recuentos de todos los tipos para investigar diferencias.
