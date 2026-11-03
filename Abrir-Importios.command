@@ -9,7 +9,7 @@ python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)'
 if [ ! -x .venv/bin/python ]; then
     python3 -m venv .venv
 fi
-if ! .venv/bin/python -c 'import mutagen, PySide6, Cryptodome; assert mutagen.version_string == "1.47.0" and PySide6.__version__ == "6.10.2" and Cryptodome.__version__ == "3.24.1"' 2>/dev/null; then
+if ! .venv/bin/python -c 'import mutagen, PySide6, Cryptodome, pymobiledevice3; assert mutagen.version_string == "1.47.0" and PySide6.__version__ == "6.10.2" and Cryptodome.__version__ == "3.24.1"' 2>/dev/null; then
     .venv/bin/python -m pip install -r requirements-desktop.txt
 fi
 exec .venv/bin/python -m importios.native

@@ -9,7 +9,7 @@ if errorlevel 1 goto python_missing
 py -3 -m venv .venv
 if errorlevel 1 goto failed
 :run
-".venv\Scripts\python.exe" -c "import mutagen, PySide6, Cryptodome; assert mutagen.version_string == '1.47.0' and PySide6.__version__ == '6.10.2' and Cryptodome.__version__ == '3.24.1'" >nul 2>&1
+".venv\Scripts\python.exe" -c "import mutagen, PySide6, Cryptodome, pymobiledevice3; assert mutagen.version_string == '1.47.0' and PySide6.__version__ == '6.10.2' and Cryptodome.__version__ == '3.24.1'" >nul 2>&1
 if not errorlevel 1 goto start
 ".venv\Scripts\python.exe" -m pip install -r requirements-desktop.txt
 if errorlevel 1 goto failed
