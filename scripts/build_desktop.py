@@ -24,7 +24,7 @@ def checked_run(command, **options):
 def main():
     system = platform.system()
     command = [sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean',
-               '--name', 'Importios', '--windowed',
+               '--name', 'TUPAQ', '--windowed',
                '--add-data', 'third_party:third_party',
                '--collect-submodules', 'mutagen', '--exclude-module', 'tkinter']
     if system == 'Windows':
@@ -35,14 +35,14 @@ def main():
         command += ['--osx-bundle-identifier', 'io.importios.desktop']
     checked_run(command + ['desktop.py'], cwd=ROOT, check=True)
     if system == 'Darwin':
-        destination = ROOT/'dist'/f'Importios-macOS-{platform.machine()}.dmg'
+        destination = ROOT/'dist'/f'TUPAQ-macOS-{platform.machine()}.dmg'
         # Stage only the app and an Applications shortcut in the disk image.
         import tempfile
         with tempfile.TemporaryDirectory(prefix='importios-dmg-') as temporary:
             stage = Path(temporary)
-            checked_run(['ditto', str(ROOT/'dist'/'Importios.app'), str(stage/'Importios.app')], check=True)
+            checked_run(['ditto', str(ROOT/'dist'/'TUPAQ.app'), str(stage/'TUPAQ.app')], check=True)
             (stage/'Applications').symlink_to('/Applications')
-            checked_run(['hdiutil', 'create', '-volname', 'Importios', '-srcfolder',
+            checked_run(['hdiutil', 'create', '-volname', 'TUPAQ', '-srcfolder',
                             str(stage), '-ov', '-format', 'UDZO', str(destination)], check=True)
         checked_run(['hdiutil', 'verify', str(destination)], check=True)
         (ROOT/'dist'/'mounted-dmg').mkdir(exist_ok=True)
@@ -50,7 +50,7 @@ def main():
                         str(ROOT/'dist'/'mounted-dmg'), str(destination)], check=True)
         try:
             checked_run([sys.executable, 'scripts/smoke_desktop.py',
-                            str(ROOT/'dist'/'mounted-dmg'/'Importios.app'/'Contents'/'MacOS'/'Importios')],
+                            str(ROOT/'dist'/'mounted-dmg'/'TUPAQ.app'/'Contents'/'MacOS'/'TUPAQ')],
                            cwd=ROOT, check=True)
         finally:
             checked_run(['hdiutil', 'detach', str(ROOT/'dist'/'mounted-dmg')], check=True)

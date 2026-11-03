@@ -1,4 +1,4 @@
-# Descargar Importios sin usar Python
+# Descargar TUPAQ sin usar Python
 
 GitHub compila la aplicación para Windows y macOS. Las descargas incluyen
 el intérprete y las dependencias: no necesitas instalar Python.
@@ -16,17 +16,17 @@ La detección USB en Windows sí necesita el controlador/servicio local de Apple
 1. Entra en [las compilaciones de GitHub](https://github.com/SRJW/importios/actions/workflows/desktop.yml).
 2. Abre la ejecución más reciente de la etiqueta de versión más reciente
    que tenga un indicador verde. Si está en curso, espera a que termine.
-3. Al final de la página, en **Artifacts**, descarga **Importios-Windows-x64**.
+3. Al final de la página, en **Artifacts**, descarga **TUPAQ-Windows-x64**.
    Para descargar artefactos debes iniciar sesión en GitHub.
-4. Extrae el ZIP y abre **Importios.exe**. Se abrirá una ventana propia de Importios.
-5. Para salir, cierra la ventana de Importios.
+4. Extrae el ZIP y abre **TUPAQ.exe**. Se abrirá una ventana propia de TUPAQ.
+5. Para salir, cierra la ventana de TUPAQ.
 
 ## macOS
 
-En la misma ejecución, descarga **Importios-macOS-AppleSilicon** para un Mac con
-chip Apple (M1, M2, etc.) o **Importios-macOS-Intel** para un Mac Intel. Extrae el
-ZIP, abre el `.dmg` y arrastra **Importios** a **Applications**. Después abre
-Importios desde Aplicaciones. No basta con cambiar la extensión de un EXE:
+En la misma ejecución, descarga **TUPAQ-macOS-AppleSilicon** para un Mac con
+chip Apple (M1, M2, etc.) o **TUPAQ-macOS-Intel** para un Mac Intel. Extrae el
+ZIP, abre el `.dmg` y arrastra **TUPAQ** a **Applications**. Después abre
+TUPAQ desde Aplicaciones. No basta con cambiar la extensión de un EXE:
 GitHub compila cada aplicación en su sistema correspondiente.
 
 ## Versiones publicadas

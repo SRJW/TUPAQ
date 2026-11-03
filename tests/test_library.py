@@ -79,7 +79,8 @@ class LibraryTests(unittest.TestCase):
     def test_missing_trust_never_opens_the_file_service(self):
         lockdown = AsyncMock()
         lockdown.__aenter__.return_value = lockdown
-        lockdown.validate_pairing.return_value = False
+        lockdown.paired = False
+        lockdown.session_id = None
         with patch('pymobiledevice3.usbmux.list_devices', new_callable=AsyncMock) as devices, \
              patch('pymobiledevice3.lockdown.create_using_usbmux', new_callable=AsyncMock) as create, \
              patch('pymobiledevice3.services.afc.AfcService') as afc:
@@ -92,7 +93,8 @@ class LibraryTests(unittest.TestCase):
     def test_phone_reader_reuses_trust_without_automatic_pairing(self):
         lockdown = AsyncMock()
         lockdown.__aenter__.return_value = lockdown
-        lockdown.validate_pairing.return_value = True
+        lockdown.paired = True
+        lockdown.session_id = 'synthetic-session'
         afc = AsyncMock()
         afc.__aenter__.return_value = afc
         with patch('pymobiledevice3.usbmux.list_devices', new_callable=AsyncMock) as devices, \
@@ -104,8 +106,46 @@ class LibraryTests(unittest.TestCase):
             copy.return_value = []
             self.assertEqual(asyncio.run(_read_phone()), [])
             self.assertFalse(create.call_args.kwargs['autopair'])
-            lockdown.validate_pairing.assert_awaited_once()
+            lockdown.validate_pairing.assert_not_awaited()
             copy.assert_awaited_once()
+
+    def test_sdk_opens_one_session_and_reader_does_not_start_it_again(self):
+        from pymobiledevice3.lockdown import LockdownClient
+        from pymobiledevice3.exceptions import SessionActiveError
+
+        lockdown = AsyncMock()
+        lockdown.__aenter__.return_value = lockdown
+        lockdown.paired = False
+        lockdown.session_id = None
+
+        async def validate():
+            if lockdown.session_id:
+                raise SessionActiveError()
+            lockdown.paired = True
+            lockdown.session_id = 'synthetic-session'
+            return True
+
+        lockdown.validate_pairing.side_effect = validate
+
+        async def create(**options):
+            # Use the pinned SDK's real initialization helper, which validates
+            # existing trust even when automatic pairing is disabled.
+            await LockdownClient._handle_autopair(lockdown, options['autopair'], None)
+            return lockdown
+
+        afc = AsyncMock()
+        afc.__aenter__.return_value = afc
+        with patch('pymobiledevice3.usbmux.list_devices', new_callable=AsyncMock) as devices, \
+             patch('pymobiledevice3.lockdown.create_using_usbmux', side_effect=create) as factory, \
+             patch('pymobiledevice3.services.afc.AfcService', return_value=afc), \
+             patch('importios.library.copy_catalogue', new_callable=AsyncMock, return_value=[]) as copy:
+            devices.return_value = [SimpleNamespace(is_usb=True, serial='synthetic-test-id')]
+            self.assertEqual(asyncio.run(_read_phone()), [])
+            self.assertFalse(factory.call_args.kwargs['autopair'])
+            lockdown.validate_pairing.assert_awaited_once()
+            lockdown.pair.assert_not_awaited()
+            copy.assert_awaited_once()
+            lockdown.__aexit__.assert_awaited_once()
 
     def test_catalogue_is_read_only_filters_music_and_joins_metadata(self):
         with tempfile.TemporaryDirectory() as temporary:

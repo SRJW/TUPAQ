@@ -21,7 +21,7 @@ class LibraryError(Exception):
 def connection_failure(error, stage):
     messages = {
         'modules': 'No se pudo cargar el componente de comunicación de esta versión.',
-        'usb': 'No se pudo acceder al servicio USB de Apple. Que el sistema detecte el teléfono no confirma que ese servicio esté disponible para Importios.',
+        'usb': 'No se pudo acceder al servicio USB de Apple. Que el sistema detecte el teléfono no confirma que ese servicio esté disponible para TUPAQ.',
         'lockdown': 'Se detectó el dispositivo, pero no se pudo abrir su conexión de confianza.',
         'trust': 'No se pudo validar la autorización existente del ordenador.',
         'afc': 'La conexión con el dispositivo se abrió, pero iOS no permitió abrir el servicio de archivos.',
@@ -133,11 +133,14 @@ async def _read_phone():
             raise LibraryError('Conecta un solo iPhone por USB y desbloquéalo para leer su biblioteca.', 'usb:device-count')
         stage = 'lockdown'
         lockdown = await create_using_usbmux(serial=devices[0].serial, connection_type='USB', autopair=False,
-                                           label='Importios')
+                                           label='TUPAQ')
         async with lockdown:
             stage = 'trust'
-            if not await lockdown.validate_pairing():
-                raise LibraryError('No se encontró una autorización de confianza válida para Importios. No restablezcas la confianza ni la biblioteca; copia el diagnóstico para revisarlo.', 'trust:missing-record')
+            # The pinned SDK validates existing trust and starts a session in
+            # create_using_usbmux even with autopair=False. A second validation
+            # sends StartSession again and iOS responds with SessionActive.
+            if not lockdown.paired or not lockdown.session_id:
+                raise LibraryError('No se encontró una autorización de confianza válida para TUPAQ. No restablezcas la confianza ni la biblioteca; copia el diagnóstico para revisarlo.', 'trust:missing-record')
             stage = 'afc'
             async with AfcService(lockdown) as afc:
                 stage = 'catalogue'

@@ -82,7 +82,7 @@ def csv_value(value):
 class Window(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle('Importios')
+        self.setWindowTitle('TUPAQ')
         self.resize(1140, 900)
         self.setMinimumSize(780, 580)
         self.setAcceptDrops(True)
@@ -96,7 +96,7 @@ class Window(QMainWindow):
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(32, 24, 32, 24)
         layout.setSpacing(10)
-        brand = QLabel('♫  importios')
+        brand = QLabel('♫  TUPAQ')
         brand.setObjectName('brand')
         layout.addWidget(brand)
         title = QLabel('Tu música, en un solo lugar.')
@@ -359,7 +359,7 @@ class Window(QMainWindow):
                     ['filename', 'title', 'artist', 'album', 'format', 'duration', 'size', 'id']])
 
     def choose_export(self):
-        path, _ = QFileDialog.getSaveFileName(self, 'Guardar lista', 'importios-canciones.csv', 'CSV (*.csv)')
+        path, _ = QFileDialog.getSaveFileName(self, 'Guardar lista', 'tupaq-canciones.csv', 'CSV (*.csv)')
         if path:
             try:
                 self.export_list(path)
@@ -381,7 +381,7 @@ class Window(QMainWindow):
             self.device_status.setText('Espera a que termine la lectura de la biblioteca antes de cerrar la ventana.')
             event.ignore()
             return
-        if self.tracks and QMessageBox.question(self, 'Cerrar Importios',
+        if self.tracks and QMessageBox.question(self, 'Cerrar TUPAQ',
             'La lista no se conserva al cerrar. ¿Quieres salir?',
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
@@ -396,6 +396,7 @@ class Window(QMainWindow):
 
 
 def smoke(app, window, fixtures, output=None):
+    assert window.windowTitle() == app.applicationName() == 'TUPAQ'
     # Import the USB transport inside the frozen build without opening a device.
     from pymobiledevice3.lockdown import create_using_usbmux
     from pymobiledevice3.services.afc import AfcService
@@ -447,14 +448,14 @@ def smoke(app, window, fixtures, output=None):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Importios: aplicación de escritorio')
+    parser = argparse.ArgumentParser(description='TUPAQ: aplicación de escritorio')
     parser.add_argument('--smoke-fixtures', type=Path, help=argparse.SUPPRESS)
     parser.add_argument('--smoke-report', type=Path, help=argparse.SUPPRESS)
     parser.add_argument('--smoke-screenshot', type=Path, help=argparse.SUPPRESS)
     args = parser.parse_args()
     app = QApplication([sys.argv[0]])
-    app.setApplicationName('Importios')
-    app.setOrganizationName('Importios')
+    app.setApplicationName('TUPAQ')
+    app.setOrganizationName('TUPAQ')
     window = Window()
     window.show()
     if args.smoke_fixtures:

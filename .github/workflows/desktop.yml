@@ -22,19 +22,19 @@ jobs:
         include:
           - os: windows-2022
             label: Windows 11 · EXE x64
-            artifact: Importios-Windows-x64
-            binary: dist/Importios.exe
-            download: dist/Importios.exe
+            artifact: TUPAQ-Windows-x64
+            binary: dist/TUPAQ.exe
+            download: dist/TUPAQ.exe
           - os: macos-15
             label: macOS · DMG Apple Silicon
-            artifact: Importios-macOS-AppleSilicon
-            binary: dist/Importios.app/Contents/MacOS/Importios
-            download: dist/Importios-macOS-arm64.dmg
+            artifact: TUPAQ-macOS-AppleSilicon
+            binary: dist/TUPAQ.app/Contents/MacOS/TUPAQ
+            download: dist/TUPAQ-macOS-arm64.dmg
           - os: macos-15-intel
             label: macOS · DMG Intel
-            artifact: Importios-macOS-Intel
-            binary: dist/Importios.app/Contents/MacOS/Importios
-            download: dist/Importios-macOS-x86_64.dmg
+            artifact: TUPAQ-macOS-Intel
+            binary: dist/TUPAQ.app/Contents/MacOS/TUPAQ
+            download: dist/TUPAQ-macOS-x86_64.dmg
     permissions:
       contents: write
     runs-on: ${{ matrix.os }}

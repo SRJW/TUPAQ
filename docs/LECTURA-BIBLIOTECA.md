@@ -4,7 +4,7 @@ Las versiones preliminares de escritorio incluyen el botón **Leer biblioteca de
 
 1. Conecta un solo iPhone por USB, desbloqueado, a un ordenador que ya tenga
    autorización de confianza. En Windows se necesita el controlador de Apple.
-2. Abre Importios y pulsa **Leer biblioteca del iPhone**.
+2. Abre TUPAQ y pulsa **Leer biblioteca del iPhone**.
 3. Espera la lectura. La pestaña del teléfono mostrará canciones o un mensaje
    de acceso/esquema no compatible. No hace falta aceptar ninguna sincronización.
 
@@ -22,8 +22,14 @@ no significa que todos los iPhone permitan acceder al catálogo por esa ruta.
 
 ## Operaciones realizadas
 
-Se abre lockdown con `autopair=False`, se valida la confianza existente y se inicia
-el servicio AFC. Solo se consultan atributos y se abren archivos en modo `r`.
+Se abre lockdown con `autopair=False`. El SDK valida la confianza existente y
+abre una sesión durante la creación del cliente, incluso con ese indicador en
+`False`; la aplicación comprueba `paired` y `session_id` y reutiliza esa sesión.
+No vuelve a llamar a `validate_pairing()`, porque enviaría otro `StartSession`
+y produciría `trust:SessionActiveError`. Una prueba reproduce el fallo con el
+lector anterior y confirma que la corrección valida solo una vez usando el
+helper real del SDK fijado. Aún falta confirmar el resultado en el teléfono.
+Después se inicia el servicio AFC. Solo se consultan atributos y se abren archivos en modo `r`.
 Se copia `MediaLibrary.sqlitedb` y su WAL, si existe, dos veces, con un límite de
 128 MiB por archivo. Se comparan huellas y atributos; si difieren se rechaza la
 copia. Esto detecta cambios durante las lecturas; no crea un bloqueo o snapshot

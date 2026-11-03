@@ -1,4 +1,6 @@
-# Importios
+# TUPAQ
+
+Antes llamado Importios. El código interno conserva el módulo `importios` y el repositorio actual.
 
 Aplicación de escritorio para Windows y macOS, en español, con ventana propia.
 El objetivo es importar música local a la app Música del iPhone sin usar la
@@ -9,16 +11,16 @@ La versión actual selecciona y analiza música, incluye lectura USB del catálo
 contiene una implementación independiente de la firma de metadatos validada
 con vectores sintéticos. No modifica la biblioteca del teléfono.
 
-![Ventana nativa de Importios con audio sintético de prueba](docs/interfaz-nativa.png)
+![Ventana nativa de TUPAQ con audio sintético de prueba](docs/interfaz-nativa.png)
 
 ## Descargar y abrir
 
 [Versiones descargables](https://github.com/SRJW/importios/releases) ·
 [Instrucciones de descarga](DESCARGAR.md)
 
-- Windows 11: abre `Importios.exe` con doble clic.
-- Mac con chip Apple: abre `Importios-macOS-arm64.dmg` y copia la app a Aplicaciones.
-- Mac Intel: usa `Importios-macOS-x86_64.dmg`.
+- Windows 11: abre `TUPAQ.exe` con doble clic.
+- Mac con chip Apple: abre `TUPAQ-macOS-arm64.dmg` y copia la app a Aplicaciones.
+- Mac Intel: usa `TUPAQ-macOS-x86_64.dmg`.
 
 No se necesita instalar Python ni abrir una terminal. La aplicación tiene una
 ventana propia y no usa el navegador. Las descargas aparecen cuando GitHub
@@ -48,7 +50,7 @@ notarización de Apple.
   coinciden; eso no demuestra aceptación por un dispositivo real.
 
 En Windows, la detección necesita el controlador/servicio de Apple. Tener ese
-controlador no requiere abrir iTunes para usar Importios. En macOS se consulta
+controlador no requiere abrir iTunes para usar TUPAQ. En macOS se consulta
 el servicio usbmuxd del sistema. Detectar un dispositivo no confirma la confianza,
 la versión de iOS ni la compatibilidad de importación.
 
@@ -80,7 +82,7 @@ python3 -m venv .venv
 .venv/bin/python -m importios.native
 ```
 
-Windows tiene `windows/Abrir-Importios.bat` y macOS `Abrir-Importios.command`
+Windows tiene `windows/Abrir-TUPAQ.bat` y macOS `Abrir-TUPAQ.command`
 para ejecución desde el código. La antigua interfaz web se conserva como utilidad
 de desarrollo: `.venv/bin/python -m importios --no-browser`.
 
@@ -93,7 +95,7 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m importios.native --smoke-fixtures 
 .venv/bin/python scripts/build_desktop.py
 ```
 
-La suite contiene 33 pruebas de formatos, HTTP local, descubrimiento USB simulado,
+La suite contiene 34 pruebas de formatos, HTTP local, descubrimiento USB simulado,
 paquetes de investigación y firmas candidatas. La prueba nativa comprueba una
 ventana Qt real, lectura en un hilo de trabajo, los AAC/ALAC dentro de M4A, portadas, duplicados,
 archivos dañados, CSV, quitar/vaciar y las firmas. En Linux se ha probado también

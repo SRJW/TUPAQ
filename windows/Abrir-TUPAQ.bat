@@ -1,9 +1,9 @@
 @echo off
 setlocal
-title Importios
+title TUPAQ
 cd /d "%~dp0.."
 if exist ".venv\Scripts\python.exe" goto run
-echo Preparando Importios por primera vez...
+echo Preparando TUPAQ por primera vez...
 py -3 -c "import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)" >nul 2>&1
 if errorlevel 1 goto python_missing
 py -3 -m venv .venv
@@ -24,6 +24,6 @@ echo Incluye el lanzador py en la instalacion y vuelve a abrir este archivo.
 pause
 exit /b 1
 :failed
-echo No se pudo abrir Importios. Comparte el mensaje que aparece arriba.
+echo No se pudo abrir TUPAQ. Comparte el mensaje que aparece arriba.
 pause
 exit /b 1
