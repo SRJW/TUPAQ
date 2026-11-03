@@ -9,6 +9,8 @@ La versión actual selecciona y analiza música, consulta la detección USB y
 contiene una implementación independiente de la firma de metadatos validada
 con vectores sintéticos. No modifica la biblioteca del teléfono.
 
+![Ventana nativa de Importios con audio sintético de prueba](docs/interfaz-nativa.png)
+
 ## Descargar y abrir
 
 [Versiones descargables](https://github.com/SRJW/importios/releases) ·
