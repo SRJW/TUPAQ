@@ -31,7 +31,8 @@ notarización de Apple.
 
 - Interfaz nativa clara inspirada en Apple, con tipografía del sistema. Sin motor web, animaciones ni sondeos periódicos.
 - Tabla de biblioteca con celdas dibujadas bajo demanda, sin crear un objeto por celda.
-- Errores de conexión por etapa y botón **Copiar diagnóstico**, sin credenciales ni identificadores del dispositivo.
+- Errores de conexión por etapa y botón **Copiar diagnóstico**, también cuando la consulta devuelve cero resultados. Incluye versión, recuentos por tipo y presencia/tamaño del WAL, sin títulos ni credenciales ni identificadores del dispositivo.
+- Las canciones sin fila de metadatos complementarios se muestran como «Sin título» en lugar de descartarse.
 
 - Elegir o arrastrar MP3, WAV, M4A (AAC o ALAC) y AIFF; comprobar el códec real.
 - Miniaturas de portadas incrustadas, en la lista y en el panel de preparación.
@@ -95,7 +96,7 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m importios.native --smoke-fixtures 
 .venv/bin/python scripts/build_desktop.py
 ```
 
-La suite contiene 34 pruebas de formatos, HTTP local, descubrimiento USB simulado,
+La suite contiene 38 pruebas de formatos, HTTP local, descubrimiento USB simulado,
 paquetes de investigación y firmas candidatas. La prueba nativa comprueba una
 ventana Qt real, lectura en un hilo de trabajo, los AAC/ALAC dentro de M4A, portadas, duplicados,
 archivos dañados, CSV, quitar/vaciar y las firmas. En Linux se ha probado también

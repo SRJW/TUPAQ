@@ -8,7 +8,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 from importios.library import copy_catalogue, read_catalogue, LibraryError
-from importios.library import _read_phone, connection_failure
+from importios.library import _read_phone, connection_failure, format_diagnostics
 
 
 def database(path):
@@ -54,6 +54,74 @@ class FakeAfc:
 
 
 class LibraryTests(unittest.TestCase):
+    def test_music_without_extra_metadata_is_not_silently_discarded(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary)/'library.db'
+            database(path)
+            with closing(sqlite3.connect(path)) as db:
+                db.execute('DELETE FROM item_extra WHERE item_pid=1')
+                db.commit()
+            diagnostics = {}
+            tracks = read_catalogue(path, diagnostics)
+            self.assertEqual(len(tracks), 1)
+            self.assertEqual(tracks[0]['title'], 'Sin título')
+            self.assertEqual(tracks[0]['duration'], 0)
+            self.assertEqual(diagnostics['music_without_extra'], 1)
+
+    def test_readout_counts_distinguish_filter_from_empty_catalogue_without_titles(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary)/'library.db'
+            database(path)
+            with closing(sqlite3.connect(path)) as db:
+                db.execute('UPDATE item SET media_type=2')
+                db.commit()
+            diagnostics = {}
+            self.assertEqual(read_catalogue(path, diagnostics), [])
+            self.assertEqual(diagnostics['items_total'], 2)
+            self.assertEqual(diagnostics['music_items'], 0)
+            self.assertEqual(diagnostics['media_types'], [{'type':2,'count':2}])
+            report = format_diagnostics(diagnostics)
+            self.assertNotIn('Canción de prueba', report)
+            self.assertNotIn(temporary, report)
+            with closing(sqlite3.connect(path)) as db:
+                db.execute('DELETE FROM item')
+                db.commit()
+            self.assertEqual(read_catalogue(path, diagnostics), [])
+            self.assertEqual(diagnostics['items_total'], 0)
+            self.assertEqual(diagnostics['tracks_returned'], 0)
+
+    def test_diagnostic_media_types_do_not_expose_unexpected_text_values(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary)/'library.db'
+            database(path)
+            with closing(sqlite3.connect(path)) as db:
+                db.execute("UPDATE item SET media_type='private-device-data'")
+                db.commit()
+            diagnostics = {}
+            self.assertEqual(read_catalogue(path, diagnostics), [])
+            self.assertNotIn('private-device-data', format_diagnostics(diagnostics))
+            self.assertEqual(diagnostics['media_types'], [{'type':None,'count':2}])
+
+    def test_readout_includes_committed_music_present_only_in_copied_wal(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary)/'source.db'
+            snapshot = Path(temporary)/'MediaLibrary.sqlitedb'
+            database(source)
+            with closing(sqlite3.connect(source)) as writer:
+                writer.execute('PRAGMA journal_mode=WAL')
+                writer.execute('PRAGMA wal_autocheckpoint=0')
+                writer.execute('INSERT INTO item VALUES(8,1,2,3)')
+                writer.execute("INSERT INTO item_extra VALUES(8,'Solo en WAL',5000)")
+                writer.commit()
+                snapshot.write_bytes(source.read_bytes())
+                Path(str(snapshot)+'-wal').write_bytes(Path(str(source)+'-wal').read_bytes())
+                diagnostics = {}
+                tracks = read_catalogue(snapshot, diagnostics)
+                self.assertEqual({t['title'] for t in tracks}, {'Canción de prueba','Solo en WAL'})
+                self.assertTrue(diagnostics['wal_present'])
+                self.assertGreater(diagnostics['wal_bytes'], 0)
+                self.assertEqual(diagnostics['music_items'], 2)
+
     def test_diagnostic_omits_exception_payload_and_device_identifiers(self):
         error = connection_failure(OSError('SECRET-PAIR-RECORD device-id path'), 'lockdown')
         self.assertEqual(error.diagnostic, 'lockdown:OSError')

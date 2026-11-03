@@ -8,7 +8,7 @@ Las versiones preliminares de escritorio incluyen el botón **Leer biblioteca de
 3. Espera la lectura. La pestaña del teléfono mostrará canciones o un mensaje
    de acceso/esquema no compatible. No hace falta aceptar ninguna sincronización.
 
-Si aparece un error, pulsa **Copiar diagnóstico** y comparte ese texto. Indica
+Si aparece un error o la consulta devuelve cero resultados, pulsa **Copiar diagnóstico** y comparte ese texto (desde `v0.2.0-preview.9`). Indica
 la etapa (`modules`, `usb`, `lockdown`, `trust`, `afc` o `catalogue`) y la clase
 del error, sin incluir mensajes internos que puedan contener credenciales o
 identificadores. No restablezcas la biblioteca ni la confianza para probar.
@@ -16,7 +16,19 @@ Estar conectado y desbloqueado no confirma que AFC o el catálogo estén accesib
 Este diagnóstico ayuda a investigar la causa; no demuestra que se haya corregido
 la conexión real del teléfono.
 
-La compatibilidad real con el iPhone 13 Pro/iOS 27 aún no se ha verificado.
+El usuario comprobó que la versión previa devolvía cero canciones aunque tenía
+canciones descargadas. Eso no demuestra que la biblioteca esté vacía ni que la
+lectura completa funcione. La versión 0.2.0-preview.9 añade un informe agregado
+para identificar qué contiene el catálogo consultado y qué descarta el filtro.
+Elimina además el INNER JOIN que descartaba música sin fila en `item_extra`:
+esas filas se muestran como «Sin título». Se mantiene el filtro de música;
+los demás tipos no se presentan como canciones sin saber qué representan.
+El informe no contiene nombres de canciones, rutas locales, números de serie
+ni registros de confianza. El título de la ventana incluye la versión.
+Una prueba con base de datos y WAL copiados confirma que se incluyen registros
+confirmados presentes solo en el WAL. No equivale a validar el teléfono real.
+
+La compatibilidad completa con el iPhone 13 Pro/iOS 27 aún no se ha verificado.
 Los tests usan dispositivos y bases de datos sintéticos. Que las pruebas pasen
 no significa que todos los iPhone permitan acceder al catálogo por esa ruta.
 

@@ -18,8 +18,9 @@ from .audio import inspect_audio, read_artwork
 from .artwork import thumbnail
 from .devices import discover, DiscoveryError
 from .sync.signing import FixedHostSession
-from .library import read_phone_library, LibraryError
+from .library import read_phone_library, LibraryError, format_diagnostics
 from .models import LibraryModel
+from .version import VERSION
 
 MAX_SIZE = 256 * 1024 * 1024
 
@@ -64,14 +65,16 @@ class DeviceReader(QThread):
 
 
 class LibraryReader(QThread):
-    result = Signal(list)
+    result = Signal(list, str)
     problem = Signal(str)
 
     def run(self):
         try:
-            self.result.emit(read_phone_library())
+            diagnostics = {}
+            tracks = read_phone_library(diagnostics=diagnostics)
+            self.result.emit(tracks, format_diagnostics(diagnostics))
         except LibraryError as error:
-            self.problem.emit(f'{error}\nDiagnóstico: {error.diagnostic}')
+            self.problem.emit(f'TUPAQ {VERSION}\n{error}\nDiagnóstico: {error.diagnostic}')
 
 
 def csv_value(value):
@@ -82,7 +85,7 @@ def csv_value(value):
 class Window(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle('TUPAQ')
+        self.setWindowTitle(f'TUPAQ {VERSION}')
         self.resize(1140, 900)
         self.setMinimumSize(780, 580)
         self.setAcceptDrops(True)
@@ -254,10 +257,13 @@ class Window(QMainWindow):
         self.library_worker.finished.connect(self.library_finished)
         self.library_worker.start()
 
-    def show_library(self, tracks):
+    def show_library(self, tracks, diagnostic=''):
         self.library_model.replace(tracks)
-        self.tabs.setTabText(1, f"Biblioteca del iPhone · {len(tracks)} canciones")
-        self.device_status.setText(f'{len(tracks)} canciones leídas. No se modificó la biblioteca. La importación sigue pendiente.')
+        self.last_diagnostic = diagnostic or format_diagnostics({'tracks_returned': len(tracks)})
+        self.copy_diagnostic.setEnabled(True)
+        self.tabs.setTabText(1, f"Biblioteca del iPhone · {len(tracks)} resultados")
+        self.device_status.setText(f'{len(tracks)} canciones leídas. No se modificó la biblioteca. La importación sigue pendiente.'
+            if tracks else 'No se encontraron canciones en el catálogo consultado. Esto no confirma que Música esté vacía. Pulsa Copiar diagnóstico.')
 
     def show_library_error(self, message):
         self.last_diagnostic = message
@@ -396,7 +402,7 @@ class Window(QMainWindow):
 
 
 def smoke(app, window, fixtures, output=None):
-    assert window.windowTitle() == app.applicationName() == 'TUPAQ'
+    assert window.windowTitle() == f'TUPAQ {VERSION}' and app.applicationName() == 'TUPAQ'
     # Import the USB transport inside the frozen build without opening a device.
     from pymobiledevice3.lockdown import create_using_usbmux
     from pymobiledevice3.services.afc import AfcService
@@ -441,6 +447,30 @@ def smoke(app, window, fixtures, output=None):
         window.show_library([{'id': 'test', 'title': 'Canción sintética', 'artist': 'Prueba', 'album': 'Prueba', 'duration': 1}])
         assert window.library_model.rowCount() == 1
         assert window.library_model.data(window.library_model.index(0, 0)) == 'Canción sintética'
+        window.show_library([], format_diagnostics({'items_total': 3, 'music_items': 0, 'tracks_returned': 0}))
+        assert window.copy_diagnostic.isEnabled() and window.library_model.rowCount() == 0
+        assert 'no confirma' in window.device_status.text()
+        window.copy_diagnostic.click()
+        assert '"items_total": 3' in QApplication.clipboard().text()
+        # Exercise the actual worker -> two-argument signal -> GUI path for
+        # an empty result, without contacting a device during package checks.
+        original_reader = globals()['read_phone_library']
+        def simulated_empty_catalogue(diagnostics=None):
+            diagnostics.update({'items_total': 4, 'music_items': 0, 'tracks_returned': 0})
+            return []
+        try:
+            globals()['read_phone_library'] = simulated_empty_catalogue
+            window.load_library()
+            deadline = time.monotonic()+10
+            while window.library_worker is not None:
+                app.processEvents()
+                if time.monotonic() > deadline:
+                    raise RuntimeError('Library result signal timed out')
+                time.sleep(0.005)
+        finally:
+            globals()['read_phone_library'] = original_reader
+        window.copy_diagnostic.click()
+        assert '"items_total": 4' in QApplication.clipboard().text()
         window.show_library_error('Error de prueba\nDiagnóstico: usb:ConnectionRefusedError')
         window.device_status.setText('Otro estado de prueba')
         window.copy_diagnostic.click()
