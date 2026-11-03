@@ -5,6 +5,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
 import secrets
+import sys
 import tempfile
 import threading
 from urllib.parse import unquote, urlsplit
@@ -54,6 +55,10 @@ def create_server(port=0):
                 or self.headers.get('X-Importios-Token') != token
                 or self.headers.get('Origin') not in (None, expected_origin)):
                 return self.reply(403, {'error': 'Acceso no autorizado.'})
+            if self.path == '/api/shutdown':
+                self.reply(200, {'closed': True})
+                threading.Thread(target=self.server.shutdown, daemon=True).start()
+                return
             if urlsplit(self.path).path != '/api/inspect':
                 return self.reply(404, {'error': 'Ruta no encontrada.'})
             try:
@@ -96,8 +101,9 @@ def main():
     args = parser.parse_args()
     server = create_server(args.port)
     address = f'http://127.0.0.1:{server.server_port}'
-    print(f'Importios está abierto en {address}', flush=True)
-    print('Solo prepara canciones. No conecta ni modifica el iPhone. Ctrl+C para cerrar.', flush=True)
+    if sys.stdout is not None:
+        print(f'Importios está abierto en {address}', flush=True)
+        print('Solo prepara canciones. No conecta ni modifica el iPhone. Ctrl+C para cerrar.', flush=True)
     if not args.no_browser:
         threading.Timer(0.5, webbrowser.open, args=(address,)).start()
     try:

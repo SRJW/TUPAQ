@@ -28,7 +28,8 @@ input[type=file] { position:absolute; width:1px; height:1px; opacity:0 } .muted 
  <p id="status" role="status" aria-live="polite">Elige canciones para empezar.</p><ul id="errors" aria-live="polite"></ul>
  <div class="summary"><strong id="count">Sin canciones</strong><button class="secondary" id="export" disabled>Exportar lista CSV</button><button class="secondary" id="clear" disabled>Vaciar lista</button></div>
  <div class="tablewrap"><table><thead><tr><th>Canción / archivo</th><th>Artista / álbum</th><th>Formato</th><th>Duración</th><th>Tamaño</th><th><span aria-label="Acciones">Acciones</span></th></tr></thead><tbody id="tracks"><tr><td colspan="6" class="empty">Tu lista de canciones aparecerá aquí.</td></tr></tbody></table></div>
- <footer>La lista se conserva solo mientras esta página esté abierta. Exporta el CSV si quieres guardarla.<br>No se modifica tu biblioteca de Apple Music. Para cerrar Importios, cierra su ventana de consola.</footer>
+ <footer>La lista se conserva solo mientras esta página esté abierta. Exporta el CSV si quieres guardarla.<br>No se modifica tu biblioteca de Apple Music.</footer>
+ <p><button class="secondary" id="quit">Cerrar Importios</button></p>
 </main>
 <script>
 'use strict';
@@ -58,6 +59,7 @@ function render() {
  const total=[...tracks.values()].reduce((sum,t)=>sum+t.duration,0);
  $('count').textContent=tracks.size ? `${tracks.size} ${tracks.size===1?'canción':'canciones'} · ${duration(total)} en total` : 'Sin canciones';
  $('clear').disabled=busy || !tracks.size; $('export').disabled=busy || !tracks.size; $('files').disabled=busy;
+ $('quit').disabled=busy;
 }
 async function addFiles(files) {
  if (busy) return;
@@ -83,6 +85,15 @@ $('drop').ondragover=e=>{e.preventDefault();if(!busy)$('drop').classList.add('ov
 $('drop').ondragleave=()=>$('drop').classList.remove('over');
 $('drop').ondrop=e=>{e.preventDefault();$('drop').classList.remove('over');addFiles(e.dataTransfer.files);};
 $('clear').onclick=()=>{tracks.clear();$('errors').replaceChildren();$('status').textContent='Lista vaciada. Los archivos originales se conservan.';render();};
+$('quit').onclick=async()=>{
+ if (tracks.size && !confirm('La lista se perderá al cerrar. ¿Quieres cerrar Importios?')) return;
+ try {
+  const response=await fetch('/api/shutdown',{method:'POST',headers:{'X-Importios-Token':token}});
+  if (!response.ok) throw new Error();
+  document.querySelectorAll('button,input').forEach(element=>element.disabled=true);
+  $('status').textContent='Importios está cerrado. Puedes cerrar esta pestaña.';
+ } catch { $('status').textContent='No se pudo confirmar el cierre. Inténtalo de nuevo.'; }
+};
 function csvValue(value) {
  let text=String(value ?? '');
  if (/^[\s]*[=+@-]/.test(text)) text="'"+text;

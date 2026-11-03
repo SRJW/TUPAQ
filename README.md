@@ -3,6 +3,18 @@
 Programa en desarrollo para preparar música local con el objetivo de importarla
 a la app Música del iPhone desde Windows o macOS.
 
+## Descargar para Windows o Mac
+
+GitHub Actions está configurado para generar **Importios.exe** y discos **DMG**
+para Mac con chip Apple e Intel. Estas distribuciones incluyen Python y sus
+dependencias; el usuario no tiene que instalarlo ni ejecutar comandos.
+Consulta [DESCARGAR.md](DESCARGAR.md) para descargar desde GitHub.
+
+Cada compilación prueba los cuatro formatos y ejecuta la aplicación empaquetada
+antes de subirla. En macOS también verifica y abre el ejecutable del DMG montado.
+Las etiquetas `v…` publican los paquetes en Releases como versiones preliminares.
+Los paquetes aún no tienen firma de desarrollador ni notarización de Apple.
+
 ## Qué funciona en esta versión
 
 - Selección múltiple y arrastre de archivos MP3, WAV, ALAC y AIFF.
@@ -13,9 +25,10 @@ a la app Música del iPhone desde Windows o macOS.
 
 **No transfiere canciones, no detecta dispositivos desde la interfaz y no modifica
 la biblioteca del iPhone.** La transferencia a Música en iOS 27 sigue pendiente de
-investigación y prueba. No hay un instalador ejecutable independiente todavía.
+investigación y prueba. El EXE es portátil y el DMG contiene la aplicación para
+copiarla a Aplicaciones; su disponibilidad depende del resultado de GitHub Actions.
 
-## Abrir en Windows 11
+## Ejecutar desde el código (solo para desarrollo)
 
 Esta versión de desarrollo necesita Python 3.10 o posterior y el lanzador `py`
 de [python.org](https://www.python.org/downloads/windows/).
@@ -25,7 +38,7 @@ de [python.org](https://www.python.org/downloads/windows/).
 3. En el primer inicio se prepara una instalación local y se descarga Mutagen
    desde PyPI. Hace falta Internet para ese paso.
 4. Se abrirá la interfaz en tu navegador. No hace falta conectar el iPhone.
-5. Para detener el programa, cierra la consola o pulsa Ctrl+C en ella.
+5. Para detener el programa, pulsa **Cerrar Importios** en la interfaz.
 
 El lanzador no requiere permisos de administrador. La ejecución real del lanzador
 en Windows aún está pendiente de validar; las pruebas actuales se ejecutan en Linux.
@@ -52,16 +65,15 @@ pierde al recargarla o cerrarla; se puede guardar como CSV. Límite por archivo:
 
 ## Pruebas
 
-Las pruebas generan audio real de un segundo usando FFmpeg, que se necesita solo
-para desarrollo. Comprueban los cuatro formatos, metadatos, huellas de duplicados,
+Las pruebas usan audio sintético real de un segundo incluido en `tests/fixtures`.
+Comprueban los cuatro formatos, metadatos, huellas de duplicados,
 rechazo de AAC y archivos dañados, y peticiones HTTP a la aplicación.
 
 ```sh
 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-Sin FFmpeg la suite de audio se omite; ese resultado no valida la aplicación.
-La prueba de navegador necesita Chromium y las dependencias de desarrollo:
+La prueba adicional de navegador necesita FFmpeg, Chromium y las dependencias de desarrollo:
 
 ```sh
 .venv/bin/python -m pip install -r requirements-dev.txt

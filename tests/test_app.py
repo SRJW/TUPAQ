@@ -3,7 +3,6 @@ import json
 from pathlib import Path
 import re
 import shutil
-import subprocess
 import tempfile
 import threading
 import unittest
@@ -12,19 +11,14 @@ from importios.audio import inspect_audio
 from importios.__main__ import MAX_FILE_SIZE, create_server
 
 
-@unittest.skipUnless(shutil.which('ffmpeg'), 'FFmpeg is required to generate real audio fixtures')
 class AudioTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.temp = tempfile.TemporaryDirectory()
         cls.folder = Path(cls.temp.name)
-        for name, codec in [('sample.mp3', 'libmp3lame'), ('sample.wav', 'pcm_s16le'),
-                            ('sample.aiff', 'pcm_s16be'), ('sample.m4a', 'alac'),
-                            ('aac.m4a', 'aac')]:
-            subprocess.run(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-f', 'lavfi',
-                            '-i', 'sine=frequency=440:duration=1', '-c:a', codec,
-                            '-metadata', 'title=Prueba áé', '-metadata', 'artist=Importios',
-                            '-metadata', 'album=Álbum', str(cls.folder/name)], check=True)
+        for fixture in Path(__file__).with_name('fixtures').glob('*'):
+            if fixture.suffix in {'.mp3', '.wav', '.aiff', '.m4a'}:
+                shutil.copyfile(fixture, cls.folder/fixture.name)
 
     @classmethod
     def tearDownClass(cls):

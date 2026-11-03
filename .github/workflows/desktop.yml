@@ -1,0 +1,82 @@
+name: Crear EXE y DMG
+
+on:
+  push:
+    branches: [main, 'desarrollo/**']
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.label }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            label: Windows 11 · EXE x64
+            artifact: Importios-Windows-x64
+            binary: dist/Importios.exe
+            download: dist/Importios.exe
+          - os: macos-15
+            label: macOS · DMG Apple Silicon
+            artifact: Importios-macOS-AppleSilicon
+            binary: dist/Importios.app/Contents/MacOS/Importios
+            download: dist/Importios-macOS-arm64.dmg
+          - os: macos-15-intel
+            label: macOS · DMG Intel
+            artifact: Importios-macOS-Intel
+            binary: dist/Importios.app/Contents/MacOS/Importios
+            download: dist/Importios-macOS-x86_64.dmg
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-build.txt
+      - name: Instalar herramientas de compilación
+        run: python -m pip install -r requirements-build.txt
+      - name: Probar lectura de audio y aplicación
+        run: python -m unittest discover -s tests -v
+      - name: Crear aplicación y disco de instalación
+        run: python scripts/build_desktop.py
+      - name: Probar ejecutable real
+        run: python scripts/smoke_desktop.py "${{ matrix.binary }}"
+      - name: Guardar descarga
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.download }}
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    name: Publicar versión descargable
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: downloads
+          merge-multiple: true
+      - name: Publicar EXE y DMG
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" downloads/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Importios $GITHUB_REF_NAME" \
+            --notes "Versión de preparación local: selección y análisis de música. Todavía no transfiere a la app Música del iPhone. Aplicaciones sin firma de desarrollador ni notarización de Apple." \
+            --prerelease \
+            --verify-tag
