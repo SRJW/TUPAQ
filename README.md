@@ -1,87 +1,88 @@
 # Importios
 
-Programa en desarrollo para preparar música local con el objetivo de importarla
-a la app Música del iPhone desde Windows o macOS.
+Aplicación de escritorio para Windows y macOS, en español, con ventana propia.
+El objetivo es importar música local a la app Música del iPhone sin usar la
+aplicación iTunes ni 3uTools.
 
-## Descargar para Windows o Mac
+**La transferencia todavía no está integrada ni verificada en un iPhone.**
+La versión actual selecciona y analiza música, consulta la detección USB y
+contiene una implementación independiente de la firma de metadatos validada
+con vectores sintéticos. No modifica la biblioteca del teléfono.
 
-GitHub Actions está configurado para generar **Importios.exe** y discos **DMG**
-para Mac con chip Apple e Intel. Estas distribuciones incluyen Python y sus
-dependencias; el usuario no tiene que instalarlo ni ejecutar comandos.
-Consulta [DESCARGAR.md](DESCARGAR.md) para descargar desde GitHub.
+## Descargar y abrir
 
-Cada compilación prueba los cuatro formatos y ejecuta la aplicación empaquetada
-antes de subirla. En macOS también verifica y abre el ejecutable del DMG montado.
-Las etiquetas `v…` publican los paquetes en Releases como versiones preliminares.
-Los paquetes aún no tienen firma de desarrollador ni notarización de Apple.
+[Versiones descargables](https://github.com/SRJW/importios/releases) ·
+[Instrucciones de descarga](DESCARGAR.md)
 
-## Qué funciona en esta versión
+- Windows 11: abre `Importios.exe` con doble clic.
+- Mac con chip Apple: abre `Importios-macOS-arm64.dmg` y copia la app a Aplicaciones.
+- Mac Intel: usa `Importios-macOS-x86_64.dmg`.
 
-- Selección múltiple y arrastre de archivos MP3, WAV, ALAC y AIFF.
-- Comprobación del formato real, incluyendo ALAC dentro de archivos `.m4a`.
-- Lectura de título, artista, álbum, duración y características del audio.
-- Detección de duplicados por contenido y exportación de la lista en CSV.
-- Análisis local con copias temporales que se eliminan después de cada lectura.
+No se necesita instalar Python ni abrir una terminal. La aplicación tiene una
+ventana propia y no usa el navegador. Las descargas aparecen cuando GitHub
+termina las compilaciones. Todavía no tienen firma de desarrollador ni
+notarización de Apple.
 
-**No transfiere canciones, no detecta dispositivos desde la interfaz y no modifica
-la biblioteca del iPhone.** La transferencia a Música en iOS 27 sigue pendiente de
-investigación y prueba. El EXE es portátil y el DMG contiene la aplicación para
-copiarla a Aplicaciones; su disponibilidad depende del resultado de GitHub Actions.
+## Funciones actuales
 
-## Ejecutar desde el código (solo para desarrollo)
+- Elegir o arrastrar MP3, WAV, ALAC y AIFF; comprobar el códec real.
+- Leer título, artista, álbum y duración sin cambiar el original.
+- Omitir duplicados por contenido, quitar elementos y exportar CSV.
+- Consultar dispositivos USB mediante **ListDevices** del servicio local de Apple.
+  No inicia sesiones de sincronización, emparejamientos ni escrituras al iPhone.
+- Calcular firmas candidatas de 21 bytes con un protocolo de solicitud fijo,
+  usando una adaptación con licencia MIT de rustunes. Cuatro vectores conocidos
+  coinciden; eso no demuestra aceptación por un dispositivo real.
 
-Esta versión de desarrollo necesita Python 3.10 o posterior y el lanzador `py`
-de [python.org](https://www.python.org/downloads/windows/).
+En Windows, la detección necesita el controlador/servicio de Apple. Tener ese
+controlador no requiere abrir iTunes para usar Importios. En macOS se consulta
+el servicio usbmuxd del sistema. Detectar un dispositivo no confirma la confianza,
+la versión de iOS ni la compatibilidad de importación.
 
-1. Guarda el proyecto completo en una carpeta y extrae el ZIP si corresponde.
-2. Abre `windows/Abrir-Importios.bat` con doble clic.
-3. En el primer inicio se prepara una instalación local y se descarga Mutagen
-   desde PyPI. Hace falta Internet para ese paso.
-4. Se abrirá la interfaz en tu navegador. No hace falta conectar el iPhone.
-5. Para detener el programa, pulsa **Cerrar Importios** en la interfaz.
+La lista vive en memoria y se pierde al cerrar. Los archivos permanecen en su
+ubicación original; no se convierten ni se envían a Internet. Límite por archivo:
+256 MB. Se necesita Internet solo para obtener el programa y, si se trabaja desde
+el código fuente, instalar las dependencias.
 
-El lanzador no requiere permisos de administrador. La ejecución real del lanzador
-en Windows aún está pendiente de validar; las pruebas actuales se ejecutan en Linux.
+## Desarrollo
 
-## macOS y Linux
-
-Con Python 3.10 o posterior, desde la carpeta del proyecto:
+Python 3.11 o posterior. Los usuarios de los paquetes EXE/DMG no necesitan esto.
 
 ```sh
 python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python -m importios
+.venv/bin/python -m pip install -r requirements-desktop.txt
+.venv/bin/python -m importios.native
 ```
 
-En macOS también se incluye `Abrir-Importios.command`, pendiente de probar allí.
+Windows tiene `windows/Abrir-Importios.bat` y macOS `Abrir-Importios.command`
+para ejecución desde el código. La antigua interfaz web se conserva como utilidad
+de desarrollo: `.venv/bin/python -m importios --no-browser`.
 
-## Privacidad y límites
-
-La aplicación escucha solo en `127.0.0.1` y no envía canciones a Internet.
-El navegador entrega cada archivo seleccionado al proceso local para analizarlo.
-Los originales no se modifican. La lista vive en la memoria de la página y se
-pierde al recargarla o cerrarla; se puede guardar como CSV. Límite por archivo:
-256 MB. No se convierte el audio ni se muestran portadas en esta versión.
-
-## Pruebas
-
-Las pruebas usan audio sintético real de un segundo incluido en `tests/fixtures`.
-Comprueban los cuatro formatos, metadatos, huellas de duplicados,
-rechazo de AAC y archivos dañados, y peticiones HTTP a la aplicación.
+## Comprobaciones y compilación
 
 ```sh
 .venv/bin/python -m unittest discover -s tests -v
+QT_QPA_PLATFORM=offscreen .venv/bin/python -m importios.native --smoke-fixtures tests/fixtures
+.venv/bin/python -m pip install -r requirements-build.txt
+.venv/bin/python scripts/build_desktop.py
 ```
 
-La prueba adicional de navegador necesita FFmpeg, Chromium y las dependencias de desarrollo:
+La suite contiene 22 pruebas de formatos, HTTP local, descubrimiento USB simulado,
+paquetes de investigación y firmas candidatas. La prueba nativa comprueba una
+ventana Qt real, lectura en un hilo de trabajo, los cuatro formatos, duplicados,
+archivos dañados, CSV, quitar/vaciar y las firmas. En Linux se ha probado también
+el ejecutable empaquetado. Windows y macOS se validan en sus runners de GitHub;
+no se deben dar por aprobados hasta comprobar los resultados de cada ejecución.
 
-```sh
-.venv/bin/python -m pip install -r requirements-dev.txt
-.venv/bin/python -m tests.browser_smoke
-```
+GitHub compila en Windows x64, Mac Apple Silicon y Mac Intel, prueba cada paquete
+y verifica/monta los DMG. Las etiquetas `v…` publican versiones preliminares con
+los paquetes como Assets. Las compilaciones normales guardan artefactos 30 días.
 
-Se ha validado en Linux: seis pruebas automatizadas y un recorrido en Chromium
-que añade los cuatro formatos, omite duplicados, muestra errores, exporta CSV,
-quita canciones y vacía la lista.
+## Investigación y atribución
 
-Consulta [VIABILIDAD.md](VIABILIDAD.md) para el estado de la integración con iOS.
+- [Hallazgos de las DLL aportadas y de la implementación independiente](research/IMPLEMENTACION-INDEPENDIENTE.md).
+- [Análisis inicial de 3uTools](ANALISIS-3UTOOLS.md).
+- [Avisos de terceros](third_party/README.md).
+
+Las DLL y ejecutables de Apple/3uTools no se incluyen en el proyecto ni en los
+paquetes. La firma independiente no es una llamada a sus binarios ni a sus servidores.

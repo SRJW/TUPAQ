@@ -1,5 +1,7 @@
 # Análisis estático del instalador aportado
 
+**Último avance:** [componentes recibidos, firma independiente e interfaz nativa](research/IMPLEMENTACION-INDEPENDIENTE.md).
+
 **Actualización:** [Segunda fase: flujo de importación y dependencias](research/SINCRONIZACION.md),
 con [evidencia reproducible](research/README.md).
 

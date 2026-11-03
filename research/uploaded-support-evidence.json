@@ -1,0 +1,37 @@
+[
+  {
+    "name": "AirTrafficHost.dll",
+    "bytes": 1691200,
+    "sha256": "95b676f0173a5dfdb567774fcb6f704e3e5f90986a7b694e426dc64db7cc9e04",
+    "machine": "0x14c",
+    "architecture": "x86",
+    "version": {
+      "FileVersion": "17.492.0.29",
+      "OriginalFilename": "AirTrafficHost.dll"
+    }
+  },
+  {
+    "name": "iTunes.dll",
+    "bytes": 26577984,
+    "sha256": "09c79c46f5bf77ce6ca7872ceaa9807104df03311c4ea3ea90abbcbdc35cc7c8",
+    "machine": "0x14c",
+    "architecture": "x86",
+    "version": {
+      "FileVersion": "12.1.0.71",
+      "OriginalFilename": "iTunes.dll",
+      "ProductVersion": "12.1.0.71"
+    }
+  },
+  {
+    "name": "CoreFP.dll",
+    "bytes": 18389288,
+    "sha256": "0aa63645bed80ab1517f3ca8c5f57ae48b2cd2372740004c92b1f8172aa797cd",
+    "machine": "0x14c",
+    "architecture": "x86",
+    "version": {
+      "FileVersion": "2.7.50",
+      "OriginalFilename": "CoreFP.dll",
+      "ProductVersion": "2.7.50"
+    }
+  }
+]

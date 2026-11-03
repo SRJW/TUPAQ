@@ -12,7 +12,7 @@ def main():
     system = platform.system()
     command = [sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean',
                '--name', 'Importios', '--windowed',
-               '--add-data', 'importios/index.html:importios',
+               '--add-data', 'third_party:third_party',
                '--collect-submodules', 'mutagen']
     if system == 'Windows':
         command += ['--onefile']

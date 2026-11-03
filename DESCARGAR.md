@@ -3,15 +3,23 @@
 GitHub compila la aplicación para Windows y macOS. Las descargas incluyen
 el intérprete y las dependencias: no necesitas instalar Python.
 
-## Windows 11
+## Descarga recomendada
+
+Entra en [Releases](https://github.com/SRJW/importios/releases) y abre la versión
+preliminar de escritorio. Sus archivos aparecen en **Assets**, una vez que la
+compilación termine. Elige `.exe` para Windows y el `.dmg` correspondiente a tu
+Mac. No necesitas Python, terminal, navegador para usar la aplicación ni iTunes.
+La detección USB en Windows sí necesita el controlador/servicio local de Apple.
+
+## Windows 11 (descarga desde Actions)
 
 1. Entra en [las compilaciones de GitHub](https://github.com/SRJW/importios/actions/workflows/desktop.yml).
 2. Abre la ejecución más reciente de la rama `desarrollo/preparacion-musica`
    que tenga un indicador verde. Si está en curso, espera a que termine.
 3. Al final de la página, en **Artifacts**, descarga **Importios-Windows-x64**.
    Para descargar artefactos debes iniciar sesión en GitHub.
-4. Extrae el ZIP y abre **Importios.exe**. Se abrirá la aplicación en tu navegador.
-5. Para salir, pulsa **Cerrar Importios** dentro de la aplicación.
+4. Extrae el ZIP y abre **Importios.exe**. Se abrirá una ventana propia de Importios.
+5. Para salir, cierra la ventana de Importios.
 
 ## macOS
 

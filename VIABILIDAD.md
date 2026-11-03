@@ -62,3 +62,5 @@ El entorno de desarrollo remoto ejecuta Linux
 y no tiene acceso al USB del ordenador del usuario. La validación física deberá
 realizarse en ese ordenador; no requiere que el usuario aprenda programación,
 pero sí que ejecute la herramienta de prueba y comunique el resultado.
+
+Actualización: se implementaron una ventana nativa Qt y un firmador candidato independiente con cuatro vectores conocidos. Véase [la cuarta fase](research/IMPLEMENTACION-INDEPENDIENTE.md). La sesión completa de importación sigue pendiente.
