@@ -1,4 +1,5 @@
 import asyncio
+from contextlib import closing
 from pathlib import Path
 import sqlite3
 import tempfile
@@ -11,7 +12,7 @@ from importios.library import _read_phone
 
 
 def database(path):
-    with sqlite3.connect(path) as db:
+    with closing(sqlite3.connect(path)) as db:
         db.executescript('''CREATE TABLE item(item_pid INTEGER, media_type INTEGER, item_artist_pid INTEGER, album_pid INTEGER);
             CREATE TABLE item_extra(item_pid INTEGER,title TEXT,total_time_ms REAL);
             CREATE TABLE item_artist(item_artist_pid INTEGER,item_artist TEXT);
@@ -116,8 +117,9 @@ class LibraryTests(unittest.TestCase):
     def test_unknown_schema_and_invalid_database_fail_explicitly(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary)/'unknown.db'
-            with sqlite3.connect(path) as db:
+            with closing(sqlite3.connect(path)) as db:
                 db.execute('CREATE TABLE unrelated(value TEXT)')
+                db.commit()
             with self.assertRaisesRegex(LibraryError, 'estructura'):
                 read_catalogue(path)
             path.write_bytes(b'not a database')

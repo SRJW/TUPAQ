@@ -2,7 +2,7 @@ name: Crear EXE y DMG
 
 on:
   push:
-    branches: [main, 'desarrollo/**']
+    branches: [main]
     tags: ['v*']
   workflow_dispatch:
 
