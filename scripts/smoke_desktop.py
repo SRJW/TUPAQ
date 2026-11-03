@@ -18,7 +18,7 @@ def main():
                         '--smoke-report', str(report)], env=environment, check=True, timeout=90)
         if not report.exists() or report.read_text(encoding='ascii') != 'native-ui-smoke-passed':
             raise RuntimeError('The frozen native UI did not complete its checks')
-    print('Native package passed: Qt UI, worker, four formats, duplicates, corrupt audio, CSV, remove, clear.')
+    print('Native package passed: Qt UI, audio worker, four formats, CSV and iOS 27 type-8 SQLite catalogue through library worker and table.')
 
 
 if __name__ == '__main__':

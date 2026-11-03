@@ -17,22 +17,25 @@ def database(path):
             CREATE TABLE item_extra(item_pid INTEGER,title TEXT,total_time_ms REAL);
             CREATE TABLE item_artist(item_artist_pid INTEGER,item_artist TEXT);
             CREATE TABLE album(album_pid INTEGER,album TEXT);
-            INSERT INTO item VALUES(1,1,2,3),(4,2,2,3);
+            PRAGMA user_version=2410000;
+            INSERT INTO item VALUES(1,8,2,3),(4,2,2,3);
             INSERT INTO item_extra VALUES(1,'Canción de prueba',2300),(4,'Vídeo',9000);
             INSERT INTO item_artist VALUES(2,'Artista'); INSERT INTO album VALUES(3,'Álbum');''')
 
 
 class FakeAfc:
-    def __init__(self, body, change=False):
+    def __init__(self, body, change=False, wal=None):
         self.body, self.change = body, change
+        self.wal = wal
         self.opens = []
         self.offsets = {}
         self.closed = []
 
     async def stat(self, path):
-        if path.endswith('-wal'):
+        if path.endswith('-wal') and self.wal is None:
             raise FileNotFoundError()
-        return {'st_size': len(self.body), 'st_ifmt': 'S_IFREG', 'st_mtime': 1}
+        data = self.wal if path.endswith('-wal') else self.body
+        return {'st_size': len(data), 'st_ifmt': 'S_IFREG', 'st_mtime': 1}
 
     async def fopen(self, path, mode):
         assert mode == 'r'
@@ -41,7 +44,7 @@ class FakeAfc:
         return len(self.opens)
 
     async def fread(self, handle, size):
-        data = self.body
+        data = self.wal if self.opens[handle-1][0].endswith('-wal') else self.body
         if self.change and handle == 2:
             data = data[:-1]+bytes([data[-1] ^ 1])
         offset = self.offsets[handle]
@@ -54,6 +57,63 @@ class FakeAfc:
 
 
 class LibraryTests(unittest.TestCase):
+    def test_ios27_type8_reference_fixture_returns_one_music_track(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary)/'library.db'
+            with closing(sqlite3.connect(path)) as db:
+                db.executescript((Path(__file__).parent/'fixtures/library-ios27.sql').read_text())
+            diagnostics = {}
+            tracks = read_catalogue(path, diagnostics)
+            self.assertEqual(diagnostics['schema_version'], 2410000)
+            self.assertEqual(diagnostics['media_types'], [{'type':8,'count':1}])
+            self.assertEqual(diagnostics['items_total'], 1)
+            self.assertEqual(diagnostics['music_items'], 1)
+            self.assertEqual(diagnostics['tracks_returned'], 1)
+            self.assertEqual(tracks[0]['title'], 'Canción de catálogo iOS 27')
+
+    def test_public_bitmask_and_other_internal_codes_are_not_catalogue_music(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary)/'library.db'
+            database(path)
+            for kind in [0,1,2,4,9,16,32]:
+                with self.subTest(kind=kind):
+                    with closing(sqlite3.connect(path)) as db:
+                        db.execute('UPDATE item SET media_type=?', (kind,))
+                        db.commit()
+                    diagnostics = {}
+                    self.assertEqual(read_catalogue(path, diagnostics), [])
+                    self.assertEqual(diagnostics['music_items'], 0)
+
+    def test_type8_song_only_in_wal_survives_two_read_only_afc_copies(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary)/'source.db'
+            database(path)
+            with closing(sqlite3.connect(path)) as db:
+                db.execute('DELETE FROM item')
+                db.execute('DELETE FROM item_extra')
+                db.commit()
+                db.execute('PRAGMA journal_mode=WAL')
+                db.execute('PRAGMA wal_autocheckpoint=0')
+                db.execute('INSERT INTO item VALUES(101,8,2,3)')
+                db.execute("INSERT INTO item_extra VALUES(101,'Música de prueba en WAL',123000)")
+                db.commit()
+                afc = FakeAfc(path.read_bytes(), wal=Path(str(path)+'-wal').read_bytes())
+            destination = Path(temporary)/'snapshot'
+            destination.mkdir()
+            diagnostics = {}
+            tracks = asyncio.run(copy_catalogue(afc, destination, diagnostics=diagnostics))
+            self.assertEqual(len(tracks), 1)
+            self.assertEqual(tracks[0]['title'], 'Música de prueba en WAL')
+            self.assertEqual(diagnostics['schema_version'], 2410000)
+            self.assertEqual(diagnostics['media_types'], [{'type':8,'count':1}])
+            self.assertEqual(diagnostics['items_total'], diagnostics['music_items'])
+            self.assertEqual(diagnostics['music_items'], diagnostics['tracks_returned'])
+            self.assertEqual(diagnostics['music_type_code'], 8)
+            self.assertEqual(diagnostics['music_type_comparison'], 'equal')
+            self.assertTrue(diagnostics['wal_present'])
+            self.assertEqual([mode for _, mode in afc.opens], ['r']*4)
+            self.assertEqual(afc.closed, [1,2,3,4])
+
     def test_music_without_extra_metadata_is_not_silently_discarded(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary)/'library.db'
@@ -110,7 +170,7 @@ class LibraryTests(unittest.TestCase):
             with closing(sqlite3.connect(source)) as writer:
                 writer.execute('PRAGMA journal_mode=WAL')
                 writer.execute('PRAGMA wal_autocheckpoint=0')
-                writer.execute('INSERT INTO item VALUES(8,1,2,3)')
+                writer.execute('INSERT INTO item VALUES(8,8,2,3)')
                 writer.execute("INSERT INTO item_extra VALUES(8,'Solo en WAL',5000)")
                 writer.commit()
                 snapshot.write_bytes(source.read_bytes())

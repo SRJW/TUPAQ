@@ -13,6 +13,10 @@ from .version import VERSION
 REMOTE_DB = '/iTunes_Control/iTunes/MediaLibrary.sqlitedb'
 MAX_FILE = 128*1024*1024
 MAX_TRACKS = 100_000
+# Internal MediaLibrary.item.media_type on the observed iOS 27 schema.
+# This is NOT MediaPlayer's public MPMediaTypeMusic (1 << 0).
+# Evidence: research/LECTURA-MEDIA-TYPE.md, rustunes catalogue/sqlite.rs.
+MUSIC_MEDIA_TYPE = 8
 
 
 class LibraryError(Exception):
@@ -75,12 +79,14 @@ def read_catalogue(path, diagnostics=None):
                     'wal_present': wal_present,
                     'wal_bytes': wal_bytes,
                     'schema_version': db.execute('PRAGMA user_version').fetchone()[0],
+                    'music_type_code': MUSIC_MEDIA_TYPE,
+                    'music_type_comparison': 'equal',
                     'wal_mode': db.execute('PRAGMA journal_mode').fetchone()[0] == 'wal',
                     'items_total': db.execute('SELECT COUNT(*) FROM item').fetchone()[0],
-                    'music_items': db.execute('SELECT COUNT(*) FROM item WHERE (media_type & 1) != 0').fetchone()[0],
+                    'music_items': db.execute('SELECT COUNT(*) FROM item WHERE media_type = ?', (MUSIC_MEDIA_TYPE,)).fetchone()[0],
                     'music_without_extra': db.execute('''SELECT COUNT(*) FROM item i
                         LEFT JOIN item_extra e ON e.item_pid=i.item_pid
-                        WHERE (i.media_type & 1) != 0 AND e.item_pid IS NULL''').fetchone()[0],
+                        WHERE i.media_type = ? AND e.item_pid IS NULL''', (MUSIC_MEDIA_TYPE,)).fetchone()[0],
                     'media_types': [{'type': kind, 'count': count} for kind, count in groups[:32]],
                     'media_types_truncated': len(groups) > 32,
                 })
@@ -88,7 +94,7 @@ def read_catalogue(path, diagnostics=None):
                 FROM item i LEFT JOIN item_extra e ON e.item_pid=i.item_pid
                 LEFT JOIN item_artist a ON a.item_artist_pid=i.item_artist_pid
                 LEFT JOIN album b ON b.album_pid=i.album_pid
-                WHERE (i.media_type & 1) != 0 ORDER BY e.title, i.item_pid LIMIT ?''', (MAX_TRACKS+1,)).fetchall()
+                WHERE i.media_type = ? ORDER BY e.title, i.item_pid LIMIT ?''', (MUSIC_MEDIA_TYPE, MAX_TRACKS+1)).fetchall()
             if len(rows) > MAX_TRACKS:
                 raise LibraryError('La biblioteca supera el límite de 100.000 canciones de esta versión.')
             tracks = []

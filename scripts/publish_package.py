@@ -16,9 +16,9 @@ def main():
     if subprocess.run(view, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         with tempfile.TemporaryDirectory() as directory:
             notes = Path(directory)/'notes.md'
-            notes.write_text('''TUPAQ 0.2.0-preview.9: permite copiar el diagnóstico también al obtener cero resultados. El informe incluye recuentos del catálogo, tipos de contenido y presencia/tamaño del WAL, sin títulos de canciones ni credenciales ni identificadores del dispositivo. La ventana muestra la versión.
+            notes.write_text('''TUPAQ 0.2.0-preview.10 corrige la causa identificada de los cero resultados: el catálogo interno usa item.media_type=8 para música, pero el lector aplicaba la máscara pública de MediaPlayer (1). Ahora tanto la consulta como los recuentos usan la igualdad con 8. La investigación y sus fuentes están en research/LECTURA-MEDIA-TYPE.md.
 
-Las canciones sin metadatos complementarios ya no se descartan silenciosamente. Hay pruebas de ese caso, de resultados vacíos y de cambios confirmados que solo existen en el WAL copiado. Aún no se ha identificado la causa exacta de los cero resultados del iPhone del usuario ni confirmado la lectura completa.
+Se corrigieron los datos de prueba y se añadió una muestra sintética del esquema 2410000. Las 41 pruebas incluyen el caso de una canción tipo 8 presente solo en el WAL; la prueba del ejecutable lee SQLite y verifica la fila a través del hilo y la tabla Qt. Falta confirmar en el iPhone del usuario el título obtenido y la cobertura de su biblioteca.
 
 **La importación a Música todavía no está integrada.** La lectura completa está pendiente de confirmar en el iPhone. No hace falta instalar Python. Paquetes sin firma de desarrollador ni notarización de Apple.
 

@@ -28,6 +28,14 @@ ni registros de confianza. El título de la ventana incluye la versión.
 Una prueba con base de datos y WAL copiados confirma que se incluyen registros
 confirmados presentes solo en el WAL. No equivale a validar el teléfono real.
 
+El informe de la versión 0.2.0-preview.9 reveló un registro con tipo 8 y esquema
+2410000. El filtro anterior usaba erróneamente la máscara pública de MediaPlayer
+(1). La versión 0.2.0-preview.10 utiliza el código interno de MediaLibrary (8),
+por igualdad, tanto para seleccionar como para contar. Se contrastó con el
+lector y las muestras de rustunes para iOS 27; la prueba del ejecutable ahora
+lee una muestra de ese esquema mediante SQLite y muestra su canción.
+Véase [la investigación y sus fuentes](../research/LECTURA-MEDIA-TYPE.md).
+
 La compatibilidad completa con el iPhone 13 Pro/iOS 27 aún no se ha verificado.
 Los tests usan dispositivos y bases de datos sintéticos. Que las pruebas pasen
 no significa que todos los iPhone permitan acceder al catálogo por esa ruta.

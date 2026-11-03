@@ -96,7 +96,7 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m importios.native --smoke-fixtures 
 .venv/bin/python scripts/build_desktop.py
 ```
 
-La suite contiene 38 pruebas de formatos, HTTP local, descubrimiento USB simulado,
+La suite contiene 41 pruebas de formatos, HTTP local, descubrimiento USB simulado,
 paquetes de investigación y firmas candidatas. La prueba nativa comprueba una
 ventana Qt real, lectura en un hilo de trabajo, los AAC/ALAC dentro de M4A, portadas, duplicados,
 archivos dañados, CSV, quitar/vaciar y las firmas. En Linux se ha probado también
@@ -110,6 +110,8 @@ pasa sus comprobaciones; una plataforma fallida puede quedar sin descarga. Los p
 los paquetes como Assets. Las compilaciones normales guardan artefactos 30 días.
 
 ## Investigación y atribución
+
+- [Corrección de cero canciones: código interno de MediaLibrary frente a MediaPlayer](research/LECTURA-MEDIA-TYPE.md).
 
 - [Hallazgos de las DLL aportadas y de la implementación independiente](research/IMPLEMENTACION-INDEPENDIENTE.md).
 - [Análisis inicial de 3uTools](ANALISIS-3UTOOLS.md).

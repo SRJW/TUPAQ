@@ -22,3 +22,9 @@ ffmpeg -f lavfi -i sine=frequency=440:duration=1 -c:a CODEC \
 
 `covered-aac.m4a` es una copia del tono AAC con una imagen PNG verde sintética
 y título «M4A con portada», para probar la extracción y presentación de miniaturas.
+
+## Catálogo SQLite de referencia
+
+`library-ios27.sql` es un catálogo sintético mínimo, con `user_version=2410000`
+y `item.media_type=8` para una canción. Su procedencia y la diferencia respecto
+a `MPMediaTypeMusic` se documentan en `research/LECTURA-MEDIA-TYPE.md`.

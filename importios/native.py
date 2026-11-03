@@ -1,10 +1,12 @@
 """Native, offline desktop interface. Device writes are not implemented."""
 import argparse
 import csv
+from contextlib import closing
 import plistlib
 from pathlib import Path
 import re
 import sys
+import sqlite3
 import tempfile
 import time
 
@@ -18,7 +20,7 @@ from .audio import inspect_audio, read_artwork
 from .artwork import thumbnail
 from .devices import discover, DiscoveryError
 from .sync.signing import FixedHostSession
-from .library import read_phone_library, LibraryError, format_diagnostics
+from .library import read_phone_library, read_catalogue, LibraryError, format_diagnostics
 from .models import LibraryModel
 from .version import VERSION
 
@@ -452,14 +454,16 @@ def smoke(app, window, fixtures, output=None):
         assert 'no confirma' in window.device_status.text()
         window.copy_diagnostic.click()
         assert '"items_total": 3' in QApplication.clipboard().text()
-        # Exercise the actual worker -> two-argument signal -> GUI path for
-        # an empty result, without contacting a device during package checks.
+        # Exercise a reference-shaped iOS catalogue through SQLite, the worker,
+        # its signal and the UI. This used to hide music with media_type=8.
+        catalogue = folder/'ios27.sqlitedb'
+        with closing(sqlite3.connect(catalogue)) as db:
+            db.executescript((fixtures/'library-ios27.sql').read_text(encoding='utf-8'))
         original_reader = globals()['read_phone_library']
-        def simulated_empty_catalogue(diagnostics=None):
-            diagnostics.update({'items_total': 4, 'music_items': 0, 'tracks_returned': 0})
-            return []
+        def simulated_catalogue(diagnostics=None):
+            return read_catalogue(catalogue, diagnostics)
         try:
-            globals()['read_phone_library'] = simulated_empty_catalogue
+            globals()['read_phone_library'] = simulated_catalogue
             window.load_library()
             deadline = time.monotonic()+10
             while window.library_worker is not None:
@@ -470,7 +474,10 @@ def smoke(app, window, fixtures, output=None):
         finally:
             globals()['read_phone_library'] = original_reader
         window.copy_diagnostic.click()
-        assert '"items_total": 4' in QApplication.clipboard().text()
+        assert '"music_items": 1' in QApplication.clipboard().text()
+        assert '"music_type_code": 8' in QApplication.clipboard().text()
+        assert window.library_model.rowCount() == 1
+        assert window.library_model.data(window.library_model.index(0, 0)) == 'Canción de catálogo iOS 27'
         window.show_library_error('Error de prueba\nDiagnóstico: usb:ConnectionRefusedError')
         window.device_status.setText('Otro estado de prueba')
         window.copy_diagnostic.click()
