@@ -57,6 +57,19 @@ ubicación original; no se convierten ni se envían a Internet. Límite por arch
 256 MB. Se necesita Internet solo para obtener el programa y, si se trabaja desde
 el código fuente, instalar las dependencias.
 
+## Recursos de la interfaz
+
+La interfaz usa Qt Widgets nativo y carga el componente de comunicación con iOS
+al solicitar la biblioteca. No tiene motor de navegador ni consulta el teléfono
+en bucle. La tabla del catálogo conserva sus filas y dibuja celdas bajo demanda.
+Se prueba el acceso a la primera y última canción de una lista sintética de
+100.000 filas.
+
+Medición orientativa en Linux, desde el código, con Qt offscreen y ventana vacía:
+76,9 MiB RSS y 0 % CPU durante una muestra de tres segundos en reposo.
+No es una medición del EXE/DMG en Windows/macOS ni del coste de cargar una
+biblioteca; ese consumo aún debe medirse en esos equipos.
+
 ## Desarrollo
 
 Python 3.11 o posterior. Los usuarios de los paquetes EXE/DMG no necesitan esto.

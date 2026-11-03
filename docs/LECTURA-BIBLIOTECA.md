@@ -1,6 +1,6 @@
 # Leer la biblioteca del iPhone y preparar la importación
 
-La versión preliminar `v0.2.0-preview.5` añade el botón **Leer biblioteca del iPhone**.
+Las versiones preliminares de escritorio incluyen el botón **Leer biblioteca del iPhone**.
 
 1. Conecta un solo iPhone por USB, desbloqueado, a un ordenador que ya tenga
    autorización de confianza. En Windows se necesita el controlador de Apple.
