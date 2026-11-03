@@ -61,7 +61,7 @@ class LibraryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary)/'library.db'
             with closing(sqlite3.connect(path)) as db:
-                db.executescript((Path(__file__).parent/'fixtures/library-ios27.sql').read_text())
+                db.executescript((Path(__file__).parent/'fixtures/library-ios27.sql').read_text(encoding='utf-8'))
             diagnostics = {}
             tracks = read_catalogue(path, diagnostics)
             self.assertEqual(diagnostics['schema_version'], 2410000)
