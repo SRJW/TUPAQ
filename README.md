@@ -22,7 +22,7 @@ con vectores sintéticos. No modifica la biblioteca del teléfono.
 
 No se necesita instalar Python ni abrir una terminal. La aplicación tiene una
 ventana propia y no usa el navegador. Las descargas aparecen cuando GitHub
-termina las compilaciones. Todavía no tienen firma de desarrollador ni
+termina la compilación de cada plataforma. Todavía no tienen firma de desarrollador ni
 notarización de Apple.
 
 ## Funciones actuales
@@ -84,7 +84,8 @@ el ejecutable empaquetado. Windows y macOS se validan en sus runners de GitHub;
 no se deben dar por aprobados hasta comprobar los resultados de cada ejecución.
 
 GitHub compila en Windows x64, Mac Apple Silicon y Mac Intel, prueba cada paquete
-y verifica/monta los DMG. Los pushes a `main` y las ejecuciones manuales compilan la app. Las etiquetas
+y verifica/monta los DMG. Cada paquete se publica de forma independiente cuando
+pasa sus comprobaciones; una plataforma fallida puede quedar sin descarga. Los pushes a `main` y las ejecuciones manuales compilan la app. Las etiquetas
 `v…` publican versiones preliminares con
 los paquetes como Assets. Las compilaciones normales guardan artefactos 30 días.
 

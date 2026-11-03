@@ -38,7 +38,8 @@ los archivos de una release se conservan hasta que se retire esa versión.
 
 ## Estado y avisos del sistema
 
-Los archivos solo estarán disponibles si la compilación de GitHub termina bien.
+Cada archivo se publica cuando pasan las comprobaciones de su plataforma. Si falta
+un paquete, consulta su ejecución en Actions; no implica que esa plataforma esté lista.
 Estos paquetes no tienen certificado de firma de Windows ni firma y notarización
 de desarrollador de Apple. Windows o macOS pueden mostrar avisos o impedir abrirlos.
 No desactives las protecciones del equipo; comunica el mensaje exacto si ocurre.

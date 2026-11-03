@@ -2,10 +2,23 @@
 
 from pathlib import Path
 import platform
+import os
 import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def checked_run(command, **options):
+    options.pop('check', None)
+    result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                            text=True, **options)
+    print(result.stdout, end='', flush=True)
+    if result.returncode:
+        if os.environ.get('GITHUB_ACTIONS') == 'true':
+            message = result.stdout[-8000:].replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+            print('::error title=Error al empaquetar::'+message, flush=True)
+        raise subprocess.CalledProcessError(result.returncode, command)
 
 
 def main():
@@ -13,34 +26,34 @@ def main():
     command = [sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean',
                '--name', 'Importios', '--windowed',
                '--add-data', 'third_party:third_party',
-               '--collect-submodules', 'mutagen']
+               '--collect-submodules', 'mutagen', '--exclude-module', 'tkinter']
     if system == 'Windows':
         command += ['--onefile']
     else:
         command += ['--onedir']
     if system == 'Darwin':
         command += ['--osx-bundle-identifier', 'io.importios.desktop']
-    subprocess.run(command + ['desktop.py'], cwd=ROOT, check=True)
+    checked_run(command + ['desktop.py'], cwd=ROOT, check=True)
     if system == 'Darwin':
         destination = ROOT/'dist'/f'Importios-macOS-{platform.machine()}.dmg'
         # Stage only the app and an Applications shortcut in the disk image.
         import tempfile
         with tempfile.TemporaryDirectory(prefix='importios-dmg-') as temporary:
             stage = Path(temporary)
-            subprocess.run(['ditto', str(ROOT/'dist'/'Importios.app'), str(stage/'Importios.app')], check=True)
+            checked_run(['ditto', str(ROOT/'dist'/'Importios.app'), str(stage/'Importios.app')], check=True)
             (stage/'Applications').symlink_to('/Applications')
-            subprocess.run(['hdiutil', 'create', '-volname', 'Importios', '-srcfolder',
+            checked_run(['hdiutil', 'create', '-volname', 'Importios', '-srcfolder',
                             str(stage), '-ov', '-format', 'UDZO', str(destination)], check=True)
-        subprocess.run(['hdiutil', 'verify', str(destination)], check=True)
+        checked_run(['hdiutil', 'verify', str(destination)], check=True)
         (ROOT/'dist'/'mounted-dmg').mkdir(exist_ok=True)
-        subprocess.run(['hdiutil', 'attach', '-readonly', '-nobrowse', '-mountpoint',
+        checked_run(['hdiutil', 'attach', '-readonly', '-nobrowse', '-mountpoint',
                         str(ROOT/'dist'/'mounted-dmg'), str(destination)], check=True)
         try:
-            subprocess.run([sys.executable, 'scripts/smoke_desktop.py',
+            checked_run([sys.executable, 'scripts/smoke_desktop.py',
                             str(ROOT/'dist'/'mounted-dmg'/'Importios.app'/'Contents'/'MacOS'/'Importios')],
                            cwd=ROOT, check=True)
         finally:
-            subprocess.run(['hdiutil', 'detach', str(ROOT/'dist'/'mounted-dmg')], check=True)
+            checked_run(['hdiutil', 'detach', str(ROOT/'dist'/'mounted-dmg')], check=True)
 
 
 if __name__ == '__main__':
