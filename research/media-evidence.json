@@ -1,0 +1,1916 @@
+{
+  "module": "idm_media.dll",
+  "sha256": "6fdaeb62646cba0e3fa72228fe320d63ce740440e36a5c31180e5494296496d2",
+  "preferred_image_base": "0x180000000",
+  "method": "static parsing and disassembly only; module not executed",
+  "regions": {
+    "initialize_support": {
+      "start_rva": "0x7fe0",
+      "end_rva": "0x8440",
+      "references": [
+        {
+          "instruction_rva": "0x8096",
+          "value": "\\CoreFP.dll",
+          "file_offset": "0x1bcb0",
+          "rva": "0x1c8b0"
+        },
+        {
+          "instruction_rva": "0x8233",
+          "value": "\\AirTrafficHost.dll",
+          "file_offset": "0x1bcc8",
+          "rva": "0x1c8c8"
+        },
+        {
+          "instruction_rva": "0x8276",
+          "value": "\\iTunes.dll",
+          "file_offset": "0x1bcf0",
+          "rva": "0x1c8f0"
+        }
+      ],
+      "calls": [
+        {
+          "instruction_rva": "0x8065",
+          "target_rva": "0x8a90"
+        },
+        {
+          "instruction_rva": "0x80ab",
+          "target_rva": "0x8a90"
+        },
+        {
+          "instruction_rva": "0x80fe",
+          "import": "RegCreateKeyExW"
+        },
+        {
+          "instruction_rva": "0x8144",
+          "import": "RegSetValueExW"
+        },
+        {
+          "instruction_rva": "0x817e",
+          "import": "RegSetValueExW"
+        },
+        {
+          "instruction_rva": "0x818c",
+          "import": "RegCloseKey"
+        },
+        {
+          "instruction_rva": "0x819a",
+          "import": "RegCloseKey"
+        },
+        {
+          "instruction_rva": "0x81d9",
+          "import": "_invalid_parameter_noinfo_noreturn"
+        },
+        {
+          "instruction_rva": "0x81e0",
+          "target_rva": "0x1993c"
+        },
+        {
+          "instruction_rva": "0x8203",
+          "target_rva": "0x7e20"
+        },
+        {
+          "instruction_rva": "0x8248",
+          "target_rva": "0x8a90"
+        },
+        {
+          "instruction_rva": "0x828b",
+          "target_rva": "0x8a90"
+        },
+        {
+          "instruction_rva": "0x82ac",
+          "import": "LoadLibraryW"
+        },
+        {
+          "instruction_rva": "0x82c2",
+          "import": "LoadLibraryW"
+        },
+        {
+          "instruction_rva": "0x8338",
+          "import": "_invalid_parameter_noinfo_noreturn"
+        },
+        {
+          "instruction_rva": "0x833f",
+          "target_rva": "0x1993c"
+        },
+        {
+          "instruction_rva": "0x838b",
+          "import": "_invalid_parameter_noinfo_noreturn"
+        },
+        {
+          "instruction_rva": "0x8392",
+          "target_rva": "0x1993c"
+        },
+        {
+          "instruction_rva": "0x83a7",
+          "target_rva": "0x7e20"
+        },
+        {
+          "instruction_rva": "0x83ec",
+          "import": "_invalid_parameter_noinfo_noreturn"
+        },
+        {
+          "instruction_rva": "0x83f3",
+          "target_rva": "0x1993c"
+        },
+        {
+          "instruction_rva": "0x8401",
+          "target_rva": "0x198e0"
+        },
+        {
+          "instruction_rva": "0x8423",
+          "target_rva": "0x6a20"
+        },
+        {
+          "instruction_rva": "0x8429",
+          "target_rva": "0x6a20"
+        },
+        {
+          "instruction_rva": "0x842f",
+          "target_rva": "0x6a20"
+        },
+        {
+          "instruction_rva": "0x8435",
+          "target_rva": "0x6a20"
+        }
+      ]
+    },
+    "http_transport": {
+      "start_rva": "0x8bd0",
+      "end_rva": "0x8fa0",
+      "references": [],
+      "calls": [
+        {
+          "instruction_rva": "0x8bfc",
+          "import": "curl_easy_init"
+        },
+        {
+          "instruction_rva": "0x8c26",
+          "import": "curl_easy_setopt"
+        },
+        {
+          "instruction_rva": "0x8c4b",
+          "import": "curl_easy_setopt"
+        },
+        {
+          "instruction_rva": "0x8c5c",
+          "import": "curl_easy_setopt"
+        },
+        {
+          "instruction_rva": "0x8c71",
+          "import": "curl_easy_setopt"
+        },
+        {
+          "instruction_rva": "0x8c81",
+          "import": "curl_easy_setopt"
+        },
+        {
+          "instruction_rva": "0x8c91",
+          "import": "curl_easy_setopt"
+        },
+        {
+          "instruction_rva": "0x8ce1",
+          "import": "curl_easy_setopt"
+        },
+        {
+          "instruction_rva": "0x8cf7",
+          "import": "curl_easy_setopt"
+        },
+        {
+          "instruction_rva": "0x8d06",
+          "import": "curl_slist_append"
+        },
+        {
+          "instruction_rva": "0x8d1a",
+          "import": "curl_easy_setopt"
+        },
+        {
+          "instruction_rva": "0x8d29",
+          "import": "malloc"
+        },
+        {
+          "instruction_rva": "0x8d41",
+          "import": "curl_easy_setopt"
+        },
+        {
+          "instruction_rva": "0x8d56",
+          "import": "curl_easy_setopt"
+        },
+        {
+          "instruction_rva": "0x8d6b",
+          "import": "curl_easy_setopt"
+        },
+        {
+          "instruction_rva": "0x8da6",
+          "import": "curl_easy_setopt"
+        },
+        {
+          "instruction_rva": "0x8dcc",
+          "import": "curl_easy_perform"
+        },
+        {
+          "instruction_rva": "0x8dd7",
+          "import": "curl_slist_free_all"
+        },
+        {
+          "instruction_rva": "0x8de6",
+          "import": "free"
+        },
+        {
+          "instruction_rva": "0x8def",
+          "import": "curl_easy_cleanup"
+        },
+        {
+          "instruction_rva": "0x8e06",
+          "target_rva": "0xa700"
+        },
+        {
+          "instruction_rva": "0x8e24",
+          "import": "curl_easy_getinfo"
+        },
+        {
+          "instruction_rva": "0x8e71",
+          "target_rva": "0x8780"
+        },
+        {
+          "instruction_rva": "0x8eab",
+          "target_rva": "0xa470"
+        },
+        {
+          "instruction_rva": "0x8ee8",
+          "target_rva": "0x1993c"
+        },
+        {
+          "instruction_rva": "0x8eff",
+          "import": "curl_slist_free_all"
+        },
+        {
+          "instruction_rva": "0x8f08",
+          "import": "curl_easy_cleanup"
+        },
+        {
+          "instruction_rva": "0x8f60",
+          "import": "_invalid_parameter_noinfo_noreturn"
+        },
+        {
+          "instruction_rva": "0x8f6a",
+          "import": "free"
+        },
+        {
+          "instruction_rva": "0x8f84",
+          "target_rva": "0x198e0"
+        }
+      ]
+    },
+    "alternate_processing": {
+      "start_rva": "0xa150",
+      "end_rva": "0xa470",
+      "references": [],
+      "calls": [
+        {
+          "instruction_rva": "0xa183",
+          "import": "malloc"
+        },
+        {
+          "instruction_rva": "0xa197",
+          "import": "malloc"
+        },
+        {
+          "instruction_rva": "0xa1fa",
+          "import": "realloc"
+        },
+        {
+          "instruction_rva": "0xa26e",
+          "import": "realloc"
+        },
+        {
+          "instruction_rva": "0xa2c4",
+          "import": "realloc"
+        },
+        {
+          "instruction_rva": "0xa2ed",
+          "target_rva": "0x2640"
+        },
+        {
+          "instruction_rva": "0xa32c",
+          "import": "realloc"
+        },
+        {
+          "instruction_rva": "0xa359",
+          "target_rva": "0x2640"
+        },
+        {
+          "instruction_rva": "0xa387",
+          "target_rva": "0x8bd0"
+        },
+        {
+          "instruction_rva": "0xa3c0",
+          "import": "malloc"
+        },
+        {
+          "instruction_rva": "0xa3d8",
+          "target_rva": "0x1a8f9"
+        },
+        {
+          "instruction_rva": "0xa3e6",
+          "import": "free"
+        },
+        {
+          "instruction_rva": "0xa3f7",
+          "import": "free"
+        },
+        {
+          "instruction_rva": "0xa40a",
+          "import": "free"
+        },
+        {
+          "instruction_rva": "0xa41a",
+          "import": "free"
+        },
+        {
+          "instruction_rva": "0xa42a",
+          "import": "free"
+        },
+        {
+          "instruction_rva": "0xa458",
+          "import": "free"
+        },
+        {
+          "instruction_rva": "0xa461",
+          "import": "free"
+        }
+      ]
+    },
+    "open_services": {
+      "start_rva": "0x9110",
+      "end_rva": "0x9390",
+      "references": [
+        {
+          "instruction_rva": "0x922e",
+          "value": "com.apple.atc",
+          "file_offset": "0x1be08",
+          "rva": "0x1ca08"
+        },
+        {
+          "instruction_rva": "0x9290",
+          "value": "com.apple.afc",
+          "file_offset": "0x1af58",
+          "rva": "0x1bb58"
+        }
+      ],
+      "calls": [
+        {
+          "instruction_rva": "0x913c",
+          "target_rva": "0x19900"
+        },
+        {
+          "instruction_rva": "0x9170",
+          "target_rva": "0x4b30"
+        },
+        {
+          "instruction_rva": "0x9188",
+          "target_rva": "0x4d40"
+        },
+        {
+          "instruction_rva": "0x919e",
+          "target_rva": "0x4570"
+        },
+        {
+          "instruction_rva": "0x91c6",
+          "target_rva": "0x5a00"
+        },
+        {
+          "instruction_rva": "0x91d2",
+          "import": "free"
+        },
+        {
+          "instruction_rva": "0x91dc",
+          "import": "DeleteCriticalSection"
+        },
+        {
+          "instruction_rva": "0x91e5",
+          "import": "free"
+        },
+        {
+          "instruction_rva": "0x91ee",
+          "target_rva": "0x5190"
+        },
+        {
+          "instruction_rva": "0x91fb",
+          "target_rva": "0x1993c"
+        },
+        {
+          "instruction_rva": "0x9235",
+          "target_rva": "0x4620"
+        },
+        {
+          "instruction_rva": "0x9256",
+          "target_rva": "0x5060"
+        },
+        {
+          "instruction_rva": "0x926f",
+          "import": "free"
+        },
+        {
+          "instruction_rva": "0x9278",
+          "import": "free"
+        },
+        {
+          "instruction_rva": "0x9297",
+          "target_rva": "0x4620"
+        },
+        {
+          "instruction_rva": "0x92b6",
+          "target_rva": "0x10c0"
+        },
+        {
+          "instruction_rva": "0x92e8",
+          "import": "free"
+        },
+        {
+          "instruction_rva": "0x92f1",
+          "import": "free"
+        },
+        {
+          "instruction_rva": "0x92fc",
+          "target_rva": "0x4570"
+        },
+        {
+          "instruction_rva": "0x930c",
+          "import": "malloc"
+        }
+      ]
+    },
+    "negotiate_sync": {
+      "start_rva": "0x9390",
+      "end_rva": "0x9780",
+      "references": [
+        {
+          "instruction_rva": "0x9428",
+          "value": "SyncAllowed",
+          "file_offset": "0x1bd88",
+          "rva": "0x1c988"
+        },
+        {
+          "instruction_rva": "0x94f1",
+          "value": "Grappa",
+          "file_offset": "0x1be60",
+          "rva": "0x1ca60"
+        },
+        {
+          "instruction_rva": "0x9511",
+          "value": "LibraryID",
+          "file_offset": "0x1be80",
+          "rva": "0x1ca80"
+        },
+        {
+          "instruction_rva": "0x9592",
+          "value": "RequestingSync",
+          "file_offset": "0x1beb0",
+          "rva": "0x1cab0"
+        },
+        {
+          "instruction_rva": "0x968b",
+          "value": "ReadyForSync",
+          "file_offset": "0x1bd68",
+          "rva": "0x1c968"
+        },
+        {
+          "instruction_rva": "0x969e",
+          "value": "SyncFailed",
+          "file_offset": "0x1bd78",
+          "rva": "0x1c978"
+        },
+        {
+          "instruction_rva": "0x971b",
+          "value": "Grappa",
+          "file_offset": "0x1be60",
+          "rva": "0x1ca60"
+        }
+      ],
+      "calls": [
+        {
+          "instruction_rva": "0x93b8",
+          "import": "_time64"
+        },
+        {
+          "instruction_rva": "0x93d2",
+          "target_rva": "0x5470"
+        },
+        {
+          "instruction_rva": "0x93e9",
+          "import": "_time64"
+        },
+        {
+          "instruction_rva": "0x9412",
+          "import": "plist_dict_get_item"
+        },
+        {
+          "instruction_rva": "0x941d",
+          "import": "plist_get_string_ptr"
+        },
+        {
+          "instruction_rva": "0x9432",
+          "target_rva": "0x1a8ff"
+        },
+        {
+          "instruction_rva": "0x9440",
+          "import": "plist_free"
+        },
+        {
+          "instruction_rva": "0x9457",
+          "target_rva": "0x5470"
+        },
+        {
+          "instruction_rva": "0x9481",
+          "import": "plist_free"
+        },
+        {
+          "instruction_rva": "0x9487",
+          "import": "plist_new_dict"
+        },
+        {
+          "instruction_rva": "0x9497",
+          "import": "plist_new_string"
+        },
+        {
+          "instruction_rva": "0x94aa",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0x94be",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0x94cb",
+          "import": "plist_new_string"
+        },
+        {
+          "instruction_rva": "0x94de",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0x94eb",
+          "import": "plist_new_data"
+        },
+        {
+          "instruction_rva": "0x94fe",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0x950b",
+          "import": "plist_new_string"
+        },
+        {
+          "instruction_rva": "0x951e",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0x9524",
+          "import": "plist_new_dict"
+        },
+        {
+          "instruction_rva": "0x953a",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0x9555",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0x9570",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0x9576",
+          "import": "plist_new_dict"
+        },
+        {
+          "instruction_rva": "0x958c",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0x9599",
+          "import": "plist_new_string"
+        },
+        {
+          "instruction_rva": "0x95ac",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0x95b7",
+          "import": "plist_new_uint"
+        },
+        {
+          "instruction_rva": "0x95ca",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0x95dd",
+          "target_rva": "0x5240"
+        },
+        {
+          "instruction_rva": "0x95e9",
+          "import": "plist_free"
+        },
+        {
+          "instruction_rva": "0x960b",
+          "import": "plist_free"
+        },
+        {
+          "instruction_rva": "0x961c",
+          "import": "_time64"
+        },
+        {
+          "instruction_rva": "0x9636",
+          "target_rva": "0x5470"
+        },
+        {
+          "instruction_rva": "0x964a",
+          "import": "_time64"
+        },
+        {
+          "instruction_rva": "0x9672",
+          "import": "plist_dict_get_item"
+        },
+        {
+          "instruction_rva": "0x967d",
+          "import": "plist_get_string_ptr"
+        },
+        {
+          "instruction_rva": "0x9695",
+          "target_rva": "0x1a8ff"
+        },
+        {
+          "instruction_rva": "0x96a8",
+          "target_rva": "0x1a8ff"
+        },
+        {
+          "instruction_rva": "0x96b6",
+          "import": "plist_free"
+        },
+        {
+          "instruction_rva": "0x96c6",
+          "import": "plist_free"
+        },
+        {
+          "instruction_rva": "0x96db",
+          "import": "plist_copy"
+        },
+        {
+          "instruction_rva": "0x96e9",
+          "import": "plist_free"
+        },
+        {
+          "instruction_rva": "0x9702",
+          "import": "plist_dict_get_item"
+        },
+        {
+          "instruction_rva": "0x9712",
+          "import": "plist_dict_get_item"
+        },
+        {
+          "instruction_rva": "0x9722",
+          "import": "plist_dict_get_item"
+        },
+        {
+          "instruction_rva": "0x9733",
+          "import": "plist_get_data_val"
+        },
+        {
+          "instruction_rva": "0x9744",
+          "import": "plist_free"
+        },
+        {
+          "instruction_rva": "0x9756",
+          "import": "plist_free"
+        }
+      ]
+    },
+    "build_metadata": {
+      "start_rva": "0xa7b0",
+      "end_rva": "0xb060",
+      "references": [
+        {
+          "instruction_rva": "0xa830",
+          "value": "update_db_info",
+          "file_offset": "0x1bfa8",
+          "rva": "0x1cba8"
+        },
+        {
+          "instruction_rva": "0xa840",
+          "value": "operation",
+          "file_offset": "0x1bfb8",
+          "rva": "0x1cbb8"
+        },
+        {
+          "instruction_rva": "0xa9b1",
+          "value": "insert_track",
+          "file_offset": "0x1c028",
+          "rva": "0x1cc28"
+        },
+        {
+          "instruction_rva": "0xa9be",
+          "value": "operation",
+          "file_offset": "0x1bfb8",
+          "rva": "0x1cbb8"
+        },
+        {
+          "instruction_rva": "0xaaad",
+          "value": "total_time_ms",
+          "file_offset": "0x1c098",
+          "rva": "0x1cc98"
+        },
+        {
+          "instruction_rva": "0xab44",
+          "value": "album",
+          "file_offset": "0x1c0dc",
+          "rva": "0x1ccdc"
+        },
+        {
+          "instruction_rva": "0xab6e",
+          "value": "artist",
+          "file_offset": "0x1c0e4",
+          "rva": "0x1cce4"
+        },
+        {
+          "instruction_rva": "0xac9a",
+          "value": "title",
+          "file_offset": "0x1c164",
+          "rva": "0x1cd64"
+        },
+        {
+          "instruction_rva": "0xae0d",
+          "value": "item_stats",
+          "file_offset": "0x1c228",
+          "rva": "0x1ce28"
+        },
+        {
+          "instruction_rva": "0xae6f",
+          "value": "audio_format",
+          "file_offset": "0x1c248",
+          "rva": "0x1ce48"
+        },
+        {
+          "instruction_rva": "0xae8f",
+          "value": "sample_rate",
+          "file_offset": "0x1c258",
+          "rva": "0x1ce58"
+        },
+        {
+          "instruction_rva": "0xaea5",
+          "value": "avformat_info",
+          "file_offset": "0x1c268",
+          "rva": "0x1ce68"
+        },
+        {
+          "instruction_rva": "0xaf04",
+          "value": "location",
+          "file_offset": "0x1c2a0",
+          "rva": "0x1cea0"
+        },
+        {
+          "instruction_rva": "0xb004",
+          "value": "timestamp",
+          "file_offset": "0x1c2b0",
+          "rva": "0x1ceb0"
+        },
+        {
+          "instruction_rva": "0xb018",
+          "value": "operations",
+          "file_offset": "0x1c2c0",
+          "rva": "0x1cec0"
+        },
+        {
+          "instruction_rva": "0xb034",
+          "value": "revision",
+          "file_offset": "0x1c2d0",
+          "rva": "0x1ced0"
+        }
+      ],
+      "calls": [
+        {
+          "instruction_rva": "0xa7cf",
+          "import": "plist_new_dict"
+        },
+        {
+          "instruction_rva": "0xa7da",
+          "import": "plist_new_uint"
+        },
+        {
+          "instruction_rva": "0xa7ed",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xa7f5",
+          "import": "plist_new_uint"
+        },
+        {
+          "instruction_rva": "0xa808",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xa811",
+          "import": "plist_new_uint"
+        },
+        {
+          "instruction_rva": "0xa824",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xa82a",
+          "import": "plist_new_dict"
+        },
+        {
+          "instruction_rva": "0xa83a",
+          "import": "plist_new_string"
+        },
+        {
+          "instruction_rva": "0xa84d",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xa860",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xa869",
+          "import": "plist_new_uint"
+        },
+        {
+          "instruction_rva": "0xa87c",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xa882",
+          "import": "plist_new_array"
+        },
+        {
+          "instruction_rva": "0xa891",
+          "import": "plist_array_append_item"
+        },
+        {
+          "instruction_rva": "0xa8c0",
+          "import": "plist_new_dict"
+        },
+        {
+          "instruction_rva": "0xa8d7",
+          "import": "plist_new_array"
+        },
+        {
+          "instruction_rva": "0xa8f3",
+          "import": "plist_new_dict"
+        },
+        {
+          "instruction_rva": "0xa900",
+          "import": "plist_new_uint"
+        },
+        {
+          "instruction_rva": "0xa913",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xa91d",
+          "import": "plist_new_uint"
+        },
+        {
+          "instruction_rva": "0xa930",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xa944",
+          "import": "plist_new_string"
+        },
+        {
+          "instruction_rva": "0xa957",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xa961",
+          "import": "plist_new_uint"
+        },
+        {
+          "instruction_rva": "0xa974",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xa980",
+          "import": "plist_array_append_item"
+        },
+        {
+          "instruction_rva": "0xa9a3",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xa9b8",
+          "import": "plist_new_string"
+        },
+        {
+          "instruction_rva": "0xa9cb",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xa9d1",
+          "import": "plist_new_dict"
+        },
+        {
+          "instruction_rva": "0xa9e1",
+          "import": "plist_new_string"
+        },
+        {
+          "instruction_rva": "0xa9f4",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xaa0b",
+          "import": "plist_new_string"
+        },
+        {
+          "instruction_rva": "0xaa1e",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xaa2b",
+          "import": "plist_new_uint"
+        },
+        {
+          "instruction_rva": "0xaa3e",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xaa46",
+          "import": "plist_new_uint"
+        },
+        {
+          "instruction_rva": "0xaa59",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xaa67",
+          "import": "plist_new_uint"
+        },
+        {
+          "instruction_rva": "0xaa7a",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xaa87",
+          "import": "plist_new_string"
+        },
+        {
+          "instruction_rva": "0xaa9a",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xaaa7",
+          "import": "plist_new_uint"
+        },
+        {
+          "instruction_rva": "0xaaba",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xaac7",
+          "import": "plist_new_string"
+        },
+        {
+          "instruction_rva": "0xaada",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xaae2",
+          "import": "plist_new_uint"
+        },
+        {
+          "instruction_rva": "0xaaf5",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xaafd",
+          "import": "plist_new_uint"
+        },
+        {
+          "instruction_rva": "0xab10",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xab18",
+          "import": "plist_new_uint"
+        },
+        {
+          "instruction_rva": "0xab2b",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xab3e",
+          "import": "plist_new_string"
+        },
+        {
+          "instruction_rva": "0xab51",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xab68",
+          "import": "plist_new_string"
+        },
+        {
+          "instruction_rva": "0xab7b",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xab83",
+          "import": "plist_new_uint"
+        },
+        {
+          "instruction_rva": "0xab96",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xabac",
+          "import": "plist_new_bool"
+        },
+        {
+          "instruction_rva": "0xabc3",
+          "import": "plist_new_bool"
+        },
+        {
+          "instruction_rva": "0xabda",
+          "import": "plist_new_bool"
+        },
+        {
+          "instruction_rva": "0xabed",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xac04",
+          "import": "plist_new_string"
+        },
+        {
+          "instruction_rva": "0xac17",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xac1f",
+          "import": "_time64"
+        },
+        {
+          "instruction_rva": "0xac2d",
+          "import": "plist_new_date"
+        },
+        {
+          "instruction_rva": "0xac40",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xac48",
+          "import": "plist_new_uint"
+        },
+        {
+          "instruction_rva": "0xac5b",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xac6e",
+          "import": "plist_new_string"
+        },
+        {
+          "instruction_rva": "0xac81",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xac94",
+          "import": "plist_new_string"
+        },
+        {
+          "instruction_rva": "0xaca7",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xacb4",
+          "import": "plist_new_string"
+        },
+        {
+          "instruction_rva": "0xacc7",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xacd4",
+          "import": "plist_new_string"
+        },
+        {
+          "instruction_rva": "0xace7",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xacfe",
+          "import": "plist_new_string"
+        },
+        {
+          "instruction_rva": "0xad11",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xad24",
+          "import": "plist_new_string"
+        },
+        {
+          "instruction_rva": "0xad37",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xad4e",
+          "import": "plist_new_string"
+        },
+        {
+          "instruction_rva": "0xad61",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xad74",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xad7a",
+          "import": "plist_new_dict"
+        },
+        {
+          "instruction_rva": "0xad85",
+          "import": "plist_new_uint"
+        },
+        {
+          "instruction_rva": "0xad98",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xada0",
+          "import": "plist_new_uint"
+        },
+        {
+          "instruction_rva": "0xadb3",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xadbb",
+          "import": "plist_new_uint"
+        },
+        {
+          "instruction_rva": "0xadce",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xadd6",
+          "import": "plist_new_bool"
+        },
+        {
+          "instruction_rva": "0xade9",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xadf1",
+          "import": "plist_new_uint"
+        },
+        {
+          "instruction_rva": "0xae04",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xae17",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xae1d",
+          "import": "plist_new_dict"
+        },
+        {
+          "instruction_rva": "0xae2d",
+          "import": "plist_new_uint"
+        },
+        {
+          "instruction_rva": "0xae40",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xae69",
+          "import": "plist_new_uint"
+        },
+        {
+          "instruction_rva": "0xae7c",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xae89",
+          "import": "plist_new_uint"
+        },
+        {
+          "instruction_rva": "0xae9c",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xaeaf",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xaeb5",
+          "import": "plist_new_dict"
+        },
+        {
+          "instruction_rva": "0xaee8",
+          "import": "plist_new_string"
+        },
+        {
+          "instruction_rva": "0xaefb",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xaf0e",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xaf1e",
+          "target_rva": "0x7980"
+        },
+        {
+          "instruction_rva": "0xaf2f",
+          "import": "_strtoui64"
+        },
+        {
+          "instruction_rva": "0xaf47",
+          "import": "free"
+        },
+        {
+          "instruction_rva": "0xaf57",
+          "target_rva": "0x7980"
+        },
+        {
+          "instruction_rva": "0xaf68",
+          "import": "_strtoui64"
+        },
+        {
+          "instruction_rva": "0xaf76",
+          "import": "plist_new_uint"
+        },
+        {
+          "instruction_rva": "0xaf89",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xafaa",
+          "target_rva": "0x8780"
+        },
+        {
+          "instruction_rva": "0xafb2",
+          "import": "free"
+        },
+        {
+          "instruction_rva": "0xafbe",
+          "import": "plist_array_append_item"
+        },
+        {
+          "instruction_rva": "0xafe0",
+          "import": "plist_new_dict"
+        },
+        {
+          "instruction_rva": "0xafec",
+          "import": "_time64"
+        },
+        {
+          "instruction_rva": "0xaffa",
+          "import": "plist_new_date"
+        },
+        {
+          "instruction_rva": "0xb00e",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xb022",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xb02a",
+          "import": "plist_new_uint"
+        }
+      ]
+    },
+    "finish_metadata": {
+      "start_rva": "0xb060",
+      "end_rva": "0xb1a0",
+      "references": [
+        {
+          "instruction_rva": "0xb113",
+          "value": "FinishedSyncingMetadata",
+          "file_offset": "0x1bde0",
+          "rva": "0x1c9e0"
+        }
+      ],
+      "calls": [
+        {
+          "instruction_rva": "0xb078",
+          "import": "plist_new_dict"
+        },
+        {
+          "instruction_rva": "0xb086",
+          "import": "plist_new_uint"
+        },
+        {
+          "instruction_rva": "0xb099",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xb09f",
+          "import": "plist_new_dict"
+        },
+        {
+          "instruction_rva": "0xb0af",
+          "import": "plist_new_string"
+        },
+        {
+          "instruction_rva": "0xb0c2",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xb0c8",
+          "import": "plist_new_dict"
+        },
+        {
+          "instruction_rva": "0xb0de",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xb0f1",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xb0f7",
+          "import": "plist_new_dict"
+        },
+        {
+          "instruction_rva": "0xb10d",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xb11a",
+          "import": "plist_new_string"
+        },
+        {
+          "instruction_rva": "0xb12d",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xb138",
+          "import": "plist_new_uint"
+        },
+        {
+          "instruction_rva": "0xb14b",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xb15e",
+          "target_rva": "0x5240"
+        },
+        {
+          "instruction_rva": "0xb16a",
+          "import": "plist_free"
+        },
+        {
+          "instruction_rva": "0xb177",
+          "import": "plist_free"
+        }
+      ]
+    },
+    "process_manifest": {
+      "start_rva": "0xc320",
+      "end_rva": "0xc6d0",
+      "references": [
+        {
+          "instruction_rva": "0xc3fb",
+          "value": "AssetManifest",
+          "file_offset": "0x1bee8",
+          "rva": "0x1cae8"
+        },
+        {
+          "instruction_rva": "0xc40e",
+          "value": "SyncFinished",
+          "file_offset": "0x1bed8",
+          "rva": "0x1cad8"
+        },
+        {
+          "instruction_rva": "0xc4a1",
+          "value": "AssetManifest",
+          "file_offset": "0x1bee8",
+          "rva": "0x1cae8"
+        },
+        {
+          "instruction_rva": "0xc503",
+          "value": "AssetID",
+          "file_offset": "0x1bef8",
+          "rva": "0x1caf8"
+        },
+        {
+          "instruction_rva": "0xc5e7",
+          "value": "AssetID",
+          "file_offset": "0x1bef8",
+          "rva": "0x1caf8"
+        },
+        {
+          "instruction_rva": "0xc60d",
+          "value": "FileError",
+          "file_offset": "0x1bf20",
+          "rva": "0x1cb20"
+        }
+      ],
+      "calls": [
+        {
+          "instruction_rva": "0xc344",
+          "import": "_time64"
+        },
+        {
+          "instruction_rva": "0xc363",
+          "target_rva": "0x5470"
+        },
+        {
+          "instruction_rva": "0xc377",
+          "import": "_time64"
+        },
+        {
+          "instruction_rva": "0xc3a8",
+          "import": "plist_dict_get_item"
+        },
+        {
+          "instruction_rva": "0xc3b4",
+          "import": "plist_get_node_type"
+        },
+        {
+          "instruction_rva": "0xc3ca",
+          "import": "plist_get_string_val"
+        },
+        {
+          "instruction_rva": "0xc3d2",
+          "import": "plist_get_node_type"
+        },
+        {
+          "instruction_rva": "0xc3e8",
+          "import": "plist_get_key_val"
+        },
+        {
+          "instruction_rva": "0xc405",
+          "target_rva": "0x1a8ff"
+        },
+        {
+          "instruction_rva": "0xc418",
+          "target_rva": "0x1a8ff"
+        },
+        {
+          "instruction_rva": "0xc424",
+          "import": "free"
+        },
+        {
+          "instruction_rva": "0xc437",
+          "import": "plist_free"
+        },
+        {
+          "instruction_rva": "0xc45d",
+          "import": "plist_free"
+        },
+        {
+          "instruction_rva": "0xc46b",
+          "import": "free"
+        },
+        {
+          "instruction_rva": "0xc498",
+          "import": "plist_dict_get_item"
+        },
+        {
+          "instruction_rva": "0xc4a8",
+          "import": "plist_dict_get_item"
+        },
+        {
+          "instruction_rva": "0xc4b8",
+          "import": "plist_dict_get_item"
+        },
+        {
+          "instruction_rva": "0xc4d5",
+          "import": "plist_array_get_size"
+        },
+        {
+          "instruction_rva": "0xc4fa",
+          "import": "plist_array_get_item"
+        },
+        {
+          "instruction_rva": "0xc50a",
+          "import": "plist_dict_get_item"
+        },
+        {
+          "instruction_rva": "0xc518",
+          "import": "plist_get_string_val"
+        },
+        {
+          "instruction_rva": "0xc577",
+          "target_rva": "0x1a8f3"
+        },
+        {
+          "instruction_rva": "0xc58c",
+          "import": "plist_new_dict"
+        },
+        {
+          "instruction_rva": "0xc595",
+          "import": "plist_new_dict"
+        },
+        {
+          "instruction_rva": "0xc5a5",
+          "import": "plist_new_string"
+        },
+        {
+          "instruction_rva": "0xc5b8",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xc5c3",
+          "import": "plist_new_uint"
+        },
+        {
+          "instruction_rva": "0xc5d6",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xc5e1",
+          "import": "plist_new_string"
+        },
+        {
+          "instruction_rva": "0xc5f4",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xc607",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xc614",
+          "import": "plist_new_string"
+        },
+        {
+          "instruction_rva": "0xc627",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xc632",
+          "import": "plist_new_uint"
+        },
+        {
+          "instruction_rva": "0xc645",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xc658",
+          "target_rva": "0x5240"
+        },
+        {
+          "instruction_rva": "0xc660",
+          "import": "plist_free"
+        },
+        {
+          "instruction_rva": "0xc66e",
+          "import": "free"
+        },
+        {
+          "instruction_rva": "0xc679",
+          "import": "plist_array_get_size"
+        },
+        {
+          "instruction_rva": "0xc696",
+          "import": "plist_free"
+        },
+        {
+          "instruction_rva": "0xc6a4",
+          "import": "free"
+        }
+      ]
+    },
+    "add_media": {
+      "start_rva": "0xc6d0",
+      "end_rva": "0xd230",
+      "references": [
+        {
+          "instruction_rva": "0xcfe9",
+          "value": "/iTunes_Control/Sync/Media/Sync_00000000.plist",
+          "file_offset": "0x1c3a0",
+          "rva": "0x1cfa0"
+        },
+        {
+          "instruction_rva": "0xd003",
+          "value": "/iTunes_Control/Sync/Media/Sync_00000000.plist.cig",
+          "file_offset": "0x1c3d0",
+          "rva": "0x1cfd0"
+        }
+      ],
+      "calls": [
+        {
+          "instruction_rva": "0xc7c2",
+          "target_rva": "0x9110"
+        },
+        {
+          "instruction_rva": "0xc839",
+          "import": "_wstat64"
+        },
+        {
+          "instruction_rva": "0xc85f",
+          "target_rva": "0x24b0"
+        },
+        {
+          "instruction_rva": "0xc883",
+          "import": "plist_new_array"
+        },
+        {
+          "instruction_rva": "0xc897",
+          "import": "plist_new_key"
+        },
+        {
+          "instruction_rva": "0xc8a3",
+          "import": "plist_array_append_item"
+        },
+        {
+          "instruction_rva": "0xc8a9",
+          "import": "plist_new_array"
+        },
+        {
+          "instruction_rva": "0xc8bd",
+          "import": "plist_new_string"
+        },
+        {
+          "instruction_rva": "0xc8c9",
+          "import": "plist_array_append_item"
+        },
+        {
+          "instruction_rva": "0xc8cf",
+          "import": "plist_new_dict"
+        },
+        {
+          "instruction_rva": "0xc8e3",
+          "import": "plist_new_string"
+        },
+        {
+          "instruction_rva": "0xc8f6",
+          "import": "plist_dict_set_item"
+        },
+        {
+          "instruction_rva": "0xc935",
+          "target_rva": "0x8fa0"
+        },
+        {
+          "instruction_rva": "0xc976",
+          "import": "malloc"
+        },
+        {
+          "instruction_rva": "0xc99c",
+          "target_rva": "0x1a8f9"
+        },
+        {
+          "instruction_rva": "0xc9bb",
+          "target_rva": "0x8bd0"
+        },
+        {
+          "instruction_rva": "0xc9ec",
+          "import": "malloc"
+        },
+        {
+          "instruction_rva": "0xca04",
+          "target_rva": "0x1a8f9"
+        },
+        {
+          "instruction_rva": "0xca38",
+          "import": "free"
+        },
+        {
+          "instruction_rva": "0xca42",
+          "import": "free"
+        },
+        {
+          "instruction_rva": "0xca77",
+          "target_rva": "0x9390"
+        },
+        {
+          "instruction_rva": "0xca86",
+          "import": "free"
+        },
+        {
+          "instruction_rva": "0xcab3",
+          "import": "free"
+        },
+        {
+          "instruction_rva": "0xcad1",
+          "target_rva": "0x1ef0"
+        },
+        {
+          "instruction_rva": "0xcaf6",
+          "import": "EnterCriticalSection"
+        },
+        {
+          "instruction_rva": "0xcb12",
+          "import": "realloc"
+        },
+        {
+          "instruction_rva": "0xcb5a",
+          "target_rva": "0x1210"
+        },
+        {
+          "instruction_rva": "0xcb6d",
+          "target_rva": "0x13d0"
+        },
+        {
+          "instruction_rva": "0xcb76",
+          "import": "LeaveCriticalSection"
+        },
+        {
+          "instruction_rva": "0xcb85",
+          "import": "malloc"
+        },
+        {
+          "instruction_rva": "0xcc76",
+          "target_rva": "0xa7b0"
+        },
+        {
+          "instruction_rva": "0xcc87",
+          "import": "plist_to_bin"
+        },
+        {
+          "instruction_rva": "0xcc91",
+          "import": "plist_free"
+        },
+        {
+          "instruction_rva": "0xccbe",
+          "indirect_slot_rva": "0x23da0"
+        },
+        {
+          "instruction_rva": "0xcceb",
+          "indirect_slot_rva": "0x23d90"
+        },
+        {
+          "instruction_rva": "0xcd00",
+          "import": "malloc"
+        },
+        {
+          "instruction_rva": "0xcd17",
+          "target_rva": "0x1a8f9"
+        },
+        {
+          "instruction_rva": "0xcd5b",
+          "target_rva": "0xa150"
+        },
+        {
+          "instruction_rva": "0xcd92",
+          "import": "free"
+        },
+        {
+          "instruction_rva": "0xcda1",
+          "import": "free"
+        },
+        {
+          "instruction_rva": "0xcdb0",
+          "import": "free"
+        },
+        {
+          "instruction_rva": "0xcdbe",
+          "import": "free"
+        },
+        {
+          "instruction_rva": "0xcded",
+          "target_rva": "0x5a00"
+        },
+        {
+          "instruction_rva": "0xcdf9",
+          "import": "free"
+        },
+        {
+          "instruction_rva": "0xce03",
+          "import": "DeleteCriticalSection"
+        },
+        {
+          "instruction_rva": "0xce0c",
+          "import": "free"
+        },
+        {
+          "instruction_rva": "0xce16",
+          "target_rva": "0x5190"
+        },
+        {
+          "instruction_rva": "0xce25",
+          "import": "free"
+        },
+        {
+          "instruction_rva": "0xce33",
+          "target_rva": "0x1993c"
+        },
+        {
+          "instruction_rva": "0xce4c",
+          "target_rva": "0xa700"
+        },
+        {
+          "instruction_rva": "0xce85",
+          "import": "_invalid_parameter_noinfo_noreturn"
+        },
+        {
+          "instruction_rva": "0xcea3",
+          "import": "EnterCriticalSection"
+        },
+        {
+          "instruction_rva": "0xcebf",
+          "import": "realloc"
+        },
+        {
+          "instruction_rva": "0xcf0d",
+          "target_rva": "0x1210"
+        },
+        {
+          "instruction_rva": "0xcf20",
+          "target_rva": "0x13d0"
+        },
+        {
+          "instruction_rva": "0xcf29",
+          "import": "LeaveCriticalSection"
+        },
+        {
+          "instruction_rva": "0xcf46",
+          "import": "EnterCriticalSection"
+        },
+        {
+          "instruction_rva": "0xcf62",
+          "import": "realloc"
+        },
+        {
+          "instruction_rva": "0xcfc3",
+          "target_rva": "0x1210"
+        },
+        {
+          "instruction_rva": "0xcfd6",
+          "target_rva": "0x13d0"
+        },
+        {
+          "instruction_rva": "0xcfdf",
+          "import": "LeaveCriticalSection"
+        },
+        {
+          "instruction_rva": "0xcff9",
+          "target_rva": "0x2230"
+        },
+        {
+          "instruction_rva": "0xd017",
+          "target_rva": "0x2230"
+        },
+        {
+          "instruction_rva": "0xd01f",
+          "target_rva": "0xb060"
+        },
+        {
+          "instruction_rva": "0xd02a",
+          "target_rva": "0xc320"
+        },
+        {
+          "instruction_rva": "0xd06d",
+          "target_rva": "0x2230"
+        },
+        {
+          "instruction_rva": "0xd07e",
+          "target_rva": "0x2360"
+        },
+        {
+          "instruction_rva": "0xd0a7",
+          "target_rva": "0xb520"
+        },
+        {
+          "instruction_rva": "0xd0bf",
+          "target_rva": "0x9780"
+        },
+        {
+          "instruction_rva": "0xd104",
+          "target_rva": "0x8780"
+        },
+        {
+          "instruction_rva": "0xd15c",
+          "target_rva": "0x1a79a"
+        },
+        {
+          "instruction_rva": "0xd177",
+          "target_rva": "0xf7f0"
+        },
+        {
+          "instruction_rva": "0xd18f",
+          "target_rva": "0x18e0"
+        },
+        {
+          "instruction_rva": "0xd1c6",
+          "target_rva": "0x1993c"
+        },
+        {
+          "instruction_rva": "0xd1dc",
+          "import": "_invalid_parameter_noinfo_noreturn"
+        },
+        {
+          "instruction_rva": "0xd1e6",
+          "target_rva": "0x1993c"
+        },
+        {
+          "instruction_rva": "0xd21c",
+          "target_rva": "0x198e0"
+        }
+      ]
+    }
+  }
+}

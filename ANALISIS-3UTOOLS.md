@@ -1,5 +1,8 @@
 # Análisis estático del instalador aportado
 
+**Actualización:** [Segunda fase: flujo de importación y dependencias](research/SINCRONIZACION.md),
+con [evidencia reproducible](research/README.md).
+
 Fecha: 3 de noviembre de 2026. Este documento registra observaciones del archivo
 aportado por el usuario; no constituye una implementación de sincronización.
 
