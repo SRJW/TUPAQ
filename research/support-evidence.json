@@ -1,0 +1,34 @@
+{
+  "sample_sha256": {
+    "3uTools.exe": "2bc4b58583b982aa59add702e200b7df4fc5058ca10e075ce277975acc786e83",
+    "idm_media.dll": "6fdaeb62646cba0e3fa72228fe320d63ce740440e36a5c31180e5494296496d2"
+  },
+  "caller_constants": [
+    {
+      "rva": "0x12b2390",
+      "value": "https://a1-s.3u.com"
+    },
+    {
+      "rva": "0x12b23a8",
+      "value": "https://a2-s.3u.com"
+    },
+    {
+      "rva": "0x12b23c0",
+      "value": "?pc_vs="
+    },
+    {
+      "rva": "0x12b1420",
+      "value": "9.09.009"
+    }
+  ],
+  "crc_table": {
+    "rva": "0x1bbb0",
+    "all_256_entries_match_crc_hqx": true
+  },
+  "required_names_present": {
+    "CoreFP.dll": false,
+    "AirTrafficHost.dll": true,
+    "iTunes.dll": false
+  },
+  "limitations": "Static evidence only; no HTTP request or DLL execution."
+}

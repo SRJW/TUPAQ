@@ -1,3 +1,6 @@
+> Actualización: la [tercera fase](DEPENDENCIAS.md) identifica los destinos HTTP
+> y corrige el inventario de AirTrafficHost.dll de esta entrega.
+
 # Segunda fase: flujo de importación y dependencia pendiente
 
 Análisis estático realizado el 3 de noviembre de 2026. Se usó la misma muestra
@@ -90,8 +93,9 @@ externa aplicada al plist, después de preparar contexto con información de la
 sesión. No se ha identificado su algoritmo: no se afirma que sea SHA-1, HMAC,
 una firma concreta o un valor constante. No se debe sustituir por datos inventados.
 
-El inventario completo de los 535 elementos extraídos no incluye archivos con
-los nombres `iTunes.dll`, `AirTrafficHost.dll` ni `CoreFP.dll`. Sí incluye
+Corrección de inventario, verificada en la tercera fase: no se encuentran
+`iTunes.dll` ni `CoreFP.dll`, pero sí `itunesFlashDll/AirTrafficHost.dll`.
+No está demostrada su equivalencia con la copia esperada bajo `itunesDll`. Sí incluye
 `iTunesdll/libitab64.dll` y `asrp64.dll`; la equivalencia entre estos archivos y
 las bibliotecas cargadas no está demostrada. Puede haber dependencias preparadas
 o descargadas durante la instalación o ejecución; no se ejecutó ese proceso.

@@ -23,3 +23,8 @@ ni un volcado completo de su código. La herramienta es específica de esta mues
 no pretende ser un descompilador general ni una demostración de soporte para iOS.
 
 Consulta [el informe de segunda fase](SINCRONIZACION.md).
+
+La [tercera fase](DEPENDENCIAS.md) identifica los destinos preparados por el
+llamador, el sobre HTTP y las dependencias que faltan en el instalador.
+`inspect_support.py` recibe el directorio extraído y una ruta JSON de salida;
+`packet.py` recibe un archivo de paquete completo para inspección local.
