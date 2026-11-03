@@ -43,9 +43,12 @@ class AudioTests(unittest.TestCase):
         self.assertEqual(first['album'], 'Álbum')
         self.assertEqual(first['id'], second['id'])
 
-    def test_reject_aac_disguised_as_alac(self):
-        with self.assertRaisesRegex(ValueError, 'AAC'):
-            inspect_audio(self.folder/'aac.m4a', 'audio.m4a')
+    def test_accepts_m4a_aac_and_retains_codec_distinction(self):
+        data = inspect_audio(self.folder/'aac.m4a', 'audio.m4a')
+        self.assertEqual(data['container'], 'M4A')
+        self.assertEqual(data['format'], 'AAC')
+        with self.assertRaisesRegex(ValueError, 'extensión'):
+            inspect_audio(self.folder/'aac.m4a', 'audio.alac')
 
     def test_reject_mismatched_extension(self):
         with self.assertRaisesRegex(ValueError, 'extensión'):

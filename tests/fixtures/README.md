@@ -19,3 +19,6 @@ ffmpeg -f lavfi -i sine=frequency=440:duration=1 -c:a CODEC \
 | sample.aiff | pcm_s16be |
 | sample.m4a | alac |
 | aac.m4a | aac |
+
+`covered-aac.m4a` es una copia del tono AAC con una imagen PNG verde sintética
+y título «M4A con portada», para probar la extracción y presentación de miniaturas.

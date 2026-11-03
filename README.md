@@ -5,7 +5,7 @@ El objetivo es importar música local a la app Música del iPhone sin usar la
 aplicación iTunes ni 3uTools.
 
 **La transferencia todavía no está integrada ni verificada en un iPhone.**
-La versión actual selecciona y analiza música, consulta la detección USB y
+La versión actual selecciona y analiza música, incluye lectura USB del catálogo y
 contiene una implementación independiente de la firma de metadatos validada
 con vectores sintéticos. No modifica la biblioteca del teléfono.
 
@@ -27,11 +27,18 @@ notarización de Apple.
 
 ## Funciones actuales
 
-- Elegir o arrastrar MP3, WAV, ALAC y AIFF; comprobar el códec real.
+- Elegir o arrastrar MP3, WAV, M4A (AAC o ALAC) y AIFF; comprobar el códec real.
+- Miniaturas de portadas incrustadas, en la lista y en el panel de preparación.
+  Sin portada se muestra una nota musical; todavía no hay una transferencia real.
 - Leer título, artista, álbum y duración sin cambiar el original.
 - Omitir duplicados por contenido, quitar elementos y exportar CSV.
 - Consultar dispositivos USB mediante **ListDevices** del servicio local de Apple.
   No inicia sesiones de sincronización, emparejamientos ni escrituras al iPhone.
+- **Leer biblioteca del iPhone**: usa la autorización de confianza existente y AFC
+  para obtener dos copias consecutivas del catálogo y su WAL. Si no coinciden,
+  rechaza la lectura. Consulta una copia local con SQLite en modo de solo lectura
+  y muestra título, artista, álbum y duración. No escribe en la biblioteca remota.
+  Esta ruta no se ha probado todavía con un iPhone físico.
 - Calcular firmas candidatas de 21 bytes con un protocolo de solicitud fijo,
   usando una adaptación con licencia MIT de rustunes. Cuatro vectores conocidos
   coinciden; eso no demuestra aceptación por un dispositivo real.
@@ -69,9 +76,9 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m importios.native --smoke-fixtures 
 .venv/bin/python scripts/build_desktop.py
 ```
 
-La suite contiene 22 pruebas de formatos, HTTP local, descubrimiento USB simulado,
+La suite contiene 30 pruebas de formatos, HTTP local, descubrimiento USB simulado,
 paquetes de investigación y firmas candidatas. La prueba nativa comprueba una
-ventana Qt real, lectura en un hilo de trabajo, los cuatro formatos, duplicados,
+ventana Qt real, lectura en un hilo de trabajo, los AAC/ALAC dentro de M4A, portadas, duplicados,
 archivos dañados, CSV, quitar/vaciar y las firmas. En Linux se ha probado también
 el ejecutable empaquetado. Windows y macOS se validan en sus runners de GitHub;
 no se deben dar por aprobados hasta comprobar los resultados de cada ejecución.

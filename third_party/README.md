@@ -29,3 +29,7 @@ Fuentes y licencias de los componentes:
 El código de Importios se publica en este repositorio. Las bibliotecas se
 empaquetan sin modificar; no se impone restricción de ingeniería inversa para
 depuraciones de modificaciones a las bibliotecas LGPL.
+
+La lectura del catálogo usa pymobiledevice3 11.49.5 (GPL-3.0), incluida como
+dependencia del paquete. Solo se usa la comunicación USB/lockdown/AFC, reutilizando
+la confianza existente. Fuente: https://github.com/doronz88/pymobiledevice3 .

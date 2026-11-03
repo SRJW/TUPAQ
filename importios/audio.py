@@ -16,7 +16,7 @@ def inspect_audio(path, filename):
     name = filename.replace('\\', '/').rsplit('/', 1)[-1]
     suffix = Path(name).suffix.lower()
     if suffix not in EXTENSIONS:
-        raise ValueError('Formato no admitido. Elige MP3, WAV, ALAC o AIFF.')
+        raise ValueError('Formato no admitido. Elige MP3, WAV, M4A o AIFF.')
     try:
         audio = mutagen.File(path)
     except (mutagen.MutagenError, OSError, ValueError) as error:
@@ -27,10 +27,16 @@ def inspect_audio(path, filename):
         fmt, extensions = 'WAV', {'.wav'}
     elif isinstance(audio, AIFF):
         fmt, extensions = 'AIFF', {'.aif', '.aiff'}
-    elif isinstance(audio, MP4) and getattr(audio.info, 'codec', None) == 'alac':
-        fmt, extensions = 'ALAC', {'.m4a', '.alac'}
+    elif isinstance(audio, MP4):
+        codec = getattr(audio.info, 'codec', '')
+        if codec == 'alac':
+            fmt, extensions = 'ALAC', {'.m4a', '.alac'}
+        elif codec.startswith('mp4a'):
+            fmt, extensions = 'AAC', {'.m4a'}
+        else:
+            raise ValueError('El códec de este archivo M4A no está admitido.')
     else:
-        raise ValueError('El contenido no es MP3, WAV, ALAC o AIFF. Un .m4a también puede contener AAC.')
+        raise ValueError('El contenido no es MP3, WAV, M4A (AAC/ALAC) o AIFF.')
     if suffix not in extensions:
         raise ValueError(f'El contenido es {fmt}, pero la extensión no coincide.')
     tags = audio.tags or {}
@@ -55,9 +61,32 @@ def inspect_audio(path, filename):
         'artist': tag('TPE1', '\xa9ART'),
         'album': tag('TALB', '\xa9alb'),
         'format': fmt,
+        'container': 'M4A' if isinstance(audio, MP4) else fmt,
         'duration': round(audio.info.length, 2),
         'sample_rate': getattr(audio.info, 'sample_rate', None),
         'bit_depth': getattr(audio.info, 'bits_per_sample', None),
         'size': Path(path).stat().st_size,
         'has_artwork': bool(tags.get('covr')) or any(str(key).startswith('APIC') for key in tags),
     }
+
+
+def read_artwork(path):
+    """Read an embedded front cover, bounded to 5 MiB; never modify tags."""
+    try:
+        audio = mutagen.File(path)
+    except (mutagen.MutagenError, OSError, ValueError):
+        return None
+    tags = audio.tags if audio is not None else None
+    if not tags:
+        return None
+    covers = tags.get('covr')
+    if covers:
+        data = covers[0]
+    elif hasattr(tags, 'getall'):
+        pictures = tags.getall('APIC')
+        if not pictures:
+            return None
+        data = next((picture.data for picture in pictures if picture.type == 3), pictures[0].data)
+    else:
+        return None
+    return bytes(data) if 0 < len(data) <= 5*1024*1024 else None

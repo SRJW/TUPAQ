@@ -92,6 +92,6 @@ jobs:
           gh release create "$GITHUB_REF_NAME" downloads/* \
             --repo "$GITHUB_REPOSITORY" \
             --title "Importios $GITHUB_REF_NAME" \
-            --notes "Aplicación de escritorio con ventana propia para Windows y macOS. No requiere Python, navegador ni iTunes para seleccionar y analizar canciones. Todavía no transfiere a la app Música del iPhone. Paquetes sin firma de desarrollador ni notarización de Apple." \
+            --notes "Aplicación nativa para Windows y macOS. M4A con AAC/ALAC, miniaturas de portadas y lector de biblioteca del iPhone en modo de solo lectura. Lectura USB pendiente de verificar con un iPhone físico; la importación a Música todavía no está integrada. No requiere instalar Python. Paquetes sin firma de desarrollador ni notarización de Apple." \
             --prerelease \
             --verify-tag
