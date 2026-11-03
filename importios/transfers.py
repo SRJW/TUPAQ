@@ -190,13 +190,16 @@ async def preferences(afc, directory, before):
         data, _, _ = await read_remote(afc,path,limit=64*1024*1024)
         parsed = saved_anchors(data)
         require(parsed['database'] == (before['database'] & ((1<<64)-1)), 'host-catalogue-identity')
-        require(parsed['media'] <= before['anchor'], 'host-anchor-ahead')
+        # This is a host-generated snapshot, not the live ATC anchor. Its
+        # Media counter can differ in either direction and must never choose
+        # the request/revision. Use SQLite, require ReadyForSync equality and
+        # recapture the live catalogue before staging any metadata instead.
         require(host is None or (parsed['database'],parsed['voice']) == (host['database'],host['voice']), 'host-anchor-conflict')
         host = parsed
         target = directory/name
         target.write_bytes(data)
         target.chmod(0o600)
-    require(host is not None and host['voice'] == 1 and host['media'] <= before['anchor'], 'host-anchor-unavailable')
+    require(host is not None and host['voice'] == 1, 'host-anchor-unavailable')
     return identity,host['voice']
 
 

@@ -103,7 +103,7 @@ catálogo puede dejar una operación pendiente. No se reintenta automáticamente
 
 ## Validación disponible
 
-Las 57 pruebas incluyen replay de importación de los cinco perfiles base,
+Las 73 pruebas incluyen replay de importación de los cinco perfiles base,
 originales conservados, exportación byte por byte, nombres existentes,
 rechazo por cambio de ancla, identidad sin configurar, manifest desconocido,
 audio permanente alterado, interrupción después de aplicar cambios, verificación
@@ -121,8 +121,9 @@ concreta para iTunesDB/iTunesCDB. La preview.2 recorre las secciones desde la
 longitud de cabecera declarada (con límites), admite contenedores comprimidos
 y reconcilia los identificadores y anclas con el catálogo SQLite actual. No
 inventa identidades ni omite las comprobaciones de sincronización. Los dos
-catálogos de host pueden tener anclas Media guardadas distintas siempre que
-no excedan la ancla actual; la operación utiliza esta última.
+catálogos de host pueden tener anclas Media guardadas distintas. Desde la
+preview.3, ese valor no se compara numéricamente con el actual: la operación
+utiliza el de SQLite, que debe coincidir con ReadyForSync.
 
 Se probó el flujo completo con cabecera alternativa y ancla de host anterior
 en un teléfono simulado. No se dispone de la cabecera real del teléfono del
@@ -140,3 +141,31 @@ primero desde Artwork/Originals con rutas validadas y después desde tags
 MP3/M4A/WAV/AIFF acotados a 8 MiB. Los datos de audio se saltan por posición;
 no se envía música a Internet. Una portada ausente, protegida o inaccesible usa
 un icono musical. La caché mantiene hasta 256 miniaturas de 96 px.
+
+## Error `import:host-anchor-ahead`
+
+La preview.2 rechazaba el catálogo de host si su contador Media superaba
+el de la biblioteca actual. Esa relación no está justificada: iTunesCDB/iTunesDB
+son copias del estado del host, y no determinan la ancla actual del servicio
+de sincronización. La preview.3 elimina esa condición y conserva estas barreras:
+
+- La identidad del catálogo de host debe coincidir con SQLite y las preferencias existentes.
+- VoiceMemo conserva el perfil admitido (1); no se sustituye ni se resetea.
+- RequestingSync usa la ancla de SQLite. ReadyForSync debe devolver exactamente ese valor.
+- Se vuelve a capturar el catálogo después de ReadyForSync y antes de escribir el delta; debe conservar identidad, ancla y canciones.
+- El delta usa la ancla actual + 1; después se verifica el catálogo y los archivos. Nunca se envía Reset.
+
+Pruebas: contador guardado menor, igual, mayor y máximo u32; contadores distintos
+en iTunesCDB/iTunesDB; respuesta del teléfono distinta incluso si coincide con
+el contador adelantado del host; cambio de catálogo después de ReadyForSync;
+identidad y perfil VoiceMemo incompatibles. Los últimos casos siguen deteniendo
+el envío antes de escribir los metadatos o el audio. Son pruebas simuladas;
+la corrección aún debe comprobarse en el iPhone del usuario.
+
+El error específico `host-anchor-ahead` de la preview.2 se produce en la
+comprobación previa: no se ha anunciado un delta ni enviado audio. No hay que
+borrar la biblioteca ni los registros para probar la versión corregida.
+
+Referencias independientes MIT: [ATC, anclas de host y actuales](https://github.com/fbiba/rustunes/blob/057ee8fc9c9da65795a6f14497fc408c2fe23c76/docs/02-atc-sync-protocol.md),
+sección 6; [vinculación del CDB para inserciones](https://github.com/fbiba/rustunes/blob/057ee8fc9c9da65795a6f14497fc408c2fe23c76/crates/rustunes/src/engine/execution/native_insert.rs),
+`bind_copied_cdb`. La referencia no impone la desigualdad que causaba este rechazo.

@@ -16,13 +16,19 @@ def main():
     if subprocess.run(view, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         with tempfile.TemporaryDirectory() as directory:
             notes = Path(directory)/'notes.md'
-            notes.write_text('''TUPAQ 0.3.0-preview.2: nueva interfaz y compatibilidad de catálogo.
+            notes.write_text('''TUPAQ 0.3.0-preview.3: corrección de import:host-anchor-ahead.
+
+Se elimina una comparación incorrecta del contador guardado en el catálogo de host. RequestingSync continúa usando el contador actual de SQLite, que debe coincidir con ReadyForSync. Se conserva la segunda captura previa al delta y la comprobación posterior: el contador del host nunca sustituye al actual y no se envía Reset.
+
+El error host-anchor-ahead de la preview.2 ocurría antes de anunciar metadatos o enviar audio. No borres tu biblioteca ni los registros para probar esta corrección.
+
+Mantiene la interfaz y funciones de la preview.2:
 
 - Barra lateral organizada, apariencia Sistema/Claro/Oscuro y preferencias guardadas.
 - Detección del iPhone y lectura automática de su biblioteca al conectarlo.
 - Miniaturas de la biblioteca por USB, con lecturas parciales y caché limitada.
 - Corrección de la restricción de cabecera fija que provocaba import:host-catalogue-layout. Se mantiene la validación contra la biblioteca actual; si el formato sigue sin admitirse, el diagnóstico añade tamaños/versiones sin datos privados.
-- 69 pruebas y comprobación de la interfaz empaquetada, incluida conexión simulada y ambos temas.
+- 73 pruebas y comprobación de la interfaz empaquetada, incluida conexión simulada y ambos temas.
 
 Conserva la importación y exportación experimental por USB:
 

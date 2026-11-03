@@ -153,7 +153,13 @@ class Peer:
     async def __aexit__(self,*ignored):self.phone.closed=True
     async def receive(self):
         if not self.queue:raise ConnectionResetError('synthetic disconnect')
-        return self.queue.pop(0)
+        message=self.queue.pop(0)
+        if message['Command']=='ReadyForSync' and self.phone.fail=='catalogue-after-ready':
+            with closing(sqlite3.connect(':memory:')) as db:
+                db.deserialize(self.phone.files[PREF+'MediaLibrary.sqlitedb'])
+                db.execute("UPDATE _MLDatabaseProperties SET value='8' WHERE key='MLSyncClientSyncAnchor'")
+                db.commit();self.phone.files[PREF+'MediaLibrary.sqlitedb']=db.serialize()
+        return message
     async def send(self,msg):
         p=self.phone;p.sent.append(msg)
         command=msg['Command']
@@ -259,6 +265,54 @@ class TransferTests(unittest.TestCase):
             self.assertIn('anchor-mismatch',caught.exception.diagnostic)
             self.assertFalse(phone.writes)
             self.assertFalse(any(m['Command']=='FinishedSyncingMetadata' for m in phone.sent))
+
+    def test_saved_host_media_never_selects_request_or_delta_revision(self):
+        for saved in (0,6,8,0xffffffff):
+            with self.subTest(saved=saved),tempfile.TemporaryDirectory() as temporary:
+                phone=Phone();data=bytearray(host_database())
+                struct.pack_into('<I',data,244+96,saved)
+                phone.files[PREF+'iTunesCDB']=bytes(data)
+                phone.files[PREF+'iTunesDB']=host_database()
+                result=self.call(phone,'import',[self.selected()],temporary)
+                self.assertEqual(result['imported'],1)
+                request=next(m for m in phone.sent if m['Command']=='RequestingSync')
+                self.assertEqual(request['Params']['DataclassAnchors']['Media'],'7')
+                finished=next(m for m in phone.sent if m['Command']=='FinishedSyncingMetadata')
+                self.assertEqual(finished['Params']['DataclassAnchors']['Media'],'8')
+                self.assertEqual(finished['Params']['SyncTypes']['Media'],1)
+                self.assertEqual(len(self.tracks(phone,temporary)),2)
+
+    def test_ahead_host_does_not_override_a_live_ready_mismatch(self):
+        phone=Phone();phone.fail='anchor';data=bytearray(host_database())
+        struct.pack_into('<I',data,244+96,8)
+        phone.files[PREF+'iTunesCDB']=bytes(data)
+        with tempfile.TemporaryDirectory() as temporary:
+            with self.assertRaises(TransferError) as caught:self.call(phone,'import',[self.selected()],temporary)
+            self.assertIn('anchor-mismatch',caught.exception.diagnostic)
+            self.assertFalse(phone.writes)
+            self.assertFalse(any(m['Command']=='FinishedSyncingMetadata' for m in phone.sent))
+
+    def test_ahead_host_does_not_bypass_live_catalogue_change_after_ready(self):
+        phone=Phone();phone.fail='catalogue-after-ready';data=bytearray(host_database())
+        struct.pack_into('<I',data,244+96,10)
+        phone.files[PREF+'iTunesCDB']=bytes(data)
+        with tempfile.TemporaryDirectory() as temporary:
+            with self.assertRaises(TransferError) as caught:self.call(phone,'import',[self.selected()],temporary)
+            self.assertIn('catalogue-changed-before-stage',caught.exception.diagnostic)
+            self.assertFalse(phone.writes)
+            self.assertFalse(any(m['Command']=='FinishedSyncingMetadata' for m in phone.sent))
+
+    def test_host_database_identity_and_voice_profile_still_required(self):
+        for offset,value,code in [(72,99,'host-catalogue-identity'),(244+96+8,2,'host-anchor-unavailable')]:
+            with self.subTest(code=code),tempfile.TemporaryDirectory() as temporary:
+                phone=Phone();data=bytearray(host_database())
+                struct.pack_into('<I',data,244+96,10)
+                struct.pack_into('<I',data,offset,value)
+                phone.files[PREF+'iTunesCDB']=bytes(data)
+                with self.assertRaises(TransferError) as caught:self.call(phone,'import',[self.selected()],temporary)
+                self.assertIn(code,caught.exception.diagnostic)
+                self.assertFalse(phone.writes)
+                self.assertFalse(phone.sent)
 
     def test_entire_manifest_checked_before_any_audio_or_ancillary_ack(self):
         phone=Phone();phone.fail='manifest'

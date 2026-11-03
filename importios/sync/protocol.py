@@ -44,8 +44,9 @@ def library_identity(data):
 def saved_anchors(data):
     """Read bounded container sections; never equate header version to layout.
 
-    The caller also reconciles database PID and Media against the live SQLite
-    catalogue and requires the observed VoiceMemo profile before any ATC send.
+    The caller reconciles database PID against the live SQLite catalogue and
+    requires the observed VoiceMemo profile. Saved Media never selects the
+    request anchor: SQLite and the live ReadyForSync response must agree.
     Header facts are safe format numbers, never the private PID or preference ID.
     """
     facts = {'file_bytes':len(data)}
