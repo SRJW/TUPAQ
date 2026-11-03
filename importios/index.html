@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Importios · Tu música</title>
+<style>
+:root { color-scheme:dark; font:16px system-ui,sans-serif; background:#10131c; color:#ecedf6 }
+* { box-sizing:border-box } body { margin:0 } main { max-width:1120px; margin:auto; padding:42px 24px }
+header { display:flex; align-items:center; gap:14px; margin-bottom:44px } .logo { background:#b5f3ce; color:#16261d; border-radius:15px; padding:8px 15px; font-size:28px } header strong { font-size:23px; letter-spacing:-1px }
+.badge { margin-left:auto; font-size:13px; color:#b5f3ce; border:1px solid #365544; border-radius:20px; padding:6px 12px }
+h1 { font-size:clamp(30px,5vw,46px); letter-spacing:-1.5px; margin:0 0 12px } p { color:#b0b6c9; line-height:1.6 } .intro { max-width:690px }
+.notice { border-left:3px solid #b5f3ce; background:#1b2430; padding:14px 18px; margin:26px 0; color:#d5dfed; line-height:1.5 }
+.drop { border:1px dashed #65718c; border-radius:20px; background:#181d2a; padding:36px 20px; text-align:center } .drop.over { border-color:#b5f3ce; background:#24372f } .drop h2 { margin:0 0 8px; font-size:21px }
+button,.picker { display:inline-block; background:#b5f3ce; color:#122219; border:0; padding:12px 20px; border-radius:10px; font:600 15px system-ui; cursor:pointer } button.secondary { background:#282f42; color:#e1e7f6 } button:disabled { opacity:.45; cursor:default } button:focus-visible,.picker:focus-within { outline:3px solid #fff; outline-offset:3px }
+input[type=file] { position:absolute; width:1px; height:1px; opacity:0 } .muted { font-size:13px; color:#9da8bd }
+.summary { display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin:28px 0 15px } .summary strong { margin-right:auto } .tablewrap { overflow-x:auto; border:1px solid #30384b; border-radius:14px } table { border-collapse:collapse; width:100%; text-align:left; font-size:14px } th { color:#a7b2c9; font-weight:500; background:#1b2130 } th,td { padding:15px; border-bottom:1px solid #2a3142 } tr:last-child td { border-bottom:0 } td small { display:block; color:#929fb8; margin-top:5px } .remove { background:none; color:#aeb9cd; padding:6px 10px } .empty { text-align:center; padding:32px; color:#929fb8 } #status { min-height:24px } #errors { color:#ffb6b6; line-height:1.6; overflow-wrap:anywhere } footer { margin-top:30px; color:#8d99b1; font-size:13px; line-height:1.7 } .format { color:#b5f3ce } .track { max-width:320px; overflow-wrap:anywhere }
+</style>
+<main>
+ <header><span class="logo" aria-hidden="true">♫</span><strong>importios</strong><span class="badge">Preparación local</span></header>
+ <h1>Tu música empieza aquí.</h1>
+ <p class="intro">Reúne tus canciones y revisa sus datos antes de preparar una transferencia. Tus archivos originales se conservan tal como están.</p>
+ <div class="notice"><strong>Primera versión: selección y revisión.</strong><br>Esta versión no se conecta al iPhone ni importa a Música. La compatibilidad de transferencia con iOS 27 está pendiente de comprobar.</div>
+ <section class="drop" id="drop" aria-label="Añadir canciones">
+  <h2>Arrastra tus canciones aquí</h2><p>MP3, WAV, ALAC (.m4a o .alac) y AIFF · Hasta 256 MB por archivo</p>
+  <label class="picker">Elegir canciones<input id="files" type="file" multiple accept=".mp3,.wav,.m4a,.alac,.aif,.aiff"></label>
+  <p class="muted">Los archivos se analizan en tu computadora. No se envían a Internet.</p>
+ </section>
+ <p id="status" role="status" aria-live="polite">Elige canciones para empezar.</p><ul id="errors" aria-live="polite"></ul>
+ <div class="summary"><strong id="count">Sin canciones</strong><button class="secondary" id="export" disabled>Exportar lista CSV</button><button class="secondary" id="clear" disabled>Vaciar lista</button></div>
+ <div class="tablewrap"><table><thead><tr><th>Canción / archivo</th><th>Artista / álbum</th><th>Formato</th><th>Duración</th><th>Tamaño</th><th><span aria-label="Acciones">Acciones</span></th></tr></thead><tbody id="tracks"><tr><td colspan="6" class="empty">Tu lista de canciones aparecerá aquí.</td></tr></tbody></table></div>
+ <footer>La lista se conserva solo mientras esta página esté abierta. Exporta el CSV si quieres guardarla.<br>No se modifica tu biblioteca de Apple Music. Para cerrar Importios, cierra su ventana de consola.</footer>
+</main>
+<script>
+'use strict';
+const token = '__TOKEN__';
+const tracks = new Map();
+const $ = id => document.getElementById(id);
+let busy = false;
+const duration = seconds => `${Math.floor(seconds/60)}:${String(Math.floor(seconds%60)).padStart(2,'0')}`;
+const size = bytes => `${(bytes/1024/1024).toFixed(1)} MB`;
+function cell(row, value, detail) {
+ const td = document.createElement('td'); td.textContent = value; row.append(td);
+ if (detail) { const small = document.createElement('small'); small.textContent = detail; td.append(small); }
+ return td;
+}
+function render() {
+ const body = $('tracks'); body.replaceChildren();
+ for (const track of tracks.values()) {
+  const row = document.createElement('tr');
+  cell(row,track.title,track.filename).className='track';
+  cell(row,track.artist || 'Sin artista',track.album || 'Sin álbum');
+  const technical = [track.sample_rate ? `${track.sample_rate/1000} kHz` : '',track.bit_depth ? `${track.bit_depth} bits` : ''].filter(Boolean).join(' · ');
+  cell(row,track.format,technical).className='format'; cell(row,duration(track.duration)); cell(row,size(track.size));
+  const td = cell(row,''); const remove = document.createElement('button'); remove.textContent='Quitar'; remove.className='remove'; remove.disabled=busy;
+  remove.setAttribute('aria-label',`Quitar ${track.title}`); remove.onclick=()=>{tracks.delete(track.id);render();}; td.append(remove); body.append(row);
+ }
+ if (!tracks.size) { const row = document.createElement('tr'); const td=cell(row,'Tu lista de canciones aparecerá aquí.'); td.colSpan=6; td.className='empty';body.append(row); }
+ const total=[...tracks.values()].reduce((sum,t)=>sum+t.duration,0);
+ $('count').textContent=tracks.size ? `${tracks.size} ${tracks.size===1?'canción':'canciones'} · ${duration(total)} en total` : 'Sin canciones';
+ $('clear').disabled=busy || !tracks.size; $('export').disabled=busy || !tracks.size; $('files').disabled=busy;
+}
+async function addFiles(files) {
+ if (busy) return;
+ busy=true; $('errors').replaceChildren(); render(); let added=0,duplicates=0,failed=0;
+ for (const [index,file] of [...files].entries()) {
+  $('status').textContent=`Revisando ${index+1} de ${files.length}: ${file.name}`;
+  try {
+   if (!file.size || file.size>256*1024*1024) throw new Error('El archivo está vacío o supera los 256 MB.');
+   if (!/\.(mp3|wav|m4a|alac|aif|aiff)$/i.test(file.name)) throw new Error('Extensión no admitida.');
+   const response=await fetch('/api/inspect',{method:'POST',headers:{'X-Importios-Token':token,'X-Filename':encodeURIComponent(file.name)},body:file});
+   const result=await response.json(); if (!response.ok) throw new Error(result.error || 'No se pudo analizar.');
+   if (tracks.has(result.id)) duplicates++; else {tracks.set(result.id,result);added++;}
+  } catch(error) {
+   failed++; const li=document.createElement('li'); li.textContent=`${file.name}: ${error.message}`; $('errors').append(li);
+  }
+ }
+ busy=false; render(); $('files').value='';
+ $('status').textContent=`Añadidas: ${added}. Duplicadas omitidas: ${duplicates}. No añadidas: ${failed}.`;
+}
+$('files').onchange=e=>addFiles(e.target.files);
+for (const event of ['dragover','drop']) window.addEventListener(event,e=>e.preventDefault());
+$('drop').ondragover=e=>{e.preventDefault();if(!busy)$('drop').classList.add('over');};
+$('drop').ondragleave=()=>$('drop').classList.remove('over');
+$('drop').ondrop=e=>{e.preventDefault();$('drop').classList.remove('over');addFiles(e.dataTransfer.files);};
+$('clear').onclick=()=>{tracks.clear();$('errors').replaceChildren();$('status').textContent='Lista vaciada. Los archivos originales se conservan.';render();};
+function csvValue(value) {
+ let text=String(value ?? '');
+ if (/^[\s]*[=+@-]/.test(text)) text="'"+text;
+ return '"'+text.replaceAll('"','""')+'"';
+}
+$('export').onclick=()=>{
+ const rows=[['Archivo','Título','Artista','Álbum','Formato','Duración (segundos)','Tamaño (bytes)','SHA-256'],...[...tracks.values()].map(t=>[t.filename,t.title,t.artist,t.album,t.format,t.duration,t.size,t.id])];
+ const blob=new Blob(['\ufeff'+rows.map(row=>row.map(csvValue).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'});
+ const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='importios-canciones.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+};
+</script>
+</html>

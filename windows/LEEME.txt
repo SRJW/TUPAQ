@@ -1,0 +1,25 @@
+IMPORTIOS - Prueba inicial para Windows 11
+
+Esta herramienta comprueba la deteccion USB y los componentes de Apple.
+Todavia no es un importador de musica.
+
+1. Extrae todos los archivos del ZIP a una carpeta.
+2. Conecta el iPhone con un cable USB que permita transferir datos.
+3. Desbloquea el iPhone. Si pregunta si confias en el ordenador, acepta.
+4. Abre Comprobar-iPhone.bat con doble clic y pulsa una tecla.
+5. Comparte en el chat el resultado o una foto de la ventana.
+
+No necesitas instalar Python, programar ni ejecutar como administrador.
+La herramienta solo consulta Windows. No instala programas, no cambia
+configuraciones y no escribe en el iPhone. No muestra numeros de serie,
+nombre del telefono ni identificadores USB completos.
+
+Si Windows bloquea la ejecucion, comunica el mensaje exacto. No desactives
+las protecciones del equipo. En un equipo administrado podria ser necesaria
+la ayuda de su administrador.
+
+Esta version se ha preparado en Linux. Su ejecucion real en Windows 11 y
+la deteccion de tu iPhone estan pendientes de comprobar.
+
+Detectar USB no demuestra que sea posible importar a Musica. El siguiente
+paso dependera de este resultado y de probar un mecanismo compatible con iOS.
