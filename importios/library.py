@@ -9,6 +9,7 @@ import sqlite3
 import tempfile
 
 from .version import VERSION
+from .phone_paths import media_path
 
 REMOTE_DB = '/iTunes_Control/iTunes/MediaLibrary.sqlitedb'
 MAX_FILE = 128*1024*1024
@@ -66,8 +67,10 @@ def read_catalogue(path, diagnostics=None):
                         'item_extra': {'item_pid', 'title', 'total_time_ms'},
                         'item_artist': {'item_artist_pid', 'item_artist'},
                         'album': {'album_pid', 'album'}}
+            layout = {}
             for table, columns in required.items():
                 found = {row[1] for row in db.execute(f'PRAGMA table_info("{table}")')}
+                layout[table] = found
                 if not columns <= found:
                     raise LibraryError('La estructura de esta biblioteca todavía no es compatible con el lector.')
             if diagnostics is not None:
@@ -90,15 +93,20 @@ def read_catalogue(path, diagnostics=None):
                     'media_types': [{'type': kind, 'count': count} for kind, count in groups[:32]],
                     'media_types_truncated': len(groups) > 32,
                 })
-            rows = db.execute('''SELECT i.item_pid, e.title, a.item_artist, b.album, e.total_time_ms
+            locations = ('base_location_id' in layout['item'] and 'location' in layout['item_extra']
+                and {'base_location_id','path'} <= {r[1] for r in db.execute('PRAGMA table_info(base_location)')})
+            paths = ', bl.path, e.location' if locations else ', NULL, NULL'
+            location_join = 'LEFT JOIN base_location bl ON bl.base_location_id=i.base_location_id' if locations else ''
+            rows = db.execute('''SELECT i.item_pid, e.title, a.item_artist, b.album, e.total_time_ms'''+paths+'''
                 FROM item i LEFT JOIN item_extra e ON e.item_pid=i.item_pid
                 LEFT JOIN item_artist a ON a.item_artist_pid=i.item_artist_pid
                 LEFT JOIN album b ON b.album_pid=i.album_pid
+                '''+location_join+'''
                 WHERE i.media_type = ? ORDER BY e.title, i.item_pid LIMIT ?''', (MUSIC_MEDIA_TYPE, MAX_TRACKS+1)).fetchall()
             if len(rows) > MAX_TRACKS:
                 raise LibraryError('La biblioteca supera el límite de 100.000 canciones de esta versión.')
             tracks = []
-            for pid, title, artist, album, ms in rows:
+            for pid, title, artist, album, ms, base, leaf in rows:
                 if any(value is not None and not isinstance(value, str) for value in [title, artist, album]):
                     raise LibraryError('El catálogo contiene metadatos de un tipo no admitido.')
                 duration = float(ms or 0)/1000
@@ -106,8 +114,12 @@ def read_catalogue(path, diagnostics=None):
                     raise LibraryError('El catálogo contiene una duración no válida.')
                 tracks.append({'id': str(pid), 'title': title or 'Sin título', 'artist': artist or 'Sin artista',
                                'album': album or 'Sin álbum', 'duration': max(0, duration)})
+                if locations:
+                    tracks[-1]['afc_path'] = media_path(base, leaf)
             if diagnostics is not None:
                 diagnostics['tracks_returned'] = len(tracks)
+                diagnostics['location_schema'] = locations
+                diagnostics['usb_audio_paths'] = sum(bool(t.get('afc_path')) for t in tracks)
             return tracks
     except (sqlite3.Error, OSError, ValueError, TypeError) as error:
         raise LibraryError('No se pudo leer una copia válida de la biblioteca de Música.') from error

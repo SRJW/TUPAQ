@@ -1,4 +1,4 @@
-"""Native, offline desktop interface. Device writes are not implemented."""
+"""Native desktop interface for local preparation and USB audio transfers."""
 import argparse
 import csv
 from contextlib import closing
@@ -10,8 +10,8 @@ import sqlite3
 import tempfile
 import time
 
-from PySide6.QtCore import Qt, QThread, Signal, QSize
-from PySide6.QtGui import QIcon, QPixmap
+from PySide6.QtCore import Qt, QThread, Signal, QSize, QStandardPaths, QLockFile, QUrl
+from PySide6.QtGui import QIcon, QPixmap, QDesktopServices
 from PySide6.QtWidgets import (QApplication, QFileDialog, QHBoxLayout, QHeaderView,
     QLabel, QListWidget, QMainWindow, QMessageBox, QProgressBar, QPushButton,
     QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QAbstractItemView, QTabWidget, QTableView)
@@ -23,6 +23,7 @@ from .sync.signing import FixedHostSession
 from .library import read_phone_library, read_catalogue, LibraryError, format_diagnostics
 from .models import LibraryModel
 from .version import VERSION
+from .transfers import run_transfer, TransferError
 
 MAX_SIZE = 256 * 1024 * 1024
 
@@ -44,6 +45,7 @@ class Reader(QThread):
                 if not 0 < path.stat().st_size <= MAX_SIZE:
                     raise ValueError('El archivo está vacío o supera los 256 MB.')
                 track = inspect_audio(path, path.name)
+                track['path'] = str(path.resolve())
                 try:
                     track['thumbnail'] = thumbnail(read_artwork(path))
                 except (OSError, ValueError):
@@ -79,6 +81,30 @@ class LibraryReader(QThread):
             self.problem.emit(f'TUPAQ {VERSION}\n{error}\nDiagnóstico: {error.diagnostic}')
 
 
+class TransferWorker(QThread):
+    result = Signal(dict)
+    problem = Signal(str)
+    progress = Signal(int,int,str,str)
+
+    def __init__(self, mode, selected, destination, lock_path, parent=None):
+        super().__init__(parent)
+        self.mode, self.selected, self.destination, self.lock_path = mode, selected, destination, lock_path
+
+    def run(self):
+        lock = QLockFile(str(self.lock_path))
+        if not lock.tryLock(0):
+            self.problem.emit('Hay otra transferencia de TUPAQ en curso.\nDiagnóstico: transfer:busy')
+            return
+        try:
+            def report(value,total,label,identifier=''):
+                self.progress.emit(value,total,label,identifier)
+            self.result.emit(run_transfer(self.mode,self.selected,self.destination,report))
+        except TransferError as error:
+            self.problem.emit(f'TUPAQ {VERSION}\n{error}\nDiagnóstico: {error.diagnostic}')
+        finally:
+            lock.unlock()
+
+
 def csv_value(value):
     text = str(value if value is not None else '')
     return "'"+text if re.match(r'^\s*[=+@-]', text) else text
@@ -95,6 +121,10 @@ class Window(QMainWindow):
         self.worker = None
         self.device_worker = None
         self.library_worker = None
+        self.transfer_worker = None
+        self.transfer_outcome = None
+        self.progress_track_id = None
+        self.backup_root = Path(QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppLocalDataLocation))/'catalogue-backups'
         self.duplicates = 0
         panel = QWidget()
         self.setCentralWidget(panel)
@@ -110,8 +140,8 @@ class Window(QMainWindow):
         intro = QLabel('Elige o arrastra canciones MP3, WAV, M4A (AAC/ALAC) y AIFF. Los originales se conservan.')
         intro.setWordWrap(True)
         layout.addWidget(intro)
-        notice = QLabel('Transferencia al iPhone: pendiente de implementar y verificar.\n'
-                        'Esta versión prepara canciones; no modifica la biblioteca de Música.')
+        notice = QLabel('Importación experimental por USB, con copia previa del catálogo y comprobación del resultado.\n'
+                        'Exporta los originales al ordenador. Los archivos protegidos conservan su protección.')
         notice.setObjectName('notice')
         notice.setWordWrap(True)
         layout.addWidget(notice)
@@ -159,6 +189,21 @@ class Window(QMainWindow):
         self.now_title.setWordWrap(True)
         preview.addWidget(self.now_title, 1)
         layout.addLayout(preview)
+        transfers = QHBoxLayout()
+        self.import_phone = QPushButton('Importar al iPhone')
+        self.import_phone.setObjectName('primary')
+        self.import_phone.clicked.connect(self.import_songs)
+        self.export_phone = QPushButton('Exportar selección')
+        self.export_phone.setToolTip('Guardar los archivos de audio del iPhone en el ordenador.')
+        self.export_phone.clicked.connect(self.export_songs)
+        self.verify_import = QPushButton('Revisar importación')
+        self.verify_import.clicked.connect(lambda: self.start_transfer('verify',[],self.backup_root))
+        self.open_backup = QPushButton('Ver respaldo')
+        self.open_backup.clicked.connect(lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.backup_root))))
+        for button in (self.import_phone,self.export_phone,self.verify_import,self.open_backup):
+            transfers.addWidget(button)
+        transfers.addStretch()
+        layout.addLayout(transfers)
         self.table = QTableWidget(0, 6)
         self.table.setHorizontalHeaderLabels(['Canción', 'Artista', 'Álbum', 'Formato', 'Duración', 'Tamaño'])
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -175,12 +220,16 @@ class Window(QMainWindow):
         self.library_table = QTableView()
         self.library_table.setModel(self.library_model)
         self.library_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.library_table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.library_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.library_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.library_table.verticalHeader().hide()
-        self.tabs.addTab(self.library_table, 'Biblioteca del iPhone · solo lectura')
+        self.library_table.selectionModel().selectionChanged.connect(self.update_buttons)
+        self.tabs.addTab(self.library_table, 'Biblioteca del iPhone')
+        self.tabs.currentChanged.connect(self.update_buttons)
         layout.addWidget(self.tabs, 1)
         self.status = QLabel('Sin canciones. Puedes arrastrar archivos sobre esta ventana.')
+        self.status.setTextFormat(Qt.TextFormat.PlainText)
         self.status.setWordWrap(True)
         layout.addWidget(self.status)
         self.progress = QProgressBar()
@@ -190,7 +239,7 @@ class Window(QMainWindow):
         self.errors.setMaximumHeight(72)
         self.errors.hide()
         layout.addWidget(self.errors)
-        footer = QLabel('Análisis local · No se envían canciones a Internet · La lista no se conserva al cerrar')
+        footer = QLabel('Procesamiento local y transferencia por USB · No se envían canciones a Internet')
         footer.setWordWrap(True)
         footer.setObjectName('footer')
         layout.addWidget(footer)
@@ -216,11 +265,102 @@ class Window(QMainWindow):
         self.update_buttons()
 
     def update_buttons(self):
-        busy = self.worker is not None
+        busy = self.worker is not None or self.transfer_worker is not None
         self.choose.setEnabled(not busy)
         self.clear.setEnabled(not busy and bool(self.tracks))
         self.export.setEnabled(not busy and bool(self.tracks))
         self.remove.setEnabled(not busy and bool(self.table.selectionModel().selectedRows()))
+        phone_busy = busy or self.library_worker is not None or self.device_worker is not None
+        self.device_button.setEnabled(not phone_busy)
+        self.library_button.setEnabled(not phone_busy)
+        self.import_phone.setEnabled(not phone_busy and bool(self.tracks) and self.tabs.currentIndex() == 0)
+        rows = self.library_table.selectionModel().selectedRows()
+        self.export_phone.setEnabled(not phone_busy and self.tabs.currentIndex() == 1 and bool(rows)
+            and all(self.library_model.tracks[r.row()].get('afc_path') for r in rows))
+        self.verify_import.setEnabled(not phone_busy and self.backup_root.exists())
+        self.open_backup.setEnabled(self.backup_root.exists())
+
+    def import_songs(self):
+        rows = self.table.selectionModel().selectedRows()
+        identifiers = [self.table.item(r.row(),0).data(Qt.ItemDataRole.UserRole) for r in rows] if rows else list(self.tracks)
+        self.start_transfer('import',[dict(self.tracks[i]) for i in identifiers],self.backup_root)
+
+    def export_songs(self):
+        selected = [dict(self.library_model.tracks[r.row()]) for r in self.library_table.selectionModel().selectedRows()]
+        if not selected:
+            return
+        folder = QFileDialog.getExistingDirectory(self,'Guardar audio del iPhone en…')
+        if folder:
+            self.start_transfer('export',selected,Path(folder))
+
+    def start_transfer(self, mode, selected, destination):
+        if self.transfer_worker is not None or self.worker is not None or self.library_worker is not None or self.device_worker is not None:
+            return
+        if mode == 'import' and not selected:
+            return
+        try:
+            self.backup_root.parent.mkdir(parents=True,exist_ok=True)
+        except OSError:
+            self.show_library_error('No se pudo preparar la carpeta local de datos de TUPAQ.\nDiagnóstico: transfer:local-folder')
+            return
+        self.transfer_outcome = None
+        self.transfer_worker = TransferWorker(mode,selected,destination,self.backup_root.parent/'transfer.lock',self)
+        self.transfer_worker.progress.connect(self.transfer_progress)
+        self.transfer_worker.result.connect(self.transfer_result)
+        self.transfer_worker.problem.connect(self.transfer_problem)
+        self.transfer_worker.finished.connect(self.transfer_finished)
+        self.progress.setRange(0,100)
+        self.progress.setValue(0)
+        self.progress.show()
+        self.status.setText('Preparando transferencia…')
+        self.update_buttons()
+        self.transfer_worker.start()
+
+    def transfer_progress(self, value, total, label, identifier=''):
+        self.progress.setRange(0,max(1,total))
+        self.progress.setValue(value)
+        self.status.setText(label)
+        if identifier and identifier != self.progress_track_id and identifier in self.tracks:
+            self.progress_track_id = identifier
+            track = self.tracks[identifier]
+            picture = QPixmap()
+            if track.get('thumbnail'):
+                picture.loadFromData(track['thumbnail'])
+            if picture.isNull():
+                self.now_cover.setPixmap(QPixmap())
+                self.now_cover.setText('♫')
+            else:
+                self.now_cover.setPixmap(picture.scaled(72,72,Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation))
+            self.now_title.setText(f"{track['title']}\n{track['artist'] or 'Sin artista'}")
+
+    def transfer_problem(self, message):
+        self.show_library_error(message)
+        self.status.setText('Transferencia detenida. Consulta el diagnóstico antes de repetirla.')
+
+    def transfer_result(self, result):
+        self.transfer_outcome = result
+        if 'exported' in result:
+            self.status.setText(f"{result['exported']} archivos exportados y comprobados.")
+        else:
+            count = result.get('imported',result.get('verified',0))
+            skipped = result.get('already_imported',0)
+            self.status.setText(f'{count} canciones importadas y comprobadas. Ya importadas: {skipped}. Copia del catálogo en Ver respaldo.')
+
+    def transfer_finished(self):
+        worker = self.transfer_worker
+        self.transfer_worker = None
+        worker.deleteLater()
+        self.progress.hide()
+        if self.transfer_outcome:
+            completed = set(self.transfer_outcome.get('source_ids',[]))
+            for row in range(self.table.rowCount()-1,-1,-1):
+                identifier = self.table.item(row,0).data(Qt.ItemDataRole.UserRole)
+                if identifier in completed:
+                    self.tracks.pop(identifier,None)
+                    self.table.removeRow(row)
+        self.update_buttons()
+        if self.transfer_outcome and ('imported' in self.transfer_outcome or 'verified' in self.transfer_outcome):
+            self.load_library()
 
     def choose_files(self):
         paths, _ = QFileDialog.getOpenFileNames(self, 'Elegir canciones', '',
@@ -228,13 +368,14 @@ class Window(QMainWindow):
         self.add_paths(paths)
 
     def check_device(self):
-        if self.device_worker is not None:
+        if self.device_worker is not None or self.transfer_worker is not None:
             return
         self.device_button.setEnabled(False)
         self.device_status.setText('Consultando el servicio local de Apple…')
         self.device_worker = DeviceReader(self)
         self.device_worker.result.connect(self.device_status.setText)
         self.device_worker.finished.connect(self.device_finished)
+        self.update_buttons()
         self.device_worker.start()
 
     def device_finished(self):
@@ -243,12 +384,13 @@ class Window(QMainWindow):
         if worker is not None:
             worker.deleteLater()
         self.device_button.setEnabled(True)
+        self.update_buttons()
 
     def load_library(self):
-        if self.library_worker is not None:
+        if self.library_worker is not None or self.transfer_worker is not None:
             return
         self.library_model.replace([])
-        self.tabs.setTabText(1, 'Biblioteca del iPhone · solo lectura')
+        self.tabs.setTabText(1, 'Biblioteca del iPhone · leyendo…')
         self.library_button.setEnabled(False)
         self.copy_diagnostic.setEnabled(False)
         self.tabs.setCurrentIndex(1)
@@ -257,6 +399,7 @@ class Window(QMainWindow):
         self.library_worker.result.connect(self.show_library)
         self.library_worker.problem.connect(self.show_library_error)
         self.library_worker.finished.connect(self.library_finished)
+        self.update_buttons()
         self.library_worker.start()
 
     def show_library(self, tracks, diagnostic=''):
@@ -264,8 +407,9 @@ class Window(QMainWindow):
         self.last_diagnostic = diagnostic or format_diagnostics({'tracks_returned': len(tracks)})
         self.copy_diagnostic.setEnabled(True)
         self.tabs.setTabText(1, f"Biblioteca del iPhone · {len(tracks)} resultados")
-        self.device_status.setText(f'{len(tracks)} canciones leídas. No se modificó la biblioteca. La importación sigue pendiente.'
+        self.device_status.setText(f'{len(tracks)} canciones leídas. Selecciona las que quieras exportar al ordenador.'
             if tracks else 'No se encontraron canciones en el catálogo consultado. Esto no confirma que Música esté vacía. Pulsa Copiar diagnóstico.')
+        self.update_buttons()
 
     def show_library_error(self, message):
         self.last_diagnostic = message
@@ -278,11 +422,13 @@ class Window(QMainWindow):
         if worker is not None:
             worker.deleteLater()
         self.library_button.setEnabled(True)
+        self.update_buttons()
 
     def add_paths(self, paths):
-        if self.worker is not None or not paths:
+        if self.worker is not None or self.transfer_worker is not None or not paths:
             return
         self.errors.clear()
+        self.tabs.setCurrentIndex(0)
         self.errors.hide()
         self.duplicates = 0
         self.progress.setRange(0, len(paths))
@@ -385,6 +531,10 @@ class Window(QMainWindow):
         event.acceptProposedAction()
 
     def closeEvent(self, event):
+        if self.transfer_worker is not None:
+            self.status.setText('Espera a que termine la transferencia y su comprobación antes de cerrar.')
+            event.ignore()
+            return
         if self.library_worker is not None:
             self.device_status.setText('Espera a que termine la lectura de la biblioteca antes de cerrar la ventana.')
             event.ignore()
@@ -478,6 +628,42 @@ def smoke(app, window, fixtures, output=None):
         assert '"music_type_code": 8' in QApplication.clipboard().text()
         assert window.library_model.rowCount() == 1
         assert window.library_model.data(window.library_model.index(0, 0)) == 'Canción de catálogo iOS 27'
+        # Exercise transfer controls and the real Qt worker/lock/signals, while
+        # the protocol itself is replayed in test_transfers (never a real phone).
+        track = inspect_audio(fixtures/'covered-aac.m4a','covered-aac.m4a')
+        track['path'] = str(fixtures/'covered-aac.m4a')
+        track['thumbnail'] = thumbnail(read_artwork(fixtures/'covered-aac.m4a'))
+        window.accept_track(track)
+        window.tabs.setCurrentIndex(0)
+        assert window.import_phone.isEnabled()
+        window.show_library([{'id':'synthetic','title':'USB audio','artist':'Prueba','album':'Prueba',
+                             'duration':1,'afc_path':'iTunes_Control/Music/F00/AAAA.m4a'}])
+        window.tabs.setCurrentIndex(1)
+        window.library_table.selectRow(0)
+        assert window.export_phone.isEnabled()
+        original_transfer = globals()['run_transfer']
+        original_backup = window.backup_root
+        def simulated_transfer(mode, selected, destination, progress):
+            assert mode == 'export' and selected[0]['afc_path'].endswith('.m4a')
+            progress(1,2,'Transferencia de prueba',track['id'])
+            return {'exported':1,'files':[]}
+        try:
+            globals()['run_transfer'] = simulated_transfer
+            window.backup_root = folder/'synthetic-backups'
+            window.start_transfer('export',list(window.library_model.tracks),folder)
+            assert not window.import_phone.isEnabled() and not window.export_phone.isEnabled()
+            deadline = time.monotonic()+10
+            while window.transfer_worker is not None:
+                app.processEvents()
+                if time.monotonic() > deadline:
+                    raise RuntimeError('Transfer worker did not finish')
+                time.sleep(0.005)
+            assert '1 archivos exportados' in window.status.text()
+            assert window.progress_track_id == track['id']
+            assert not window.now_cover.pixmap().isNull()
+        finally:
+            globals()['run_transfer'] = original_transfer
+            window.backup_root = original_backup
         window.show_library_error('Error de prueba\nDiagnóstico: usb:ConnectionRefusedError')
         window.device_status.setText('Otro estado de prueba')
         window.copy_diagnostic.click()

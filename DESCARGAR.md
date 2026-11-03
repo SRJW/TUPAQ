@@ -45,5 +45,8 @@ de desarrollador de Apple. Windows o macOS pueden mostrar avisos o impedir abrir
 No desactives las protecciones del equipo; comunica el mensaje exacto si ocurre.
 Un DMG no sustituye la firma ni la notarización.
 
-Esta versión selecciona y analiza audio; **todavía no transfiere canciones al
-iPhone**. No hace falta conectar el teléfono y no se modifica su biblioteca.
+La versión 0.3.0-preview.1 prepara archivos y añade importación y exportación
+experimental por USB. No necesitas conectar el teléfono para preparar archivos;
+sí para leer su catálogo o transferir. La lectura ya fue confirmada por el usuario;
+las transferencias nuevas necesitan su primera comprobación en un iPhone físico.
+Consulta [las instrucciones de transferencia](docs/TRANSFERENCIAS.md).

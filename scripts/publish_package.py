@@ -16,13 +16,18 @@ def main():
     if subprocess.run(view, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         with tempfile.TemporaryDirectory() as directory:
             notes = Path(directory)/'notes.md'
-            notes.write_text('''TUPAQ 0.2.0-preview.11 corrige la causa identificada de los cero resultados: el catálogo interno usa item.media_type=8 para música, pero el lector aplicaba la máscara pública de MediaPlayer (1). Ahora tanto la consulta como los recuentos usan la igualdad con 8. La investigación y sus fuentes están en research/LECTURA-MEDIA-TYPE.md.
+            notes.write_text('''TUPAQ 0.3.0-preview.1 incorpora importación y exportación experimental por USB.
 
-Se corrigieron los datos de prueba y se añadió una muestra sintética del esquema 2410000. Las 41 pruebas incluyen el caso de una canción tipo 8 presente solo en el WAL; la prueba del ejecutable lee SQLite y verifica la fila a través del hilo y la tabla Qt. Falta confirmar en el iPhone del usuario el título obtenido y la cobertura de su biblioteca.
+- Importar al iPhone: MP3, M4A AAC/ALAC, WAV y AIFF en perfiles admitidos, sin convertir los originales; miniatura y progreso.
+- Delta ATC firmado con la identidad existente, copia local previa del catálogo y verificación posterior de las canciones y sus archivos. No envía un reset ni escribe SQLite en el teléfono.
+- Exportar selección: copia los originales accesibles por USB, verifica sus bytes y evita sobrescribir archivos existentes. Un original protegido conserva su protección.
+- Revisar importación: comprueba una operación cuya confirmación se perdió; bloquea nuevos envíos mientras quede una operación sin verificar.
 
-**La importación a Música todavía no está integrada.** La lectura completa está pendiente de confirmar en el iPhone. No hace falta instalar Python. Paquetes sin firma de desarrollador ni notarización de Apple.
+**La lectura del catálogo ya fue confirmada por el usuario. Las transferencias todavía no se han validado en un iPhone físico.** Pasan pruebas con un dispositivo simulado y la prueba de la interfaz empaquetada. La copia del catálogo no es un respaldo completo del teléfono ni una restauración automática.
 
-Los archivos se añaden a esta versión solo después de pasar las comprobaciones de su plataforma. Si falta un EXE o DMG, esa compilación aún no terminó correctamente; consulta Actions. La disponibilidad de un paquete no depende de los otros runners.
+Importación: hasta 49 archivos y 2 GiB por operación; 256 MiB por archivo. Requiere identidad de biblioteca configurada, anclas/preferencias compatibles y área de sincronización vacía. Si falta esa información, se detiene sin enviar un delta. No se registra todavía la portada en el catálogo de Artwork; los bytes de las portadas incrustadas se conservan en el archivo.
+
+No necesitas Python ni abrir iTunes. Paquetes sin firma de desarrollador ni notarización de Apple. Cada paquete se añade solo cuando pasa las comprobaciones de su plataforma. Instrucciones y límites: docs/TRANSFERENCIAS.md.
 ''', encoding='utf-8')
             created = subprocess.run(['gh','release','create',tag,'--repo',repo,'--title',
                 'TUPAQ '+tag,'--notes-file',str(notes),'--prerelease','--verify-tag'])

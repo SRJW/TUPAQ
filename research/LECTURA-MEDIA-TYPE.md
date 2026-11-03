@@ -66,3 +66,7 @@ registro. No demuestra por sí solo que ese catálogo represente toda la bibliot
 visible en Música ni que la importación esté implementada. Debe comprobarse el
 título devuelto en el teléfono/ordenador del usuario. Este entorno no tiene
 acceso USB físico a su iPhone. No se han realizado escrituras en el dispositivo.
+
+El usuario confirmó después que 0.2.0-preview.11 mostró correctamente la canción,
+artistas, álbum y duración. Esa confirmación valida esta lectura en su teléfono;
+no valida la implementación posterior de importación/exportación de 0.3.
