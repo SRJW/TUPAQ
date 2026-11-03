@@ -10,6 +10,7 @@ import sqlite3
 import struct
 import tempfile
 import unittest
+import zlib
 from unittest.mock import patch
 
 import mutagen
@@ -235,6 +236,21 @@ class TransferTests(unittest.TestCase):
             self.assertEqual(len([m for m in phone.sent if m['Command']=='FileError']),1)
             self.assertTrue((Path(result['backup'])/'before/1/MediaLibrary.sqlitedb').exists())
 
+    def test_import_accepts_bounded_alternate_header_and_stale_host_media_anchor(self):
+        phone=Phone()
+        original=host_database()
+        root=bytearray(original[:244])+bytearray(80)
+        struct.pack_into('<IIIII',root,4,324,324+144,1,118,1)
+        phone.files[PREF+'iTunesCDB']=bytes(root)+original[244:]
+        stale=bytearray(original)
+        struct.pack_into('<I',stale,244+96,6)
+        phone.files[PREF+'iTunesDB']=bytes(stale)
+        with tempfile.TemporaryDirectory() as temporary:
+            result=self.call(phone,'import',[self.selected()],temporary)
+            self.assertEqual(result['imported'],1)
+            request=next(message for message in phone.sent if message['Command']=='RequestingSync')
+            self.assertEqual(request['Params']['DataclassAnchors']['Media'],'7')
+
     def test_anchor_drift_never_stages_metadata_or_audio(self):
         phone=Phone();phone.fail='anchor'
         with tempfile.TemporaryDirectory() as temporary:
@@ -348,6 +364,36 @@ class TransferTests(unittest.TestCase):
         value=bytearray(preferences());value[8]=0
         with self.assertRaises(ProtocolError):library_identity(bytes(value))
         self.assertEqual(saved_anchors(host_database()),{'database':11,'media':7,'voice':1})
+
+    def test_host_catalogue_variants_retain_section_and_live_identity_checks(self):
+        for header,minor in [(208,105),(244,116),(324,118)]:
+            with self.subTest(header=header,minor=minor):
+                original=host_database()
+                data=bytearray(header)+original[244:]
+                data[:min(header,244)]=original[:min(header,244)]
+                struct.pack_into('<I',data,4,header)
+                struct.pack_into('<I',data,8,len(data))
+                struct.pack_into('<I',data,16,minor)
+                self.assertEqual(saved_anchors(data),{'database':11,'media':7,'voice':1})
+        original=host_database()
+        for declared in (244+144,244+len(zlib.compress(original[244:]))):
+            data=bytearray(original[:244])+zlib.compress(original[244:])
+            struct.pack_into('<I',data,8,declared)
+            struct.pack_into('<I',data,12,2);data[168]=1
+            self.assertEqual(saved_anchors(data)['voice'],1)
+
+    def test_host_catalogue_failure_reports_only_public_header_numbers(self):
+        data=bytearray(host_database());struct.pack_into('<I',data,4,9000)
+        with self.assertRaises(ProtocolError) as caught:saved_anchors(data)
+        from importios.transfers import transfer_error
+        report=transfer_error(caught.exception,'import').diagnostic
+        self.assertIn('9000',report)
+        self.assertNotIn('database',report)
+        for offset,value in [(8,1),(20,0)]:
+            data=bytearray(host_database());struct.pack_into('<I',data,offset,value)
+            with self.assertRaises(ProtocolError):saved_anchors(data)
+        data=bytearray(host_database());struct.pack_into('<I',data,244+8,9999)
+        with self.assertRaises(ProtocolError):saved_anchors(data)
 
     def test_phone_path_validation_never_allows_traversal(self):
         for base,leaf in [('../Music/F00','A.mp3'),('iTunes_Control/Music/F00','../A.mp3'),

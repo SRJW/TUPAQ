@@ -7,11 +7,15 @@ El objetivo es importar música local a la app Música del iPhone sin usar la
 aplicación iTunes ni 3uTools.
 
 La lectura del catálogo ya fue confirmada por el usuario en su iPhone.
-La versión 0.3.0-preview.1 incorpora **importación y exportación experimental por USB**.
+La versión 0.3.0-preview.2 añade una interfaz con barra lateral, temas claro/oscuro,
+lectura automática de la biblioteca y miniaturas por USB. Incluye compatibilidad
+con cabeceras variables del catálogo de host para la importación experimental.
 Las transferencias pasan pruebas con un dispositivo simulado; todavía deben
 verificarse en el iPhone real. Véase [cómo transferir](docs/TRANSFERENCIAS.md).
 
-![Ventana nativa de TUPAQ con audio sintético de prueba](docs/interfaz-nativa.png)
+![TUPAQ en modo claro, con audio sintético de prueba](docs/interfaz-nativa.png)
+
+![TUPAQ en modo oscuro, con audio sintético de prueba](docs/interfaz-oscura.png)
 
 ## Descargar y abrir
 
@@ -29,7 +33,8 @@ notarización de Apple.
 
 ## Funciones actuales
 
-- Interfaz nativa clara inspirada en Apple, con tipografía del sistema. Sin motor web, animaciones ni sondeos periódicos.
+- Interfaz nativa inspirada en Apple: barra lateral, tipografía del sistema y apariencia Sistema/Claro/Oscuro en Preferencias. Sin motor web ni animaciones.
+- Detección USB automática cada cinco segundos cuando la conexión está libre. Lee la biblioteca al conectar el teléfono y al reconectarlo; no vuelve a copiar el catálogo en cada sondeo. Se puede desactivar en Preferencias. Nunca importa automáticamente.
 - Tabla de biblioteca con celdas dibujadas bajo demanda, sin crear un objeto por celda.
 - Errores de conexión por etapa y botón **Copiar diagnóstico**, también cuando la consulta devuelve cero resultados. Incluye versión, recuentos por tipo y presencia/tamaño del WAL, sin títulos ni credenciales ni identificadores del dispositivo.
 - Las canciones sin fila de metadatos complementarios se muestran como «Sin título» en lugar de descartarse.
@@ -41,11 +46,12 @@ notarización de Apple.
 - Omitir duplicados por contenido, quitar elementos y exportar CSV.
 - Consultar dispositivos USB mediante **ListDevices** del servicio local de Apple.
   No inicia sesiones de sincronización, emparejamientos ni escrituras al iPhone.
-- **Leer biblioteca del iPhone**: usa la autorización de confianza existente y AFC
+- **Biblioteca** se abre al detectar el iPhone; **Actualizar** permite releerla. Usa la autorización de confianza existente y AFC
   para obtener dos copias consecutivas del catálogo y su WAL. Si no coinciden,
   rechaza la lectura. Consulta una copia local con SQLite en modo de solo lectura
   y muestra título, artista, álbum y duración. No escribe en la biblioteca remota.
   El usuario confirmó la lectura de título, artista, álbum y duración en su iPhone.
+- Miniaturas de la biblioteca: consulta los originales de Artwork y, si faltan, los tags incrustados mediante lecturas parciales por USB. Solo las filas visibles y con caché de hasta 256 iconos; no descarga todo el audio ni consulta URLs. Si no hay portada accesible, muestra una nota musical.
 - **Importar al iPhone**: toma archivos del ordenador, guarda el catálogo y las
   preferencias de biblioteca localmente, conserva la identidad existente y envía
   un delta ATC firmado. Comprueba después las canciones nuevas, la conservación
@@ -73,8 +79,10 @@ el código fuente, instalar las dependencias.
 ## Recursos de la interfaz
 
 La interfaz usa Qt Widgets nativo y carga el componente de comunicación con iOS
-al solicitar la biblioteca. No tiene motor de navegador ni consulta el teléfono
-en bucle. La tabla del catálogo conserva sus filas y dibuja celdas bajo demanda.
+al solicitar la biblioteca. No tiene motor de navegador. La consulta ligera ListDevices
+se hace cada cinco segundos, con las lecturas suspendidas durante una transferencia.
+La biblioteca completa se lee una vez por conexión; si falla, se espera al menos
+20 segundos antes de reintentar. La tabla conserva sus filas y dibuja celdas bajo demanda.
 Se prueba el acceso a la primera y última canción de una lista sintética de
 100.000 filas.
 
@@ -106,8 +114,8 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m importios.native --smoke-fixtures 
 .venv/bin/python scripts/build_desktop.py
 ```
 
-La suite contiene 57 pruebas de formatos, HTTP local, descubrimiento USB simulado,
-paquetes de investigación y firmas candidatas. La prueba nativa comprueba una
+La suite contiene 69 pruebas de formatos, HTTP local, descubrimiento USB simulado,
+paquetes de investigación, firmas candidatas, conexión automática y portadas remotas. La prueba nativa comprueba una
 ventana Qt real, lectura en un hilo de trabajo, los AAC/ALAC dentro de M4A, portadas, duplicados,
 archivos dañados, CSV, quitar/vaciar y las firmas. En Linux se ha probado también
 el ejecutable empaquetado. Windows y macOS se validan en sus runners de GitHub;

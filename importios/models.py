@@ -1,16 +1,35 @@
 """Library rows are rendered on demand; no object is allocated for every cell."""
 from PySide6.QtCore import QAbstractTableModel, Qt
+from collections import OrderedDict
 
 
 class LibraryModel(QAbstractTableModel):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.tracks = []
+        self.icons = OrderedDict()
+        self.default_icon = None
 
     def replace(self, tracks):
         self.beginResetModel()
         self.tracks = tracks
+        self.icons.clear()
         self.endResetModel()
+
+    def set_icon(self, identifier, icon):
+        self.icons[identifier] = icon
+        self.icons.move_to_end(identifier)
+        while len(self.icons)>256:
+            old,_ = self.icons.popitem(last=False)
+            self._icon_changed(old)
+        self._icon_changed(identifier)
+
+    def _icon_changed(self, identifier):
+        for row,track in enumerate(self.tracks):
+            if track.get('id') == identifier:
+                index = self.index(row,0)
+                self.dataChanged.emit(index,index,[Qt.ItemDataRole.DecorationRole])
+                break
 
     def rowCount(self, parent=None):
         return 0 if parent is not None and parent.isValid() else len(self.tracks)
@@ -23,6 +42,8 @@ class LibraryModel(QAbstractTableModel):
             return ['Canción', 'Artista', 'Álbum', 'Duración', 'Archivo por USB'][section]
 
     def data(self, index, role=Qt.ItemDataRole.DisplayRole):
+        if index.isValid() and index.column() == 0 and role == Qt.ItemDataRole.DecorationRole:
+            return self.icons.get(self.tracks[index.row()].get('id'),self.default_icon)
         if not index.isValid() or role != Qt.ItemDataRole.DisplayRole:
             return None
         track = self.tracks[index.row()]

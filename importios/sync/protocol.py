@@ -16,6 +16,9 @@ from .signing import HOST_REQUEST, FixedHostSession
 
 class ProtocolError(Exception):
     """Only fixed diagnostic codes, never remote payloads or private identities."""
+    def __init__(self, code, facts=None):
+        super().__init__(code)
+        self.facts = facts
 
 
 def require(condition, code):
@@ -39,24 +42,46 @@ def library_identity(data):
 
 
 def saved_anchors(data):
-    require(244 <= len(data) <= 64*1024*1024, 'host-catalogue-size')
+    """Read bounded container sections; never equate header version to layout.
+
+    The caller also reconciles database PID and Media against the live SQLite
+    catalogue and requires the observed VoiceMemo profile before any ATC send.
+    Header facts are safe format numbers, never the private PID or preference ID.
+    """
+    facts = {'file_bytes':len(data)}
+    try:
+        return _saved_anchors(data,facts)
+    except ProtocolError as error:
+        error.facts = facts
+        raise
+
+
+def _saved_anchors(data, facts):
+    require(172 <= len(data) <= 64*1024*1024, 'host-catalogue-size')
     endian = '<' if data[:4] == b'mhbd' else '>' if data[:4] == b'dbhm' else None
     require(endian is not None, 'host-catalogue-magic')
     def number(offset):
         return struct.unpack_from(endian+'I', data, offset)[0]
-    require(number(4) == 244 and number(8) == len(data) and number(16) == 117, 'host-catalogue-layout')
+    header, declared, major, minor = number(4), number(8), number(12), number(16)
+    facts.update(header_bytes=header,declared_bytes=declared,major=major,minor=minor)
+    require(172 <= header <= min(4096,len(data)) and 0 < minor <= 65535, 'host-catalogue-layout')
     count = number(20)
     require(1 <= count <= 4096, 'host-catalogue-sections')
     database = struct.unpack_from(endian+'Q', data, 72)[0]
-    major, compressed = number(12), data[168]
-    body = data[244:]
+    compressed = data[168]
+    facts.update(compression=compressed,sections=count)
+    body = data[header:]
     if (major, compressed) == (2,1):
         decoder = zlib.decompressobj()
-        body = decoder.decompress(body, 256*1024*1024+1)
+        try:
+            body = decoder.decompress(body, 256*1024*1024+1)
+        except zlib.error:
+            raise ProtocolError('host-catalogue-compression') from None
         require(len(body) <= 256*1024*1024 and decoder.eof and not decoder.unused_data and not decoder.unconsumed_tail,
                 'host-catalogue-compression')
     else:
         require((major,compressed) == (1,0), 'host-catalogue-version')
+    require(declared == len(data) or (compressed == 1 and declared == header+len(body)), 'host-catalogue-length')
     anchors = None
     offset = 0
     for _ in range(count):

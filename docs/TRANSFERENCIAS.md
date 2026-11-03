@@ -9,8 +9,8 @@ y controlador USB de Apple que ya permite leer la biblioteca.
 ## Importar del ordenador a Música
 
 1. Conecta un solo iPhone por USB y desbloquéalo.
-2. Usa **Elegir canciones** o arrastra los archivos a TUPAQ.
-3. En la pestaña del ordenador, selecciona las canciones y pulsa **Importar al
+2. Entra en **Inicio** o **Importación USB**. Usa **Elegir canciones** o arrastra los archivos a TUPAQ.
+3. En la lista del ordenador, selecciona las canciones y pulsa **Importar al
    iPhone**. Sin selección se usa toda la cola. Se admiten hasta 49 archivos y
    2 GiB por operación, con un máximo de 256 MiB por archivo.
 4. Espera a que termine el envío y su comprobación. La miniatura cambia con la
@@ -34,7 +34,7 @@ no garantiza que Música muestre esa portada después de importar.
 
 ## Exportar del iPhone al ordenador
 
-1. Pulsa **Leer biblioteca del iPhone**.
+1. Conecta el iPhone: su biblioteca se carga automáticamente. Puedes entrar en **Biblioteca** o pulsar **Actualizar** para releerla.
 2. Selecciona filas con archivo accesible en la columna **Archivo por USB**.
 3. Pulsa **Exportar selección** y elige una carpeta del ordenador.
 4. Espera a que finalice la comprobación. Los archivos se guardan con artista y
@@ -55,7 +55,7 @@ autorizados. La exportación no envía operaciones ATC ni modifica el iPhone.
 
 Antes de importar se guardan dos copias coincidentes del catálogo y su WAL,
 las preferencias y el catálogo de host usados para obtener la identidad y las
-anclas existentes. **Ver respaldo** abre su carpeta local de datos de TUPAQ.
+anclas existentes. En **Preferencias**, **Ver respaldo del catálogo** abre su carpeta local de datos de TUPAQ.
 Es información privada de la biblioteca; no es un respaldo de todos los audios
 ni del teléfono completo. No existe una restauración automática de esa copia.
 
@@ -65,7 +65,7 @@ respuestas Grappa ni claves del firmador. Estos archivos se conservan al cerrar;
 el botón de diagnóstico no copia su contenido.
 
 Si la confirmación final se pierde, una nueva importación queda bloqueada. Usa
-**Revisar importación** para leer nuevamente la biblioteca y comprobar canciones
+**Preferencias → Revisar importación pendiente** para leer nuevamente la biblioteca y comprobar canciones
 y hashes sin reenviar los metadatos ni el audio. Si no puede comprobarse, copia
 el diagnóstico. No borres el registro para forzar otro envío: una operación
 parcial no debe confundirse con una importación que no ocurrió.
@@ -113,3 +113,30 @@ La prueba de la ventana empaquetada comprueba selección, botones, lock local,
 hilo de transferencia, señales, progreso y miniatura con un transporte simulado.
 Estas pruebas no demuestran que el iPhone del usuario acepte la primera sesión
 ATC; esa comprobación debe hacerse ejecutando el paquete nuevo con el teléfono.
+
+## Error `import:host-catalogue-layout`
+
+La preview.1 exigía una cabecera de exactamente 244 bytes y una versión menor
+concreta para iTunesDB/iTunesCDB. La preview.2 recorre las secciones desde la
+longitud de cabecera declarada (con límites), admite contenedores comprimidos
+y reconcilia los identificadores y anclas con el catálogo SQLite actual. No
+inventa identidades ni omite las comprobaciones de sincronización. Los dos
+catálogos de host pueden tener anclas Media guardadas distintas siempre que
+no excedan la ancla actual; la operación utiliza esta última.
+
+Se probó el flujo completo con cabecera alternativa y ancla de host anterior
+en un teléfono simulado. No se dispone de la cabecera real del teléfono del
+usuario, por lo que aún no confirma que resuelva su caso particular. Si sigue
+fallando, **Copiar diagnóstico** incluye tamaños, versiones y compresión
+del contenedor, sin su contenido ni sus identificadores privados.
+
+## Miniaturas y conexión automática
+
+Preferencias permite escoger Sistema/Claro/Oscuro y activar la detección
+automática. Esta consulta ListDevices cada cinco segundos y lee el catálogo
+al detectar una conexión nueva, sin iniciar importaciones. Las lecturas se
+serializan con las transferencias. Las portadas se cargan para las filas visibles,
+primero desde Artwork/Originals con rutas validadas y después desde tags
+MP3/M4A/WAV/AIFF acotados a 8 MiB. Los datos de audio se saltan por posición;
+no se envía música a Internet. Una portada ausente, protegida o inaccesible usa
+un icono musical. La caché mantiene hasta 256 miniaturas de 96 px.

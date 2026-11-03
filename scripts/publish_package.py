@@ -16,7 +16,15 @@ def main():
     if subprocess.run(view, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         with tempfile.TemporaryDirectory() as directory:
             notes = Path(directory)/'notes.md'
-            notes.write_text('''TUPAQ 0.3.0-preview.1 incorpora importación y exportación experimental por USB.
+            notes.write_text('''TUPAQ 0.3.0-preview.2: nueva interfaz y compatibilidad de catálogo.
+
+- Barra lateral organizada, apariencia Sistema/Claro/Oscuro y preferencias guardadas.
+- Detección del iPhone y lectura automática de su biblioteca al conectarlo.
+- Miniaturas de la biblioteca por USB, con lecturas parciales y caché limitada.
+- Corrección de la restricción de cabecera fija que provocaba import:host-catalogue-layout. Se mantiene la validación contra la biblioteca actual; si el formato sigue sin admitirse, el diagnóstico añade tamaños/versiones sin datos privados.
+- 69 pruebas y comprobación de la interfaz empaquetada, incluida conexión simulada y ambos temas.
+
+Conserva la importación y exportación experimental por USB:
 
 - Importar al iPhone: MP3, M4A AAC/ALAC, WAV y AIFF en perfiles admitidos, sin convertir los originales; miniatura y progreso.
 - Delta ATC firmado con la identidad existente, copia local previa del catálogo y verificación posterior de las canciones y sus archivos. No envía un reset ni escribe SQLite en el teléfono.

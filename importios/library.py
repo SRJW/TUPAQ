@@ -97,7 +97,7 @@ def read_catalogue(path, diagnostics=None):
                 and {'base_location_id','path'} <= {r[1] for r in db.execute('PRAGMA table_info(base_location)')})
             paths = ', bl.path, e.location' if locations else ', NULL, NULL'
             location_join = 'LEFT JOIN base_location bl ON bl.base_location_id=i.base_location_id' if locations else ''
-            rows = db.execute('''SELECT i.item_pid, e.title, a.item_artist, b.album, e.total_time_ms'''+paths+'''
+            rows = db.execute('''SELECT i.item_pid, e.title, a.item_artist, b.album, e.total_time_ms'''+paths+''', i.album_pid
                 FROM item i LEFT JOIN item_extra e ON e.item_pid=i.item_pid
                 LEFT JOIN item_artist a ON a.item_artist_pid=i.item_artist_pid
                 LEFT JOIN album b ON b.album_pid=i.album_pid
@@ -106,7 +106,9 @@ def read_catalogue(path, diagnostics=None):
             if len(rows) > MAX_TRACKS:
                 raise LibraryError('La biblioteca supera el límite de 100.000 canciones de esta versión.')
             tracks = []
-            for pid, title, artist, album, ms, base, leaf in rows:
+            from .remote_artwork import catalogue_artwork
+            artwork = catalogue_artwork(db)
+            for pid, title, artist, album, ms, base, leaf, album_pid in rows:
                 if any(value is not None and not isinstance(value, str) for value in [title, artist, album]):
                     raise LibraryError('El catálogo contiene metadatos de un tipo no admitido.')
                 duration = float(ms or 0)/1000
@@ -116,6 +118,9 @@ def read_catalogue(path, diagnostics=None):
                                'album': album or 'Sin álbum', 'duration': max(0, duration)})
                 if locations:
                     tracks[-1]['afc_path'] = media_path(base, leaf)
+                covers = [artwork[key] for key in ((str(pid),0),(str(album_pid),4)) if key in artwork]
+                if covers:
+                    tracks[-1]['artwork_paths'] = list(dict.fromkeys(covers))
             if diagnostics is not None:
                 diagnostics['tracks_returned'] = len(tracks)
                 diagnostics['location_schema'] = locations
@@ -169,7 +174,7 @@ async def copy_catalogue(afc, directory, missing_errors=(FileNotFoundError,), di
     return read_catalogue(directory/'1'/'MediaLibrary.sqlitedb', diagnostics)
 
 
-async def _read_phone(diagnostics=None):
+async def _read_phone(diagnostics=None, device_info=None):
     stage = 'modules'
     try:
         from pymobiledevice3 import usbmux
@@ -184,6 +189,10 @@ async def _read_phone(diagnostics=None):
         lockdown = await create_using_usbmux(serial=devices[0].serial, connection_type='USB', autopair=False,
                                            label='TUPAQ')
         async with lockdown:
+            if device_info is not None and isinstance(lockdown.all_values,dict):
+                name = lockdown.all_values.get('DeviceName')
+                if isinstance(name,str) and 0 < len(name)<=120 and not any(ord(c)<32 for c in name):
+                    device_info['name'] = name
             stage = 'trust'
             # The pinned SDK validates existing trust and starts a session in
             # create_using_usbmux even with autopair=False. A second validation
@@ -201,9 +210,9 @@ async def _read_phone(diagnostics=None):
         raise connection_failure(error, stage) from error
 
 
-def read_phone_library(diagnostics=None):
+def read_phone_library(diagnostics=None, device_info=None):
     try:
-        return asyncio.run(asyncio.wait_for(_read_phone(diagnostics), timeout=120))
+        return asyncio.run(asyncio.wait_for(_read_phone(diagnostics,device_info), timeout=120))
     except LibraryError:
         raise
     except Exception as error:

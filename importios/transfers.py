@@ -190,7 +190,8 @@ async def preferences(afc, directory, before):
         data, _, _ = await read_remote(afc,path,limit=64*1024*1024)
         parsed = saved_anchors(data)
         require(parsed['database'] == (before['database'] & ((1<<64)-1)), 'host-catalogue-identity')
-        require(host is None or parsed == host, 'host-anchor-conflict')
+        require(parsed['media'] <= before['anchor'], 'host-anchor-ahead')
+        require(host is None or (parsed['database'],parsed['voice']) == (host['database'],host['voice']), 'host-anchor-conflict')
         host = parsed
         target = directory/name
         target.write_bytes(data)
@@ -467,6 +468,8 @@ def transfer_error(error, mode):
         'alac-profile':'El perfil ALAC de este archivo no está admitido por la importación actual.',
     }
     message = messages.get(code,message)
+    if isinstance(error,ProtocolError) and error.facts is not None:
+        code += '\nFormato del catálogo: '+json.dumps(error.facts,sort_keys=True)
     return TransferError(message, mode+':'+code)
 
 

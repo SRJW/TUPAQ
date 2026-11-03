@@ -37,6 +37,17 @@ class DiscoveryTests(unittest.TestCase):
     def test_empty_list_is_valid(self):
         self.assertEqual(read_devices(FakeStream(response({'DeviceList': []}))), [])
 
+    def test_optional_connection_token_changes_on_replug_without_returning_serial(self):
+        def token(device_id):
+            stream = FakeStream(response({'DeviceList':[{'DeviceID':device_id,
+                'Properties':{'ConnectionType':'USB','SerialNumber':'private-serial'}}]}))
+            return read_devices(stream,fingerprint=True)
+        first = token(1)
+        self.assertEqual(first,token(1))
+        self.assertNotEqual(first,token(2))
+        self.assertEqual(len(first[0]['token']),64)
+        self.assertNotIn('private-serial',repr(first))
+
     def test_service_error_is_not_treated_as_no_devices(self):
         for value in [{'MessageType': 'Result', 'Number': 1}, {'DeviceList': ['invalid entry']}]:
             with self.subTest(value=value), self.assertRaises(DiscoveryError):
