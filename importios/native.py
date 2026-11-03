@@ -12,13 +12,14 @@ from PySide6.QtCore import Qt, QThread, Signal, QSize
 from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtWidgets import (QApplication, QFileDialog, QHBoxLayout, QHeaderView,
     QLabel, QListWidget, QMainWindow, QMessageBox, QProgressBar, QPushButton,
-    QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QAbstractItemView, QTabWidget)
+    QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QAbstractItemView, QTabWidget, QTableView)
 
 from .audio import inspect_audio, read_artwork
 from .artwork import thumbnail
 from .devices import discover, DiscoveryError
 from .sync.signing import FixedHostSession
 from .library import read_phone_library, LibraryError
+from .models import LibraryModel
 
 MAX_SIZE = 256 * 1024 * 1024
 
@@ -70,7 +71,7 @@ class LibraryReader(QThread):
         try:
             self.result.emit(read_phone_library())
         except LibraryError as error:
-            self.problem.emit(str(error))
+            self.problem.emit(f'{error}\nDiagnóstico: {error.diagnostic}')
 
 
 def csv_value(value):
@@ -118,8 +119,15 @@ class Window(QMainWindow):
         connection.addWidget(self.library_button)
         self.device_status = QLabel('Detección sin sincronizar ni modificar el teléfono.')
         self.device_status.setWordWrap(True)
-        connection.addWidget(self.device_status, 1)
+        connection.addStretch()
+        self.copy_diagnostic = QPushButton('Copiar diagnóstico')
+        self.last_diagnostic = ''
+        self.copy_diagnostic.setEnabled(False)
+        self.copy_diagnostic.clicked.connect(lambda: QApplication.clipboard().setText(self.last_diagnostic))
+        connection.addWidget(self.copy_diagnostic)
         layout.addLayout(connection)
+        self.device_status.setTextFormat(Qt.TextFormat.PlainText)
+        layout.addWidget(self.device_status)
         buttons = QHBoxLayout()
         self.choose = QPushButton('Elegir canciones')
         self.choose.setObjectName('primary')
@@ -158,8 +166,10 @@ class Window(QMainWindow):
         self.table.itemSelectionChanged.connect(self.update_buttons)
         self.tabs = QTabWidget()
         self.tabs.addTab(self.table, 'Canciones para preparar')
-        self.library_table = QTableWidget(0, 4)
-        self.library_table.setHorizontalHeaderLabels(['Canción', 'Artista', 'Álbum', 'Duración'])
+        self.library_model = LibraryModel(self)
+        self.library_table = QTableView()
+        self.library_table.setModel(self.library_model)
+        self.library_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.library_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.library_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.library_table.verticalHeader().hide()
@@ -180,24 +190,23 @@ class Window(QMainWindow):
         footer.setObjectName('footer')
         layout.addWidget(footer)
         self.setStyleSheet('''
-            QWidget { background: #111723; color: #e9eef7; font-size: 14px; }
-            QLabel#brand { font-size: 23px; color: #b5f3ce; font-weight: 700; }
-            QLabel#title { font-size: 30px; font-weight: 700; }
-            QLabel#notice { background: #202d3d; border-left: 3px solid #b5f3ce; padding: 15px; }
-            QLabel#footer { color: #a3b0c5; font-size: 12px; }
-            QPushButton { background: #29374c; padding: 11px 15px; border: 0; border-radius: 7px; }
-            QPushButton#primary { background: #b5f3ce; color: #14251b; font-weight: 700; }
-            QPushButton:disabled { background: #202939; color: #6d7d96; }
-            QPushButton:focus { border: 2px solid #b5f3ce; }
-            QTableWidget { background: #161e2d; border: 1px solid #33425a; gridline-color: #33425a; }
-            QTableWidget::item { padding: 8px; }
-            QTableWidget::item:selected { background: #334f65; }
-            QHeaderView::section { background: #233047; padding: 10px; border: 0; }
-            QListWidget { color: #ffb5b5; border: 1px solid #513745; }
-            QProgressBar { border: 0; background: #263249; text-align: center; }
-            QProgressBar::chunk { background: #54876c; }
-            QTabBar::tab { background: #233047; padding: 9px 14px; }
-            QTabBar::tab:selected { background: #334f65; }
+            QWidget { background: #f5f5f7; color: #1d1d1f; font-size: 14px; }
+            QLabel#brand { font-size: 19px; font-weight: 600; }
+            QLabel#title { font-size: 27px; font-weight: 600; }
+            QLabel#notice { background: #e9e9ed; border-radius: 9px; padding: 12px; color: #515154; }
+            QLabel#footer { color: #6e6e73; font-size: 12px; }
+            QPushButton { background: #ffffff; border: 1px solid #d2d2d7; padding: 8px 13px; border-radius: 7px; }
+            QPushButton#primary { background: #007aff; color: white; border: 1px solid #007aff; font-weight: 600; }
+            QPushButton:disabled { background: #eeeef0; color: #9b9ba0; border-color: #dedee2; }
+            QPushButton:focus { border: 2px solid #007aff; }
+            QTableWidget, QTableView { background: white; alternate-background-color: #fafafa; border: 1px solid #dedee2; gridline-color: #eeeeef; selection-background-color: #dcecff; selection-color: #1d1d1f; }
+            QTableWidget::item { padding: 6px; }
+            QHeaderView::section { background: #f2f2f4; color: #6e6e73; padding: 9px; border: 0; }
+            QListWidget { background: #fff5f4; color: #a12c21; border: 1px solid #ecd5d2; }
+            QProgressBar { border: 0; background: #e5e5ea; text-align: center; border-radius: 4px; }
+            QProgressBar::chunk { background: #007aff; border-radius: 4px; }
+            QTabBar::tab { background: #e9e9ed; padding: 8px 14px; margin-right: 2px; }
+            QTabBar::tab:selected { background: #ffffff; color: #0066cc; }
         ''')
         self.update_buttons()
 
@@ -233,25 +242,27 @@ class Window(QMainWindow):
     def load_library(self):
         if self.library_worker is not None:
             return
-        self.library_table.setRowCount(0)
+        self.library_model.replace([])
         self.tabs.setTabText(1, 'Biblioteca del iPhone · solo lectura')
         self.library_button.setEnabled(False)
+        self.copy_diagnostic.setEnabled(False)
         self.tabs.setCurrentIndex(1)
         self.device_status.setText('Leyendo una copia de la biblioteca. Puede tardar hasta dos minutos…')
         self.library_worker = LibraryReader(self)
         self.library_worker.result.connect(self.show_library)
-        self.library_worker.problem.connect(self.device_status.setText)
+        self.library_worker.problem.connect(self.show_library_error)
         self.library_worker.finished.connect(self.library_finished)
         self.library_worker.start()
 
     def show_library(self, tracks):
-        self.library_table.setRowCount(len(tracks))
-        for row, track in enumerate(tracks):
-            seconds = int(track['duration'])
-            for column, value in enumerate([track['title'], track['artist'], track['album'], f'{seconds//60}:{seconds%60:02}']):
-                self.library_table.setItem(row, column, QTableWidgetItem(value))
+        self.library_model.replace(tracks)
         self.tabs.setTabText(1, f"Biblioteca del iPhone · {len(tracks)} canciones")
         self.device_status.setText(f'{len(tracks)} canciones leídas. No se modificó la biblioteca. La importación sigue pendiente.')
+
+    def show_library_error(self, message):
+        self.last_diagnostic = message
+        self.device_status.setText(message)
+        self.copy_diagnostic.setEnabled(True)
 
     def library_finished(self):
         worker = self.library_worker
@@ -427,8 +438,12 @@ def smoke(app, window, fixtures, output=None):
         assert not window.export.isEnabled()
         assert all(path.exists() for path in files)
         window.show_library([{'id': 'test', 'title': 'Canción sintética', 'artist': 'Prueba', 'album': 'Prueba', 'duration': 1}])
-        assert window.library_table.rowCount() == 1
-        assert window.library_table.item(0, 0).text() == 'Canción sintética'
+        assert window.library_model.rowCount() == 1
+        assert window.library_model.data(window.library_model.index(0, 0)) == 'Canción sintética'
+        window.show_library_error('Error de prueba\nDiagnóstico: usb:ConnectionRefusedError')
+        window.device_status.setText('Otro estado de prueba')
+        window.copy_diagnostic.click()
+        assert QApplication.clipboard().text() == 'Error de prueba\nDiagnóstico: usb:ConnectionRefusedError'
 
 
 def main():

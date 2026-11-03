@@ -14,7 +14,7 @@ La detección USB en Windows sí necesita el controlador/servicio local de Apple
 ## Windows 11 (descarga desde Actions)
 
 1. Entra en [las compilaciones de GitHub](https://github.com/SRJW/importios/actions/workflows/desktop.yml).
-2. Abre la ejecución más reciente de la rama `desarrollo/preparacion-musica`
+2. Abre la ejecución más reciente de la etiqueta de versión más reciente
    que tenga un indicador verde. Si está en curso, espera a que termine.
 3. Al final de la página, en **Artifacts**, descarga **Importios-Windows-x64**.
    Para descargar artefactos debes iniciar sesión en GitHub.

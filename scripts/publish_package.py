@@ -16,7 +16,7 @@ def main():
     if subprocess.run(view, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         with tempfile.TemporaryDirectory() as directory:
             notes = Path(directory)/'notes.md'
-            notes.write_text('''Aplicación nativa de preparación de música: M4A (AAC/ALAC), portadas y lectura del catálogo del iPhone.
+            notes.write_text('''Interfaz nativa clara inspirada en Apple, tabla de biblioteca con celdas bajo demanda y botón Copiar diagnóstico para errores de conexión. Incluye M4A (AAC/ALAC), portadas y lectura experimental del catálogo del iPhone.
 
 **La importación a Música todavía no está integrada.** La lectura USB está pendiente de verificar en un iPhone físico. No hace falta instalar Python. Paquetes sin firma de desarrollador ni notarización de Apple.
 

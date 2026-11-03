@@ -8,7 +8,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 from importios.library import copy_catalogue, read_catalogue, LibraryError
-from importios.library import _read_phone
+from importios.library import _read_phone, connection_failure
 
 
 def database(path):
@@ -54,6 +54,28 @@ class FakeAfc:
 
 
 class LibraryTests(unittest.TestCase):
+    def test_diagnostic_omits_exception_payload_and_device_identifiers(self):
+        error = connection_failure(OSError('SECRET-PAIR-RECORD device-id path'), 'lockdown')
+        self.assertEqual(error.diagnostic, 'lockdown:OSError')
+        self.assertNotIn('SECRET', str(error))
+        self.assertNotIn('device-id', str(error))
+        missing = ModuleNotFoundError('private payload', name='pymobiledevice3.lockdown')
+        self.assertEqual(connection_failure(missing, 'modules').diagnostic,
+                         'modules:ModuleNotFoundError:pymobiledevice3.lockdown')
+        missing.name = '/private/path'
+        self.assertEqual(connection_failure(missing, 'modules').diagnostic,
+                         'modules:ModuleNotFoundError')
+
+    def test_usb_failure_identifies_stage_without_attempting_pairing(self):
+        with patch('pymobiledevice3.usbmux.list_devices', new_callable=AsyncMock) as devices, \
+             patch('pymobiledevice3.lockdown.create_using_usbmux', new_callable=AsyncMock) as create:
+            devices.side_effect = ConnectionRefusedError('private payload')
+            with self.assertRaises(LibraryError) as caught:
+                asyncio.run(_read_phone())
+            self.assertEqual(caught.exception.diagnostic, 'usb:ConnectionRefusedError')
+            self.assertNotIn('private payload', str(caught.exception))
+            create.assert_not_awaited()
+
     def test_missing_trust_never_opens_the_file_service(self):
         lockdown = AsyncMock()
         lockdown.__aenter__.return_value = lockdown

@@ -1,12 +1,20 @@
 # Leer la biblioteca del iPhone y preparar la importación
 
-La versión preliminar `v0.2.0-preview.4` añade el botón **Leer biblioteca del iPhone**.
+La versión preliminar `v0.2.0-preview.5` añade el botón **Leer biblioteca del iPhone**.
 
 1. Conecta un solo iPhone por USB, desbloqueado, a un ordenador que ya tenga
    autorización de confianza. En Windows se necesita el controlador de Apple.
 2. Abre Importios y pulsa **Leer biblioteca del iPhone**.
 3. Espera la lectura. La pestaña del teléfono mostrará canciones o un mensaje
    de acceso/esquema no compatible. No hace falta aceptar ninguna sincronización.
+
+Si aparece un error, pulsa **Copiar diagnóstico** y comparte ese texto. Indica
+la etapa (`modules`, `usb`, `lockdown`, `trust`, `afc` o `catalogue`) y la clase
+del error, sin incluir mensajes internos que puedan contener credenciales o
+identificadores. No restablezcas la biblioteca ni la confianza para probar.
+Estar conectado y desbloqueado no confirma que AFC o el catálogo estén accesibles.
+Este diagnóstico ayuda a investigar la causa; no demuestra que se haya corregido
+la conexión real del teléfono.
 
 La compatibilidad real con el iPhone 13 Pro/iOS 27 aún no se ha verificado.
 Los tests usan dispositivos y bases de datos sintéticos. Que las pruebas pasen

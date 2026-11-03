@@ -13,7 +13,30 @@ MAX_TRACKS = 100_000
 
 
 class LibraryError(Exception):
-    pass
+    def __init__(self, message, diagnostic=None):
+        super().__init__(message)
+        self.diagnostic = diagnostic or 'catalogue:LibraryError'
+
+
+def connection_failure(error, stage):
+    messages = {
+        'modules': 'No se pudo cargar el componente de comunicación de esta versión.',
+        'usb': 'No se pudo acceder al servicio USB de Apple. Que el sistema detecte el teléfono no confirma que ese servicio esté disponible para Importios.',
+        'lockdown': 'Se detectó el dispositivo, pero no se pudo abrir su conexión de confianza.',
+        'trust': 'No se pudo validar la autorización existente del ordenador.',
+        'afc': 'La conexión con el dispositivo se abrió, pero iOS no permitió abrir el servicio de archivos.',
+        'catalogue': 'El servicio de archivos se abrió, pero no se pudo copiar o consultar el catálogo de Música.',
+        'timeout': 'La lectura tardó demasiado y se interrumpió.',
+    }
+    kind = type(error).__name__
+    detail = f'{stage}:{kind}'
+    if isinstance(error, ModuleNotFoundError) and error.name:
+        import re
+        if re.fullmatch(r'[A-Za-z_][A-Za-z0-9_.]{0,120}', error.name):
+            detail += ':'+error.name
+    return LibraryError(messages.get(stage, 'La lectura no pudo completarse.')+
+                        ' No se ha escrito en la biblioteca del teléfono.', detail)
+
 
 
 def read_catalogue(path):
@@ -98,22 +121,32 @@ async def copy_catalogue(afc, directory, missing_errors=(FileNotFoundError,)):
 
 
 async def _read_phone():
-    # Imported explicitly so the desktop packager discovers all runtime modules.
-    from pymobiledevice3 import usbmux
-    from pymobiledevice3.lockdown import create_using_usbmux
-    from pymobiledevice3.services.afc import AfcService, AfcFileNotFoundError
+    stage = 'modules'
+    try:
+        from pymobiledevice3 import usbmux
+        from pymobiledevice3.lockdown import create_using_usbmux
+        from pymobiledevice3.services.afc import AfcService, AfcFileNotFoundError
 
-    devices = [device for device in await usbmux.list_devices() if device.is_usb]
-    if len(devices) != 1:
-        raise LibraryError('Conecta un solo iPhone por USB y desbloquéalo para leer su biblioteca.')
-    lockdown = await create_using_usbmux(serial=devices[0].serial, connection_type='USB', autopair=False,
-                                       label='Importios')
-    async with lockdown:
-        if not await lockdown.validate_pairing():
-            raise LibraryError('El ordenador necesita una autorización de confianza existente. Desbloquea el iPhone y comprueba su conexión con Windows o Finder; Importios no crea emparejamientos automáticamente.')
-        async with AfcService(lockdown) as afc:
-            with tempfile.TemporaryDirectory(prefix='importios-library-') as directory:
-                return await copy_catalogue(afc, directory, (FileNotFoundError, AfcFileNotFoundError))
+        stage = 'usb'
+        devices = [device for device in await usbmux.list_devices() if device.is_usb]
+        if len(devices) != 1:
+            raise LibraryError('Conecta un solo iPhone por USB y desbloquéalo para leer su biblioteca.', 'usb:device-count')
+        stage = 'lockdown'
+        lockdown = await create_using_usbmux(serial=devices[0].serial, connection_type='USB', autopair=False,
+                                           label='Importios')
+        async with lockdown:
+            stage = 'trust'
+            if not await lockdown.validate_pairing():
+                raise LibraryError('No se encontró una autorización de confianza válida para Importios. No restablezcas la confianza ni la biblioteca; copia el diagnóstico para revisarlo.', 'trust:missing-record')
+            stage = 'afc'
+            async with AfcService(lockdown) as afc:
+                stage = 'catalogue'
+                with tempfile.TemporaryDirectory(prefix='importios-library-') as directory:
+                    return await copy_catalogue(afc, directory, (FileNotFoundError, AfcFileNotFoundError))
+    except LibraryError:
+        raise
+    except Exception as error:
+        raise connection_failure(error, stage) from error
 
 
 def read_phone_library():
@@ -123,4 +156,4 @@ def read_phone_library():
         raise
     except Exception as error:
         # Do not expose pairing records or device identifiers in UI diagnostics.
-        raise LibraryError('No se pudo consultar Música. Comprueba el cable, el desbloqueo y la confianza del ordenador. La biblioteca del teléfono no se ha modificado.') from error
+        raise connection_failure(error, 'timeout' if isinstance(error, TimeoutError) else 'inicio') from error
