@@ -16,7 +16,7 @@ def main():
     if subprocess.run(view, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         with tempfile.TemporaryDirectory() as directory:
             notes = Path(directory)/'notes.md'
-            notes.write_text('''TUPAQ 0.3.0-preview.10: biblioteca estable, tipografía global y estilo Apple Music.
+            notes.write_text('''TUPAQ 0.3.0-preview.11: biblioteca estable, tipografía global y estilo Apple Music.
 
 - Sin vaciar la biblioteca mientras se actualiza después de importar. Conserva selección, casillas, posición de lectura y carátulas válidas. Ante un error mantiene la vista anterior con aviso.
 - Diseño inspirado en Apple Music: portada y resumen sobre la lista, paneles suaves, acento rosa y barra inferior de transferencias. Fondos estáticos, sin motor web ni desenfoque continuo.

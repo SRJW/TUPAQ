@@ -55,7 +55,7 @@ class FontApplicationTests(unittest.TestCase):
             w=Window(auto_connect=False);w.show();APP.processEvents()
             try:
                 current=w.font_choice.currentFont().family()
-                family=next(f for f in QFontDatabase.families() if f!=current)
+                family=next(f for f in QFontDatabase.families() if f not in (current,w.font_choice.currentText()))
                 old=QFontInfo(w.choose.font()).family();w.font_choice.setCurrentFont(QFont(family));APP.processEvents()
                 self.assertEqual(QFontInfo(w.choose.font()).family(),old);self.assertTrue(w.apply_font_button.isEnabled())
                 w.apply_font();APP.processEvents()

@@ -7,7 +7,7 @@ El objetivo es importar música local a la app Música del iPhone sin usar la
 aplicación iTunes ni 3uTools.
 
 El usuario confirmó la lectura y la importación con metadatos y portada en Música del iPhone.
-La **0.3.0-preview.10** conserva la biblioteca visible mientras se actualiza después
+La **0.3.0-preview.11** conserva la biblioteca visible mientras se actualiza después
 de una importación, incluidas selección, marcas, posición de lectura y carátulas.
 Si falla la lectura, mantiene la última vista válida e indica que no está actualizada.
 El diseño se acerca a Apple Music: portada y detalles sobre la tabla, paneles suaves,

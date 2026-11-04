@@ -1,17 +1,30 @@
 """Native UI behaviour with a simulated attach; never opens USB or imports."""
 import os
+import sys
+from pathlib import Path
 os.environ.setdefault('QT_QPA_PLATFORM','offscreen')
 import time
 import unittest
 from unittest.mock import patch
 
 from PySide6.QtCore import Qt, QEvent
-from PySide6.QtGui import QCloseEvent
+from PySide6.QtGui import QCloseEvent,QFontDatabase
 from PySide6.QtWidgets import QApplication, QMessageBox
 from importios.native import Window
 from importios.visuals import music_icon
 
 APP = QApplication.instance() or QApplication([])
+# Qt's Windows offscreen plugin does not enumerate the system font collection.
+# Register real OS fonts for the GUI tests; nothing is copied or distributed.
+TEST_FONT_IDS=[]
+if sys.platform=='win32' and len(QFontDatabase.families())<2:
+    font_folder=Path(os.environ.get('WINDIR','C:/Windows'))/'Fonts'
+    for filename in ('arial.ttf','consola.ttf','times.ttf'):
+        path=font_folder/filename
+        if path.is_file():
+            identifier=QFontDatabase.addApplicationFont(str(path))
+            if identifier>=0:TEST_FONT_IDS.append(identifier)
+
 TRACK = {'id':'1','title':'Prueba','artist':'Artista','album':'Álbum','duration':120,'is_local':True}
 
 

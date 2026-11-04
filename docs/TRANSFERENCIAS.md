@@ -391,7 +391,7 @@ La asignación usa un ID libre y busca huecos si el máximo de 32 bits ya está
 ocupado. Las portadas nuevas siguen requiriendo registro y bytes SHA-256 correctos.
 
 
-## Actualización visual y tipografía (preview.10)
+## Actualización visual y tipografía (preview.11)
 
 Al releer el catálogo, las filas anteriores siguen visibles con el aviso
 Actualizando biblioteca. Se muestra el resultado completo cuando termina la lectura,
