@@ -403,18 +403,6 @@ async def import_selected(selected, backup_root, progress, expected_snapshot=Non
     require(sum(s['size'] for s in sources) <= 2*1024*1024*1024, 'import-batch-size')
     root = Path(backup_root)
     root.mkdir(parents=True,exist_ok=True)
-    completed_receipts, retired_receipts = [], []
-    for journal in root.glob('*/journal.json'):
-        record = json.loads(journal.read_text(encoding='utf-8'))
-        require(record.get('phase') in ('completed','before-write-failed','resolved-items-removed'), 'previous-import-unverified')
-        if record.get('phase') == 'resolved-items-removed':
-            retired_receipts.append(record)
-        if record.get('phase') == 'completed':
-            matches = [{'track_id':e['track_id'],'destination':e['destination'],
-                        'source':{'id':e['source']['id'],'size':e['source']['size']}}
-                       for e in record.get('entries',[]) if e['source']['id'] in hashes]
-            if matches:
-                completed_receipts.append({'database':record.get('database'),'primary':record.get('primary'),'entries':matches})
     directory = root/(datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')+'-'+uuid.uuid4().hex[:8])
     directory.mkdir(mode=0o700)
     receipt = {'phase':'preflight','entries':[]}
@@ -431,6 +419,21 @@ async def import_selected(selected, backup_root, progress, expected_snapshot=Non
                 progress(0,100,'Guardando una copia del catálogo…')
                 before = await capture(afc,directory/'before')
                 require(expected_snapshot is None or before == expected_snapshot, 'recovery-catalogue-changed')
+                identity, voice = await preferences(afc,directory,before)
+                from .reconciliation import reconcile,ensure_resolved
+                reconciliation = await reconcile(root,afc,before,identity,progress,exclude=directory)
+                ensure_resolved(reconciliation)
+                completed_receipts, retired_receipts = [], []
+                for journal in root.glob('*/journal.json'):
+                    record = json.loads(journal.read_text(encoding='utf-8'))
+                    if record.get('phase') == 'resolved-items-removed':
+                        retired_receipts.append(record)
+                    if record.get('phase') in ('completed','observed-present'):
+                        matches = [{'track_id':e['track_id'],'destination':e['destination'],
+                                    'source':{'id':e['source']['id'],'size':e['source']['size']}}
+                                   for e in record.get('entries',[]) if e['source']['id'] in hashes]
+                        if matches:
+                            completed_receipts.append({'database':record.get('database'),'primary':record.get('primary'),'entries':matches})
                 for retired in retired_receipts:
                     if retired.get('database') == before['database']:
                         require(not any(str(e['track_id']) in before['wire_to_item'] for e in retired.get('entries',[])),
@@ -453,8 +456,7 @@ async def import_selected(selected, backup_root, progress, expected_snapshot=Non
                 if not sources:
                     receipt.update(phase='completed',database=before['database'],primary=before['primary'])
                     save_receipt(directory,receipt)
-                    return {'imported':0,'already_imported':len(already),'source_ids':list(hashes),'backup':str(directory)}
-                identity, voice = await preferences(afc,directory,before)
+                    return {'imported':0,'already_imported':len(already),'source_ids':list(hashes),'backup':str(directory),'reconciled':reconciliation['reconciled'],'metadata_unverified':reconciliation['metadata_unverified']}
                 await check_empty_staging(afc)
                 entries = await plan_entries(afc,before,sources,directory)
                 receipt.update(entries=entries,anchor=before['anchor'],database=before['database'],primary=before['primary'])
@@ -473,13 +475,15 @@ async def import_selected(selected, backup_root, progress, expected_snapshot=Non
                 receipt['phase'] = 'completed'
                 save_receipt(directory,receipt)
                 progress(100,100,'Importación comprobada en el catálogo.')
-                return {'imported':len(entries),'already_imported':len(already),'source_ids':list(hashes),'backup':str(directory)}
+                return {'imported':len(entries),'already_imported':len(already),'source_ids':list(hashes),'backup':str(directory),'reconciled':reconciliation['reconciled'],'metadata_unverified':reconciliation['metadata_unverified']}
             finally:
                 if locked:
                     with suppress(Exception):
                         await afc.lock(lock,AFC_LOCK_UN)
                 await afc.fclose(lock)
-    except BaseException:
+    except BaseException as error:
+        from .reconciliation import note_failure
+        note_failure(receipt,error)
         if receipt['phase'] == 'preflight':
             receipt['phase'] = 'before-write-failed'
         save_receipt(directory,receipt)
@@ -532,22 +536,16 @@ def transfer_error(error, mode):
 
 
 async def verify_pending(backup_root, progress):
-    from .recovery import pending_receipt
-    journal, receipt = pending_receipt(backup_root)
-    before = snapshot(journal.parent/'before'/'1'/'MediaLibrary.sqlitedb')
+    from .reconciliation import reconcile,ensure_resolved
     async with device() as (_,afc):
         with tempfile.TemporaryDirectory(prefix='tupaq-verify-') as temporary:
-            after = await capture(afc,Path(temporary)/'catalogue')
-            verify_before_after(before,after,receipt['entries'])
-            from .sync.artwork import verify as verify_artwork
-            await verify_artwork(afc,after,receipt['entries'])
-        for index, entry in enumerate(receipt['entries']):
-            _, digest, size = await read_remote(afc,entry['destination'])
-            require(digest == entry['source']['id'] and size == entry['source']['size'], 'verify-permanent-audio')
-            progress(index+1,len(receipt['entries']),'Comprobando la importación pendiente…')
-    receipt['phase'] = 'completed'
-    save_receipt(journal.parent,receipt)
-    return {'verified':len(receipt['entries']),'source_ids':[e['source']['id'] for e in receipt['entries']],'backup':str(journal.parent)}
+            directory=Path(temporary)
+            current=await capture(afc,directory/'catalogue')
+            prefs=directory/'preferences';prefs.mkdir()
+            identity,_=await preferences(afc,prefs,current)
+            result=await reconcile(backup_root,afc,current,identity,progress)
+            ensure_resolved(result)
+    return result
 
 
 def run_transfer(mode, selected, destination, progress):

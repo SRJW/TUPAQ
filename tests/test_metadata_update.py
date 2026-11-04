@@ -127,8 +127,10 @@ class MetadataUpdateTests(unittest.TestCase):
                 p=MetadataPhone();self.owned(p,root);p.fail=failure
                 with self.assertRaises(TransferError) as caught:self.call(p,'repair',[],root)
                 self.assertIn(code,caught.exception.diagnostic)
-                with self.assertRaises(TransferError) as blocked:self.call(p,'import',[self.selected('sample.wav')],root)
-                self.assertIn('previous-import-unverified',blocked.exception.diagnostic)
+                p.fail=None
+                result=self.call(p,'import',[self.selected('sample.wav')],root)
+                self.assertEqual(result['imported'],1)
+                self.assertEqual(result['metadata_unverified'],1)
 
     def test_no_registered_import_is_never_an_update_authority(self):
         p=MetadataPhone()

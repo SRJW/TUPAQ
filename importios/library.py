@@ -99,12 +99,15 @@ def read_catalogue(path, diagnostics=None):
             location_join = 'LEFT JOIN base_location bl ON bl.base_location_id=i.base_location_id' if locations else ''
             state_columns = {r[1] for r in db.execute('PRAGMA table_info(item_state)')}
             state_schema = {'item_pid','is_placeholder','is_library_added','has_non_purgeable_asset'} <= state_columns
-            playback_schema = {'item_pid','audio_format'} <= {r[1] for r in db.execute('PRAGMA table_info(item_playback)')}
+            playback_columns = {r[1] for r in db.execute('PRAGMA table_info(item_playback)')}
+            playback_schema = {'item_pid','audio_format'} <= playback_columns
             extra_fields = ', e.file_size' if 'file_size' in layout['item_extra'] else ', NULL'
             extra_fields += ', st.is_placeholder, st.is_library_added, st.has_non_purgeable_asset' if state_schema else ', NULL, NULL, NULL'
             extra_fields += ', pb.audio_format' if playback_schema else ', NULL'
             protected_local = state_schema and 'has_non_purgeable_subscription_protected_local_asset' in state_columns
             extra_fields += ', st.has_non_purgeable_subscription_protected_local_asset' if protected_local else ', NULL'
+            playback_timing = playback_schema and {'duration','sample_rate'} <= playback_columns
+            extra_fields += ', pb.duration, pb.sample_rate' if playback_timing else ', NULL, NULL'
             metadata_joins = (' LEFT JOIN item_state st ON st.item_pid=i.item_pid' if state_schema else '')
             metadata_joins += ' LEFT JOIN item_playback pb ON pb.item_pid=i.item_pid' if playback_schema else ''
             rows = db.execute('''SELECT i.item_pid, e.title, a.item_artist, b.album, e.total_time_ms'''+paths+', i.album_pid'+extra_fields+'''
@@ -118,7 +121,7 @@ def read_catalogue(path, diagnostics=None):
             tracks = []
             from .remote_artwork import catalogue_artwork
             artwork = catalogue_artwork(db)
-            for pid, title, artist, album, ms, base, leaf, album_pid, size, placeholder, added, asset, codec, protected in rows:
+            for pid, title, artist, album, ms, base, leaf, album_pid, size, placeholder, added, asset, codec, protected, frames, rate in rows:
                 if any(value is not None and not isinstance(value, str) for value in [title, artist, album]):
                     raise LibraryError('El catálogo contiene metadatos de un tipo no admitido.')
                 duration = float(ms or 0)/1000
@@ -126,6 +129,10 @@ def read_catalogue(path, diagnostics=None):
                     raise LibraryError('El catálogo contiene una duración no válida.')
                 tracks.append({'id': str(pid), 'title': title or 'Sin título', 'artist': artist or 'Sin artista',
                                'album': album or 'Sin álbum', 'duration': max(0, duration)})
+                if duration<=0 and type(frames) in (int,float) and type(rate) in (int,float) and frames>0 and rate>0:
+                    seconds=frames/rate
+                    if math.isfinite(seconds) and 0<seconds<=7*86400:
+                        tracks[-1].update(duration=seconds,duration_source='playback')
                 if locations:
                     tracks[-1]['afc_path'] = media_path(base, leaf)
                 if state_schema:
@@ -228,7 +235,9 @@ async def _read_phone(diagnostics=None, device_info=None):
             async with AfcService(lockdown) as afc:
                 stage = 'catalogue'
                 with tempfile.TemporaryDirectory(prefix='importios-library-') as directory:
-                    return await copy_catalogue(afc, directory, (FileNotFoundError, AfcFileNotFoundError), diagnostics=diagnostics)
+                    tracks=await copy_catalogue(afc, directory, (FileNotFoundError, AfcFileNotFoundError), diagnostics=diagnostics)
+                    from .presence import probe_files
+                    return await probe_files(afc,tracks,diagnostics)
     except LibraryError:
         raise
     except Exception as error:

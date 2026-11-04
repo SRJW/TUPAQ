@@ -15,7 +15,7 @@ from .sync.catalogue import snapshot, verify_originals, verify_before_after
 from .sync.protocol import require, library_identity, handshake
 from .sync.source import inspect_source
 
-TERMINAL = ('completed','before-write-failed','resolved-items-removed')
+TERMINAL = ('completed','observed-present','before-write-failed','resolved-items-removed')
 
 
 def pending_receipt(root):

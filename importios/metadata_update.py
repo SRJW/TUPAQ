@@ -20,9 +20,8 @@ async def repair_imported(root, selected, progress):
     root=Path(root);records=[]
     for journal in sorted(root.glob('*/journal.json'),reverse=True):
         record=json.loads(journal.read_text(encoding='utf-8'))
-        require(record.get('phase') in TERMINAL,'previous-import-unverified')
-        if record.get('phase')=='completed':records.append((journal.parent,record))
-    require(bool(records),'metadata-no-owned-tracks')
+        if record.get('phase') in ('completed','observed-present'):records.append((journal.parent,record))
+    require(bool(records) or any(root.glob('*/journal.json')),'metadata-no-owned-tracks')
     requested={track['id'] for track in selected}
     directory=root/(datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')+'-'+uuid.uuid4().hex[:8])
     directory.mkdir(mode=0o700)
@@ -34,6 +33,13 @@ async def repair_imported(root, selected, progress):
                 await afc.lock(lock,AFC_LOCK_EX);locked=True
                 before=await capture(afc,directory/'before')
                 identity,voice=await preferences(afc,directory,before)
+                from .reconciliation import reconcile,ensure_resolved
+                summary=await reconcile(root,afc,before,identity,progress,exclude=directory)
+                ensure_resolved(summary)
+                records=[]
+                for journal in sorted(root.glob('*/journal.json'),reverse=True):
+                    record=json.loads(journal.read_text(encoding='utf-8'))
+                    if record.get('phase') in ('completed','observed-present'):records.append((journal.parent,record))
                 entries=[];seen=set()
                 for saved,record in records:
                     if (record.get('database'),record.get('primary'))!=(before['database'],before['primary']):continue
@@ -80,7 +86,9 @@ async def repair_imported(root, selected, progress):
                 if locked:
                     with suppress(Exception):await afc.lock(lock,AFC_LOCK_UN)
                 await afc.fclose(lock)
-    except BaseException:
+    except BaseException as error:
+        from .reconciliation import note_failure
+        note_failure(receipt,error)
         if receipt['phase']=='preflight':receipt['phase']='before-write-failed'
         save_receipt(directory,receipt)
         raise

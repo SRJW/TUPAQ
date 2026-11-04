@@ -17,6 +17,8 @@ class RemoteDetailsTests(unittest.TestCase):
                 data=(FIXTURES/name).read_bytes();afc=AFC({AUDIO:data})
                 result=asyncio.run(audio_details(afc,{'afc_path':AUDIO}))
                 self.assertEqual(result['format_label'],label)
+                from mutagen import File
+                self.assertAlmostEqual(result['duration'],File(FIXTURES/name).info.length,delta=.1)
                 self.assertEqual(result['size'],len(data));self.assertEqual(result['size_source'],'usb')
                 self.assertFalse(afc.handles)
                 self.assertTrue(all(mode=='r' for _,mode in afc.opens))

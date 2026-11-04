@@ -17,6 +17,7 @@ def local_tracks(tracks):
     """Do not collapse equal titles: only repeat references to the same file."""
     result,paths = [],set()
     for track in tracks:
+        if track.get('usb_exists') is False:continue
         local = track.get('is_local')
         if local is False or (local is None and not track.get('afc_path')):
             continue

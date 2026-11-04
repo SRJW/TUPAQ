@@ -414,14 +414,18 @@ class TransferTests(unittest.TestCase):
             journal=next(Path(temporary).glob('*/journal.json'))
             self.assertEqual(json.loads(journal.read_text(encoding='utf-8'))['phase'],'verifying')
 
-    def test_pending_import_blocks_a_second_send_until_it_is_verified(self):
+    def test_verified_audio_after_lost_completion_unblocks_the_next_import(self):
         phone=Phone();phone.fail='lost-finished'
         with tempfile.TemporaryDirectory() as temporary:
             with self.assertRaises(TransferError):self.call(phone,'import',[self.selected()],temporary)
             previous=len(phone.sent)
-            with self.assertRaises(TransferError) as caught:self.call(phone,'import',[self.selected('aac.m4a')],temporary)
-            self.assertIn('previous-import-unverified',caught.exception.diagnostic)
-            self.assertEqual(len(phone.sent),previous)
+            phone.fail=None
+            result=self.call(phone,'import',[self.selected('aac.m4a')],temporary)
+            self.assertEqual(result['imported'],1)
+            self.assertEqual(result['reconciled'],1)
+            records=[json.loads(path.read_text()) for path in Path(temporary).glob('*/journal.json')]
+            self.assertEqual(sum(r['phase']=='observed-present' for r in records),1)
+            self.assertGreater(len(phone.sent),previous)
 
     def test_export_keeps_a_protected_original_unchanged(self):
         phone=Phone()

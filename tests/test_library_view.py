@@ -69,10 +69,31 @@ class LibraryViewTests(unittest.TestCase):
         try:
             self.assertEqual([button.text() for button in window.nav_buttons],['Biblioteca','Preferencias'])
             self.assertTrue(window.choose.isVisible());self.assertTrue(window.import_phone.isVisible());self.assertTrue(window.export_phone.isVisible())
-            rows=[{'id':'local','title':'Local','artist':'A','album':'B','duration':1,'is_local':True},
+            rows=[{'id':'local','title':'Local','artist':'A','album':'B','duration':1,'is_local':True,'usb_exists':True},
                   {'id':'cloud','title':'Local','artist':'A','album':'B','duration':1,'is_local':False}]
             window.show_library(rows)
             self.assertEqual(window.library_model.rowCount(),1)
             window.phone_filter.setCurrentIndex(1)
-            self.assertEqual(window.library_model.rowCount(),2)
+            self.assertEqual(window.library_model.rowCount(),1)
+            window.search.setText('absent')
+            self.assertEqual(window.library_model.rowCount(),0)
+            window.search.setText('local')
+            self.assertEqual(window.library_model.rowCount(),1)
+            window.library_table.selectRow(0)
+            self.assertEqual(window.now_title.text(),'Local')
         finally:window.close();window.deleteLater();APP.processEvents()
+
+    def test_unknown_duration_is_not_displayed_as_zero(self):
+        from importios.models import duration_label
+        self.assertEqual(duration_label(None),'—')
+        self.assertEqual(duration_label(0),'—')
+        self.assertEqual(duration_label(.1),'0:01')
+        self.assertEqual(duration_label(148),'2:28')
+
+    def test_playback_frame_count_recovers_missing_duration(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/'library.db';path.write_bytes(initial_catalogue())
+            with closing(sqlite3.connect(path)) as db:
+                db.executescript("ALTER TABLE item_playback ADD COLUMN duration; ALTER TABLE item_playback ADD COLUMN sample_rate; UPDATE item_extra SET total_time_ms=0; INSERT INTO item_playback VALUES(1,301,6526800,44100);")
+                db.commit()
+            self.assertEqual(read_catalogue(path)[0]['duration'],148)

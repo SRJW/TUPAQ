@@ -1,12 +1,18 @@
 """Virtual song rows with stable selection while sorting by values, not labels."""
 from collections import OrderedDict
 import unicodedata
+import math
 
 from PySide6.QtCore import QAbstractTableModel,Qt
 from PySide6.QtWidgets import QTableWidgetItem
 
 SORT_ROLE = int(Qt.ItemDataRole.UserRole)+1
 HEADERS = ['Canción','Artista','Álbum','Formato','Duración','Tamaño','Archivo por USB']
+
+
+def duration_label(value):
+    if not isinstance(value,(int,float)) or not math.isfinite(value) or value<=0:return '—'
+    seconds=max(1,round(value));return f'{seconds//60}:{seconds%60:02}'
 
 
 def text_key(value):
@@ -49,7 +55,9 @@ class LibraryModel(QAbstractTableModel):
         def value(track):
             if column in (0,1,2):return text_key(track.get(('title','artist','album')[column],''))
             if column == 3:return text_key(track.get('format_label') or '')
-            if column == 4:return track.get('duration',0)
+            if column == 4:
+                value=track.get('duration')
+                return value if isinstance(value,(int,float)) and value>0 else (float('inf') if order==Qt.SortOrder.AscendingOrder else float('-inf'))
             if column == 5:
                 size=track.get('size')
                 return size if type(size) is int else (float('inf') if order==Qt.SortOrder.AscendingOrder else float('-inf'))
@@ -72,7 +80,7 @@ class LibraryModel(QAbstractTableModel):
         if row is None:return
         self.tracks[row].update(details)
         self._changed(identifier,3,6)
-        if self.sort_column in (3,5):self.sort(self.sort_column,self.sort_order)
+        if self.sort_column in (3,4,5):self.sort(self.sort_column,self.sort_order)
 
     def _changed(self,identifier,first,last):
         row=self.rows.get(identifier)
@@ -97,8 +105,7 @@ class LibraryModel(QAbstractTableModel):
         if role!=Qt.ItemDataRole.DisplayRole:return None
         if column<3:return track[('title','artist','album')[column]]
         if column==3:return track.get('format_label') or '—'
-        if column==4:
-            seconds=int(track['duration']);return f'{seconds//60}:{seconds%60:02}'
+        if column==4:return duration_label(track.get('duration'))
         if column==5:return byte_label(track.get('size'))
         path=track.get('afc_path')
         return 'Original protegido' if path and path.lower().endswith('.m4p') else 'Disponible' if path else 'Sin acceso USB'

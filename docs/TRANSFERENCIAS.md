@@ -107,7 +107,7 @@ catálogo puede dejar una operación pendiente. No se reintenta automáticamente
 
 ## Validación disponible
 
-Las 98 pruebas incluyen replay de importación de los cinco perfiles base,
+Las 108 pruebas incluyen replay de importación de los cinco perfiles base,
 originales conservados, exportación byte por byte, nombres existentes,
 rechazo por cambio de ancla, identidad sin configurar, manifest desconocido,
 audio permanente alterado, interrupción después de aplicar cambios, verificación
@@ -242,7 +242,7 @@ La vista inicial usa item_state: pertenencia a biblioteca, ausencia de placehold
 y has_non_purgeable_asset o has_non_purgeable_subscription_protected_local_asset.
 Así las descargas protegidas de Apple Music cuentan aunque no tengan un audio
 exportable por AFC. Los registros de nube o aún sin audio no se cuentan como
-descargadas, y se conservan en Todo el catálogo. Dos títulos iguales con archivos
+descargadas. Desde preview.6 el catálogo bruto se conserva internamente para verificar transferencias, sin ofrecerlo como lista de canciones reales. Dos títulos iguales con archivos
 diferentes siguen siendo dos canciones; dos referencias a la misma ruta se
 cuentan una vez. No se elimina ninguna fila del teléfono. Si el esquema no
 expone esos estados, se muestran referencias USB y se indica que el estado
@@ -286,8 +286,46 @@ Solo se toman recibos completados cuya biblioteca, IDs, metadatos, rutas y
 hashes de audio coincidan. Se envían update_track de fecha/caché y el JPEG;
 no insert_track, audio nuevo, eliminaciones ni SQL remoto. Sin portada incrustada
 se actualiza solo la fecha. Se verifican los audios antes y después. Una
-actualización sin confirmar bloquea otra importación; Revisar importación puede
-comprobarla sin reenvío. Estas actualizaciones todavía requieren validación física.
+actualización sin confirmar se revisa antes de otro envío; si el audio coincide
+pero falla solo la portada o fecha, se registra como metadatos por revisar. Estas actualizaciones todavía requieren validación física.
 
 Referencia independiente MIT: [campos de fecha y protocolo de Artwork](https://github.com/fbiba/rustunes/blob/057ee8fc9c9da65795a6f14497fc408c2fe23c76/docs/04-media-library-database.md),
 secciones 4 y 10. El cliente no modifica ArtworkDB del host ni la SQLite del teléfono.
+
+
+## Interfaz y recuperación (preview.6)
+
+La referencia visual vigente es Peel: panel lateral compacto, lista central con
+búsqueda por canción/artista/álbum y un inspector derecho plegable. Los controles
+Importar/Exportar comparten Biblioteca. Se conserva una vista clara opcional.
+macOS utiliza su fuente nativa San Francisco; Preferencias identifica la familia
+resuelta. No se redistribuyen fuentes de Apple en Windows. Se admite seleccionar
+un archivo local autorizado; el usuario necesita derechos de uso aplicables.
+
+Al leer la biblioteca se enumeran los nombres de cada carpeta de audio validada
+una sola vez (máximo 512 carpetas); no se descargan los audios. Una referencia a
+un archivo ausente se excluye. Un fallo de acceso no se interpreta como borrado,
+y las descargas protegidas sin ruta AFC conservan su indicador de estado local.
+El segundo filtro muestra solo archivos cuya presencia USB se comprobó.
+
+Una duración desconocida se muestra como —. Se usa total_time_ms, o duración en
+muestras / frecuencia de item_playback; las filas visibles comprueban también
+cabeceras WAV, AIFF, MP4, MP3 y FLAC, sin leer todo el audio. Un valor positivo
+menor a un segundo se muestra como 0:01 en vez de aparentar duración nula.
+
+Antes de importar se revisan recibos anteriores contra la biblioteca conectada.
+Un audio propio con ID, ruta, tamaño y SHA-256 correctos queda como
+observed-present: evidencia de que existe ahora, distinta de la confirmación
+original de la sesión. Puede verificarse aunque el ancla haya avanzado. Se
+comprueban por separado metadatos/portada y se informa si siguen pendientes.
+Un fallo cosmético no exige reenviar audio ya correcto. La deduplicación por
+contenido incluye estos recibos y vuelve a comprobar sus bytes antes de omitirlos.
+
+Si faltan bytes, cambió la identidad o la operación está en una fase incierta,
+no se envía otra importación: el diagnóstico añade la causa guardada y la
+comprobación fallida actual. No se borra el recibo para desbloquear la interfaz.
+Los recibos vinculados a otra biblioteca se conservan sin bloquear el iPhone actual.
+Un preflight interrumpido sin escrituras se cierra localmente. Un lote cuyos IDs
+y todos sus archivos propios ya están ausentes puede retirarse del estado pendiente
+tras comprobar también el área temporal. Revisar importación ejecuta estas mismas
+comprobaciones de solo lectura y no abre una nueva sesión ATC.

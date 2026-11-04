@@ -20,7 +20,7 @@ from .artwork import thumbnail
 from .devices import discover, DiscoveryError
 from .sync.signing import FixedHostSession
 from .library import read_phone_library, read_catalogue, LibraryError, format_diagnostics
-from .models import LibraryModel, SortableItem, SORT_ROLE, byte_label
+from .models import LibraryModel, SortableItem, SORT_ROLE, byte_label, duration_label
 from .version import VERSION
 from .transfers import run_transfer, TransferError
 
@@ -163,8 +163,10 @@ class Window(QMainWindow):
     def __init__(self, auto_connect=True):
         super().__init__()
         self.setWindowTitle(f'TUPAQ {VERSION}')
-        self.resize(1260, 900)
-        self.setMinimumSize(980, 660)
+        screen=QApplication.primaryScreen()
+        area=screen.availableGeometry() if screen else None
+        self.setMinimumSize(1080,680)
+        self.resize(min(1500,area.width()-48) if area else 1500,min(880,area.height()-70) if area else 880)
         self.setAcceptDrops(True)
         self.tracks = {}
         self.worker = None
@@ -184,12 +186,20 @@ class Window(QMainWindow):
         self.library_epoch = 0
         self.artwork_attempted = set()
         self.duplicates = 0
+        from .typography import configure
+        app=QApplication.instance()
+        font_path=QSettings().value('font_path','') if auto_connect else ''
+        try:configure(app,font_path or None)
+        except (OSError,ValueError):configure(app)
+        self.setFont(app.font())
         from .interface import build, apply_theme
         build(self)
         self.persist_settings = auto_connect
         if self.persist_settings:
             settings = QSettings()
-            self.theme_choice.setCurrentIndex(int(settings.value('appearance',0)))
+            choice=int(settings.value('appearance',2)) if settings.value('design_version','')=='peel' else 2
+            settings.setValue('design_version','peel')
+            self.theme_choice.setCurrentIndex(choice)
             self.auto_read.setChecked(settings.value('automatic_library',True,type=bool))
         self.theme_choice.currentIndexChanged.connect(self.change_theme)
         self.auto_read.toggled.connect(self.change_auto_read)
@@ -229,7 +239,7 @@ class Window(QMainWindow):
         self.repair_metadata.setEnabled(not phone_busy and self.backup_root.exists())
         self.open_backup.setEnabled(self.backup_root.exists())
         self.queue_panel.setVisible(bool(self.tracks) or self.worker is not None)
-        self.queue_panel.setMinimumHeight(min(226,110+58*len(self.tracks)) if self.tracks else 110)
+        self.queue_panel.setMinimumHeight(min(210,100+44*len(self.tracks)) if self.tracks else 110)
 
     def navigate(self, number):
         self.pages.setCurrentIndex(1 if number == 1 else 0)
@@ -249,14 +259,26 @@ class Window(QMainWindow):
             self.thumbnail_worker.stop()
         local = local_tracks(self.phone_tracks)
         known = any('is_local' in track for track in self.phone_tracks)
-        displayed = local if self.phone_filter.currentIndex() == 0 else list(self.phone_tracks)
+        displayed = local if self.phone_filter.currentIndex()==0 else [track for track in local if track.get('usb_exists') is True]
+        text=self.search.text().strip().casefold()
+        if text:displayed=[track for track in displayed if text in ' '.join(str(track.get(key,'')) for key in ('title','artist','album')).casefold()]
         self.library_model.replace(displayed)
-        title = 'En el iPhone' if self.phone_filter.currentIndex() == 0 else 'Catálogo completo'
+        title = 'En el iPhone' if self.phone_filter.currentIndex() == 0 else 'Exportables por USB'
         self.library_heading.setText(f'{title} · {len(displayed)}')
         if self.worker is None and self.transfer_worker is None:
             self.status.setText(f"{len(local)} {'descargadas' if known else 'con ruta USB'} · {len(self.tracks)} para importar")
+        if not self.library_table.selectionModel().selectedRows() and not self.table.selectionModel().selectedRows() and self.transfer_worker is None:self.clear_inspector()
+        self.update_library_summary()
         self.update_buttons()
         self.schedule_artwork()
+
+    def update_library_summary(self):
+        from .library_fields import local_tracks
+        local=local_tracks(self.phone_tracks)
+        missing=sum(track.get('usb_exists') is False for track in self.phone_tracks)
+        text=f'{len(local)} canciones descargadas'
+        if missing:text+=f' · {missing} referencias sin archivo ocultas'
+        self.device_status.setText(text if self.phone_tracks else 'Conecta tu iPhone para mostrar su música.')
 
     def change_theme(self, *ignored):
         hints = QApplication.styleHints()
@@ -366,6 +388,8 @@ class Window(QMainWindow):
     def phone_details_ready(self, epoch, identifier, details):
         if epoch == self.library_epoch:
             self.library_model.set_details(identifier,details)
+            if details.get('usb_exists') is False:self.filter_library()
+            else:self.library_selection_changed()
 
     def library_selection_changed(self, *ignored):
         self.update_buttons()
@@ -373,9 +397,46 @@ class Window(QMainWindow):
         if not rows:
             return
         track = self.library_model.tracks[rows[0].row()]
-        icon = self.library_model.icons.get(track['id'],self.default_music_icon)
-        self.now_cover.setPixmap(icon.pixmap(64,64))
-        self.now_title.setText(f"{track['title']}\n{track['artist'] or 'Sin artista'}")
+        self.show_track_details(track,'En el iPhone')
+
+    def local_selection_changed(self):
+        self.update_buttons()
+        rows=self.table.selectionModel().selectedRows()
+        if rows:
+            identifier=self.table.item(rows[0].row(),0).data(Qt.ItemDataRole.UserRole)
+            if identifier in self.tracks:self.show_track_details(self.tracks[identifier],'Para importar')
+
+    def clear_inspector(self):
+        self.now_cover.setPixmap(QPixmap());self.now_cover.setText('♪')
+        self.now_title.setText('Selecciona una canción');self.info_artist.setText('');self.info_origin.setText('DETALLES')
+        for value in self.info_fields.values():value.setText('—')
+
+    def show_track_details(self,track,origin):
+        self.now_title.setText(track.get('title') or 'Sin título');self.info_artist.setText(track.get('artist') or 'Sin artista')
+        self.info_origin.setText(origin.upper())
+        fmt=track.get('format_label') or (f"M4A · {track['format']}" if track.get('container')=='M4A' else track.get('format'))
+        values={'album':track.get('album') or 'Sin álbum','format':fmt or '—','duration':duration_label(track.get('duration')),
+                'size':byte_label(track.get('size')),'availability':'Original del ordenador' if track.get('path') else
+                'Disponible por USB' if track.get('afc_path') and track.get('usb_exists') is not False else 'Sin acceso USB'}
+        for key,value in values.items():self.info_fields[key].setText(value)
+        image=QPixmap()
+        if track.get('thumbnail'):image.loadFromData(track['thumbnail'])
+        icon=self.library_model.icons.get(track.get('id'),self.default_music_icon)
+        self.now_cover.setPixmap(image.scaled(96,96,Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation) if not image.isNull() else icon.pixmap(96,96))
+
+    def choose_font(self):
+        path,_=QFileDialog.getOpenFileName(self,'Selecciona una fuente que tengas autorización de usar','', 'Fuentes (*.ttf *.otf *.ttc)')
+        if not path:return
+        from .typography import configure
+        try:
+            status=configure(QApplication.instance(),path);self.setFont(QApplication.instance().font());self.font_status.setText(status)
+            if self.persist_settings:QSettings().setValue('font_path',path)
+        except (OSError,ValueError):QMessageBox.warning(self,'No se pudo cargar','El archivo no es una fuente admitida o supera 32 MiB.')
+
+    def reset_font(self):
+        from .typography import configure
+        status=configure(QApplication.instance());self.setFont(QApplication.instance().font());self.font_status.setText(status)
+        if self.persist_settings:QSettings().remove('font_path')
 
     def artwork_finished(self):
         worker = self.thumbnail_worker
@@ -420,6 +481,7 @@ class Window(QMainWindow):
             self.show_library_error('No se pudo preparar la carpeta local de datos de TUPAQ.\nDiagnóstico: transfer:local-folder')
             return
         self.transfer_outcome = None
+        self.progress_track_id = None
         self.transfer_worker = TransferWorker(mode,selected,destination,self.backup_root.parent/'transfer.lock',self)
         self.transfer_worker.progress.connect(self.transfer_progress)
         self.transfer_worker.result.connect(self.transfer_result)
@@ -439,15 +501,7 @@ class Window(QMainWindow):
         if identifier and identifier != self.progress_track_id and identifier in self.tracks:
             self.progress_track_id = identifier
             track = self.tracks[identifier]
-            picture = QPixmap()
-            if track.get('thumbnail'):
-                picture.loadFromData(track['thumbnail'])
-            if picture.isNull():
-                self.now_cover.setPixmap(QPixmap())
-                self.now_cover.setText('♫')
-            else:
-                self.now_cover.setPixmap(picture.scaled(64,64,Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation))
-            self.now_title.setText(f"{track['title']}\n{track['artist'] or 'Sin artista'}")
+            self.show_track_details(track,'Importando')
 
     def transfer_problem(self, message):
         self.show_library_error(message)
@@ -457,6 +511,8 @@ class Window(QMainWindow):
         self.transfer_outcome = result
         if 'exported' in result:
             self.status.setText(f"{result['exported']} archivos exportados y comprobados.")
+        elif 'reconciled' in result and 'imported' not in result:
+            self.status.setText(f"{result.get('verified',0)} audios comprobados · {result.get('metadata_unverified',0)} con metadatos por revisar · {result.get('retired',0)} retirados por el iPhone")
         elif 'updated' in result:
             self.status.setText(f"{result['updated']} canciones actualizadas · {result['covers']} portadas comprobadas.")
         else:
@@ -540,11 +596,8 @@ class Window(QMainWindow):
         self.library_ready = True
         self.retry_library_at = 0
         self.connection_badge.setText('● Conectado por USB')
-        from .library_fields import local_tracks
-        count = len(local_tracks(tracks))
-        known = any('is_local' in track for track in tracks)
-        self.device_status.setText(f"{count} {'descargadas en el iPhone' if known else 'con ruta USB; estado de descarga no disponible'} · {len(tracks)} registros en el catálogo."
-            if tracks else 'No se encontraron canciones en el catálogo consultado. Esto no confirma que Música esté vacía. Pulsa Copiar diagnóstico.')
+        self.update_library_summary()
+        if not tracks:self.device_status.setText('No se encontraron canciones. Esto no confirma que Música esté vacía. Copia el diagnóstico.')
         self.update_buttons()
         self.schedule_artwork()
 
@@ -591,22 +644,15 @@ class Window(QMainWindow):
             self.duplicates += 1
             return
         self.tracks[track['id']] = track
-        picture = QPixmap()
-        if track.get('thumbnail'):
-            picture.loadFromData(track['thumbnail'])
-        if picture.isNull():
-            self.now_cover.setPixmap(QPixmap())
-            self.now_cover.setText('♫')
-        else:
-            self.now_cover.setPixmap(picture.scaled(64, 64, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
-        self.now_title.setText(f"Preparando: {track['title']}\n{track['artist'] or 'Sin artista'}")
+        picture=QPixmap()
+        if track.get('thumbnail'):picture.loadFromData(track['thumbnail'])
+        self.show_track_details(track,'Para importar')
         sorting = self.table.isSortingEnabled()
         self.table.setSortingEnabled(False)
         row = self.table.rowCount()
         self.table.insertRow(row)
-        seconds = int(track['duration'])
         values = [track['title'], track['artist'] or 'Sin artista', track['album'] or 'Sin álbum',
-                  (f"M4A · {track['format']}" if track.get('container') == 'M4A' else track['format']), f'{seconds//60}:{seconds%60:02}', byte_label(track['size'])]
+                  (f"M4A · {track['format']}" if track.get('container') == 'M4A' else track['format']), duration_label(track.get('duration')), byte_label(track['size'])]
         for column, value in enumerate(values):
             item = SortableItem(value)
             if column == 4:item.setData(SORT_ROLE,track['duration'])
@@ -619,7 +665,7 @@ class Window(QMainWindow):
                 else:
                     item.setIcon(self.default_music_icon)
             self.table.setItem(row, column, item)
-        self.table.setRowHeight(row, 58)
+        self.table.setRowHeight(row, 44)
         self.table.setSortingEnabled(sorting)
 
     def show_problem(self, message):
@@ -644,9 +690,7 @@ class Window(QMainWindow):
         self.update_buttons()
 
     def clear_tracks(self):
-        self.now_cover.setPixmap(QPixmap())
-        self.now_cover.setText('♫')
-        self.now_title.setText('La portada de la canción aparecerá aquí, si el archivo la incluye.')
+        self.clear_inspector()
         self.table.setRowCount(0)
         self.tracks.clear()
         self.errors.clear()
@@ -761,7 +805,7 @@ def smoke(app, window, fixtures, output=None):
         assert {track['format'] for track in window.tracks.values()} == {'MP3', 'WAV', 'AIFF', 'ALAC', 'AAC'}
         covered_row = next(row for row in range(window.table.rowCount()) if window.table.item(row,0).text() == 'M4A con portada')
         assert not window.table.item(covered_row,0).icon().isNull()
-        assert window.now_title.text().startswith('Preparando: M4A con portada')
+        assert window.now_title.text() == 'M4A con portada'
         assert window.duplicates == 1
         assert window.errors.count() == 1
         path = folder/'list.csv'
@@ -777,8 +821,8 @@ def smoke(app, window, fixtures, output=None):
         assert not window.tracks and window.table.rowCount() == 0
         assert not window.export.isEnabled()
         assert all(path.exists() for path in files)
-        window.phone_filter.setCurrentIndex(1)
-        window.show_library([{'id': 'test', 'title': 'Canción sintética', 'artist': 'Prueba', 'album': 'Prueba', 'duration': 1}])
+        window.phone_filter.setCurrentIndex(0)
+        window.show_library([{'is_local':True,'id': 'test', 'title': 'Canción sintética', 'artist': 'Prueba', 'album': 'Prueba', 'duration': 1}])
         assert window.library_model.rowCount() == 1
         assert window.library_model.data(window.library_model.index(0, 0)) == 'Canción sintética'
         window.show_library([], format_diagnostics({'items_total': 3, 'music_items': 0, 'tracks_returned': 0}))
@@ -793,7 +837,9 @@ def smoke(app, window, fixtures, output=None):
             db.executescript((fixtures/'library-ios27.sql').read_text(encoding='utf-8'))
         original_reader = globals()['read_phone_library']
         def simulated_catalogue(diagnostics=None, device_info=None):
-            return read_catalogue(catalogue, diagnostics)
+            rows=read_catalogue(catalogue, diagnostics)
+            for row in rows:row['is_local']=True
+            return rows
         try:
             globals()['read_phone_library'] = simulated_catalogue
             window.devices_found([{'token':'simulated-attach'}])

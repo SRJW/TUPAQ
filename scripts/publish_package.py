@@ -16,20 +16,18 @@ def main():
     if subprocess.run(view, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         with tempfile.TemporaryDirectory() as directory:
             notes = Path(directory)/'notes.md'
-            notes.write_text('''TUPAQ 0.3.0-preview.5: biblioteca unificada, recuento local, columnas y portadas.
+            notes.write_text('''TUPAQ 0.3.0-preview.6: interfaz compacta, archivos reales y recuperación.
 
-- Solo Biblioteca y Preferencias en la barra lateral. Importar/exportar y la cola del ordenador comparten una página.
-- Descargadas por defecto; Todo el catálogo conserva nube y pendientes. Incluye descargas protegidas de Apple Music. No fusiona canciones por título; evita referencias repetidas al mismo archivo.
-- Formato y tamaño, con verificación de cabeceras/stat por USB para filas visibles. Cabeceras clicables y ordenación numérica sin perder la selección.
-- Nuevas importaciones: portada JPEG separada con registro Artwork, entrega antes del audio y comprobación posterior. Fechas UTC para incorporación; se comprueba date_added.
-- Preferencias → Actualizar portadas y fecha: para canciones ya importadas con registros de TUPAQ en este ordenador y originales coincidentes. Envía solo metadatos y JPEG; no duplica filas ni reenvía audio. Hasta 49 canciones por lote.
-- 98 pruebas y comprobación de la aplicación empaquetada. Incluye nube/local, descargas protegidas, selección al ordenar, formatos reales, entrega de portada, fechas y actualización sin reinsertar canciones.
+- Diseño inspirado en Peel: barra lateral, búsqueda, biblioteca y cola central e inspector de canción plegable. Solo Biblioteca y Preferencias.
+- Oculta referencias a audios eliminados tras comprobar las carpetas USB. Conserva descargas protegidas sin ruta exportable. Nube y pendientes no aparecen como canciones descargadas.
+- Duración desde catálogo o cabeceras reales; un dato desconocido se muestra como —. Formato, tamaño y columnas ordenables.
+- Antes de importar revisa operaciones pendientes: un audio con ID, ruta y SHA-256 correctos permite continuar sin duplicarlo. Si falta o está dañado, conserva el bloqueo y explica la causa. Portadas/fechas pendientes se distinguen del audio.
+- Fuente nativa San Francisco en macOS; Preferencias muestra la fuente real. Windows admite fuentes locales autorizadas y declara la alternativa cuando SF no está disponible. No se redistribuyen archivos de Apple por las restricciones de su licencia estándar.
+- 108 pruebas y comprobación de la aplicación empaquetada, incluidas pérdida de confirmación, archivos ausentes/corruptos, duración, interfaz y tipografía.
 
-El usuario confirmó la incorporación básica a Música con la preview.4. **Las nuevas portadas, fechas y actualizaciones pasan replay de protocolo y aún deben comprobarse en el iPhone físico**, incluida su aparición visual en Recientes. Si se detiene una operación, conserva los respaldos y copia el diagnóstico.
+El usuario confirmó importación con metadatos y portada. Los cambios de esta versión se validan con simulación y necesitan prueba física en el iPhone. No se envían Reset ni eliminaciones ni se escribe SQLite remoto. Conserva los registros de operaciones pendientes; la copia del catálogo no es un respaldo completo.
 
-No se envía Reset, eliminaciones ni se escribe SQLite en el teléfono. Una operación pendiente sigue bloqueando importaciones. La copia del catálogo no es un respaldo completo ni una restauración automática. No se inventan carátulas para archivos sin portada.
-
-Windows y Mac: no necesitas Python ni abrir iTunes. Windows requiere el controlador/servicio USB de Apple. Paquetes sin firma de desarrollador ni notarización. Cada paquete se publica al pasar las pruebas de su plataforma. Instrucciones y límites: docs/TRANSFERENCIAS.md.
+Windows y Mac: no necesitas Python ni abrir iTunes. Windows requiere el controlador/servicio USB de Apple. Paquetes sin firma de desarrollador ni notarización. Cada paquete aparece cuando pasa las comprobaciones de su plataforma. Instrucciones y límites: docs/TRANSFERENCIAS.md.
 ''', encoding='utf-8')
             created = subprocess.run(['gh','release','create',tag,'--repo',repo,'--title',
                 'TUPAQ '+tag,'--notes-file',str(notes),'--prerelease','--verify-tag'])

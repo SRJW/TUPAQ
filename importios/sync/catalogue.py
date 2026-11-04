@@ -89,6 +89,10 @@ def verify_before_after(before, after, entries):
     if before['dates_known'] and after['dates_known']:
         require(all(after['dates'].get(pid)==value for pid,value in before['dates'].items() if pid not in targets),
                 'verify-original-date-changed')
+    verify_owned_entries(after,entries)
+
+
+def verify_owned_entries(after,entries):
     for entry in entries:
         item_id = after['wire_to_item'].get(str(entry['track_id']))
         track = after['tracks'].get(item_id)
