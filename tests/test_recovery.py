@@ -278,7 +278,9 @@ class FramedRecoveryTests(unittest.TestCase):
         phone=PendingPhone()
         with tempfile.TemporaryDirectory() as root:
             journal,_=self.pending(phone,root)
-            with patch('importios.transfers.device',phone.device),patch('importios.transfers.Atc',lambda peer:Atc(SerializedPeer(peer,early=True))):
+            # Python 3.12 on Windows has a coarse monotonic clock. Arrival
+            # ordering must remain strict even when every tick is identical.
+            with patch('time.monotonic_ns',return_value=1),patch('importios.transfers.device',phone.device),patch('importios.transfers.Atc',lambda peer:Atc(SerializedPeer(peer,early=True))):
                 with self.assertRaises(TransferError) as caught:run_transfer('resume',[],root,lambda *args:None)
             self.assertIn('terminal-before-settlement',caught.exception.diagnostic)
             self.assertNotEqual(json.loads(journal.read_text(encoding='utf-8'))['phase'],'completed')

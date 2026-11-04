@@ -10,14 +10,14 @@ class Phone(support.Phone):
 class Peer(support.Peer):
     async def send(self,msg):
         await super().send(msg)
-        if msg['Command']=='FileComplete' and not self.remaining:self.terminal_at=time.monotonic_ns()
+        if msg['Command']=='FileComplete' and not self.remaining:self.terminal_at=time.perf_counter_ns()
         if msg['Command']=='FileError' and not self.remaining:
-            self.terminal_at=time.monotonic_ns()
+            self.terminal_at=time.perf_counter_ns()
     async def receive(self):
         # Real phones wait for ancillary refusal before emitting SyncFinished.
         if self.queue and self.queue[0]['Command']=='SyncFinished' and not hasattr(self,'terminal_at'):raise AssertionError('missing timestamp')
         result=await super().receive()
-        self.last_received_at=self.terminal_at if result['Command']=='SyncFinished' else time.monotonic_ns()
+        self.last_received_at=self.terminal_at if result['Command']=='SyncFinished' else time.perf_counter_ns()
         return result
 
 class FastCompletionTests(unittest.TestCase):

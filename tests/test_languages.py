@@ -93,7 +93,7 @@ class LanguageTests(unittest.TestCase):
             self.assertEqual(fields(source),fields(target),source)
         # Explicit static UI messages must have English entries. Symbols and brands need none.
         for filename in ('interface.py','native.py'):
-            for node in ast.walk(ast.parse(Path('importios',filename).read_text())):
+            for node in ast.walk(ast.parse(Path('importios',filename).read_text(encoding='utf-8'))):
                 if isinstance(node,ast.Call) and isinstance(node.func,ast.Name) and node.func.id=='tr' and node.args:
                     arg=node.args[0]
                     if isinstance(arg,ast.Constant) and isinstance(arg.value,str) and any(c.isalpha() for c in arg.value) and arg.value not in ('iPhone','CSV (*.csv)'):

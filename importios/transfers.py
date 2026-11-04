@@ -340,7 +340,7 @@ async def transact(afc, channel, before, identity, voice, entries, receipt, dire
         await write_bytes(afc,MEDIA+'/Sync_00000000.plist.cig',signature)
         receipt['phase'] = 'metadata-announced'
         save_receipt(directory,receipt)
-        announced_at=time.monotonic_ns()
+        announced_at=time.perf_counter_ns()
         await channel.send({'Command':'FinishedSyncingMetadata','Session':2,'Params':{
             'DataclassAnchors':{'Media':str(before['anchor']+1),'VoiceMemo':str(voice)},
             'SyncTypes':{'Media':1,'Book':0,'Keybag':1}}})
@@ -354,7 +354,7 @@ async def transact(afc, channel, before, identity, voice, entries, receipt, dire
 async def deliver_assets(afc,channel,before,entries,receipt,directory,progress,artwork_only=False,forbidden=None,announced_at=None):
     own = {} if forbidden is not None else {str(e['track_id']):e for e in entries}
     manifest_seen, completed = False, set()
-    settled_at = (announced_at or time.monotonic_ns()) if not own else None
+    settled_at = (announced_at or time.perf_counter_ns()) if not own else None
     for _ in range(256):
         message = await channel.receive()
         require(message.get('Session') == 2, 'terminal-session')
@@ -383,14 +383,14 @@ async def deliver_assets(afc,channel,before,entries,receipt,directory,progress,a
                 def bytes_progress(done,total):
                     progress(index*100+int(done*80/max(1,total)),len(entries)*100,'Importando: '+entry['source']['title'],entry['source']['id'])
                 if not artwork_only:await upload_audio(afc,entry,bytes_progress)
-                if index==len(audio)-1 and not ancillary:settled_at=time.monotonic_ns()
+                if index==len(audio)-1 and not ancillary:settled_at=time.perf_counter_ns()
                 await channel.send({'Command':'FileComplete','Session':2,'Params':{
                     'AssetID':identifier,'Dataclass':'Media','AssetPath':'' if artwork_only else entry['destination']}})
                 completed.add(identifier)
                 receipt['completed_assets'] = sorted(completed)
                 save_receipt(directory,receipt)
             for index,identifier in enumerate(ancillary):
-                if index==len(ancillary)-1:settled_at=time.monotonic_ns()
+                if index==len(ancillary)-1:settled_at=time.perf_counter_ns()
                 await channel.send({'Command':'FileError','Session':2,'Params':{
                     'AssetID':identifier,'Dataclass':'Media','ErrorCode':16,'ErrorIsVisible':False}})
         elif command == 'SyncFinished':

@@ -188,7 +188,7 @@ class Atc:
             while True:
                 first = await self.connection.recvall(1)
                 require(len(first) == 1, 'atc-header')
-                received_at = time.monotonic_ns()
+                received_at = time.perf_counter_ns()
                 header = first+await self.connection.recvall(3)
                 require(len(header) == 4, 'atc-header')
                 size = struct.unpack('<I',header)[0]

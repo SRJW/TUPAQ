@@ -484,3 +484,20 @@ catálogo inglés está en importios/translations.py; las frases españolas son 
 referencia y el respaldo cuando no hay traducción. Las pruebas comprueban el
 cambio en ambos sentidos, persistencia, conservación de canciones/cola/marcas,
 mensajes de transferencia y diagnóstico y los campos variables del catálogo.
+
+
+### Compatibilidad de las comprobaciones en Windows (preview.14)
+
+En Python 3.12 para Windows, monotonic_ns usa GetTickCount64 y varias operaciones
+pueden compartir un mismo tick. La recepción anticipada y la confirmación final
+no deben ordenarse con ese reloj. Ambas fronteras del protocolo y la recepción
+ahora usan perf_counter_ns (QueryPerformanceCounter en Windows). Se conserva
+la frontera anterior al último FileComplete/FileError de preview.12.
+
+La prueba de recepción anticipada fuerza un reloj monotónico constante y exige
+el mismo rechazo; la de respuesta rápida válida debe seguir completándose. No
+se añade una espera artificial ni se elimina la verificación. La prueba nueva
+que inspecciona los mensajes de UI abre el código explícitamente como UTF-8,
+evita depender de cp1252 y puede ejecutarse con la configuración de Windows.
+Referencia: implementación oficial de relojes de
+[CPython 3.12](https://github.com/python/cpython/blob/3.12/Python/pytime.c).
