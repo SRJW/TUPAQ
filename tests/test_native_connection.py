@@ -12,7 +12,7 @@ from importios.native import Window
 from importios.visuals import music_icon
 
 APP = QApplication.instance() or QApplication([])
-TRACK = {'id':'1','title':'Prueba','artist':'Artista','album':'Álbum','duration':120}
+TRACK = {'id':'1','title':'Prueba','artist':'Artista','album':'Álbum','duration':120,'is_local':True}
 
 
 class NativeConnectionTests(unittest.TestCase):
@@ -37,9 +37,9 @@ class NativeConnectionTests(unittest.TestCase):
         with patch('importios.native.read_phone_library',return_value=[dict(TRACK)]) as read,patch('importios.native.run_transfer') as transfer:
             self.window.devices_found([{'token':'first'}]);self.drain_library()
             self.assertTrue(self.window.library_ready)
-            self.assertEqual(self.window.tabs.currentIndex(),1)
+            self.assertEqual(self.window.pages.currentIndex(),0)
             self.assertEqual(self.window.library_model.rowCount(),1)
-            self.assertFalse(self.window.local_tools.isVisible())
+            self.assertTrue(self.window.local_tools.isVisible())
             self.window.devices_found([{'token':'first'}]);APP.processEvents()
             self.assertEqual(read.call_count,1)
             self.window.devices_found([])
@@ -52,8 +52,8 @@ class NativeConnectionTests(unittest.TestCase):
         with patch('importios.native.read_phone_library',return_value=[dict(TRACK)]):
             self.window.tracks['queued']={'id':'queued'}
             self.window.devices_found([{'token':'first'}]);self.drain_library()
-            self.assertEqual(self.window.tabs.currentIndex(),0)
-            self.window.navigate(3)
+            self.assertEqual(self.window.pages.currentIndex(),0)
+            self.window.navigate(1)
             self.window.devices_found([{'token':'second'}]);self.drain_library()
             self.assertEqual(self.window.pages.currentIndex(),1)
             self.assertIn('queued',self.window.tracks)
@@ -62,8 +62,8 @@ class NativeConnectionTests(unittest.TestCase):
         for choice,dark in [(1,False),(2,True)]:
             self.window.theme_choice.setCurrentIndex(choice)
             self.assertEqual(self.window.theme_dark,dark)
-            self.window.nav_buttons[1].click()
-            self.assertEqual(self.window.tabs.currentIndex(),1)
+            self.window.nav_buttons[0].click()
+            self.assertEqual(self.window.pages.currentIndex(),0)
         model=self.window.library_model
         model.replace([dict(TRACK,id=str(n)) for n in range(260)])
         icon=music_icon(40)
@@ -73,7 +73,7 @@ class NativeConnectionTests(unittest.TestCase):
         self.assertEqual(model.data(model.index(259,0),Qt.ItemDataRole.DecorationRole).cacheKey(),icon.cacheKey())
         model.replace([])
         self.assertFalse(model.icons)
-        self.window.nav_buttons[3].click()
+        self.window.nav_buttons[1].click()
         self.assertEqual(self.window.pages.currentIndex(),1)
 
     def test_cancelling_close_keeps_automatic_detection_running(self):

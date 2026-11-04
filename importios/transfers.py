@@ -237,11 +237,12 @@ def allocate_id(reserved):
             return identifier
 
 
-async def plan_entries(afc, before, sources):
+async def plan_entries(afc, before, sources, directory):
     reserved = set(before['ids'])
     artists = {k:v[0] for k,v in before['artists'].items() if len(v) == 1}
     albums = {k:v[0] for k,v in before['albums'].items() if len(v) == 1}
     entries, destinations = [], set()
+    artwork_ids = set(before['artwork_ids'])
     for source in sources:
         artist = source['album_artist']
         if artist not in artists:
@@ -253,7 +254,17 @@ async def plan_entries(afc, before, sources):
         require(destination.lower() not in destinations, 'plan-path-collision')
         destinations.add(destination.lower())
         entry = {'track_id':allocate_id(reserved),'album_id':albums[album],'artist_id':artists[artist],
-                 'destination':destination,'source':source}
+                 'destination':destination,'source':source,'added_at':int(time.time())}
+        if source.get('has_artwork'):
+            from .sync.artwork import prepare
+            require(before['artwork_known'],'artwork-catalogue-schema')
+            picture = prepare(source['path'],directory/'artwork',source['container'])
+            require(local_hash(source['path'])==source['id'],'source-changed-before-upload')
+            if picture:
+                cache_id = max(artwork_ids | {99})+1
+                require(cache_id<=0xffffffff,'artwork-cache-range')
+                artwork_ids.add(cache_id);picture['cache_id']=cache_id;entry['artwork']=picture
+                require(await missing(afc,f"/Airlock/Media/Artwork/{entry['track_id']}"),'artwork-staging-collision')
         for suffix in (source['extension'],''):
             require(await missing(afc,f"/Airlock/Media/{entry['track_id']}{suffix}"), 'airlock-collision')
         entries.append(entry)
@@ -267,7 +278,7 @@ async def write_bytes(afc, path, data):
         await afc.fwrite(handle,data)
     finally:
         await afc.fclose(handle)
-    _, digest, size = await read_remote(afc,path,limit=4*1024*1024)
+    _, digest, size = await read_remote(afc,path,limit=5*1024*1024)
     require(size == len(data) and digest == hashlib.sha256(data).hexdigest(), 'staged-file-hash')
 
 
@@ -295,7 +306,8 @@ async def upload_audio(afc, entry, progress):
     await afc.rename(path,bare)
 
 
-async def transact(afc, channel, before, identity, voice, entries, receipt, directory, progress):
+async def transact(afc, channel, before, identity, voice, entries, receipt, directory, progress,
+                   operation=None, artwork_only=False):
     await check_empty_staging(afc)
     signer = await handshake(channel,identity,before['anchor'],voice)
     try:
@@ -309,8 +321,9 @@ async def transact(afc, channel, before, identity, voice, entries, receipt, dire
             require(current_identity == identity and current_voice == voice, 'identity-changed-before-stage')
         require(current['anchor'] == before['anchor'] and current['database'] == before['database'] and
                 current['primary'] == before['primary'] and current['tracks'] == before['tracks'] and
-                current['originals'] == before['originals'] and current['wire_to_item'] == before['wire_to_item'], 'catalogue-changed-before-stage')
-        operation = encode_operations(before['database'],before['primary'],before['anchor'],entries)
+                current['originals'] == before['originals'] and current['wire_to_item'] == before['wire_to_item'] and
+                current['artwork_ids'] == before['artwork_ids'], 'catalogue-changed-before-stage')
+        if operation is None:operation = encode_operations(before['database'],before['primary'],before['anchor'],entries)
         signature = signer.sign(operation)
         receipt['phase'] = 'staging'
         save_receipt(directory,receipt)
@@ -321,15 +334,16 @@ async def transact(afc, channel, before, identity, voice, entries, receipt, dire
         await channel.send({'Command':'FinishedSyncingMetadata','Session':2,'Params':{
             'DataclassAnchors':{'Media':str(before['anchor']+1),'VoiceMemo':str(voice)},
             'SyncTypes':{'Media':1,'Book':0,'Keybag':1}}})
-        await deliver_assets(afc,channel,before,entries,receipt,directory,progress)
+        assets=[entry for entry in entries if entry.get('artwork')] if artwork_only else entries
+        await deliver_assets(afc,channel,before,assets,receipt,directory,progress,artwork_only=artwork_only)
     finally:
         signer.close()
 
 
-async def deliver_assets(afc,channel,before,entries,receipt,directory,progress):
+async def deliver_assets(afc,channel,before,entries,receipt,directory,progress,artwork_only=False):
     own = {str(e['track_id']):e for e in entries}
     manifest_seen, completed = False, set()
-    settled_at = None
+    settled_at = time.monotonic_ns() if not own else None
     for _ in range(256):
         message = await channel.receive()
         require(message.get('Session') == 2, 'terminal-session')
@@ -338,18 +352,27 @@ async def deliver_assets(afc,channel,before,entries,receipt,directory,progress):
         if command == 'AssetManifest':
             require(not manifest_seen, 'manifest-repeated')
             existing_music = {wire for wire,item in before['wire_to_item'].items() if item in before['tracks']}
-            audio, ancillary = validate_manifest(message,set(own),existing_music)
+            declared = {identifier:2 if artwork_only else 3 if entry.get('artwork') else 1 for identifier,entry in own.items()}
+            audio, ancillary = validate_manifest(message,set(own),existing_music,declared)
             manifest_seen = True
             receipt['manifest_parts'] = sorted({asset['Variant']['AssetParts'] for asset in message['Params']['AssetManifest']['Media']})
             save_receipt(directory,receipt)
             # Every request is checked before any completion/refusal is sent.
             for index, identifier in enumerate(audio):
                 entry = own[identifier]
+                if entry.get('artwork'):
+                    picture=entry['artwork']
+                    data=Path(picture['path']).read_bytes()
+                    require(len(data)==picture['size'] and hashlib.sha256(data).hexdigest()==picture['id'],'artwork-source-changed')
+                    folder='/Airlock/Media/Artwork'
+                    if await missing(afc,folder):await afc.mkdir(folder)
+                    require((await afc.stat(folder)).get('st_ifmt')=='S_IFDIR','artwork-staging-directory')
+                    await write_bytes(afc,f"{folder}/{identifier}",data)
                 def bytes_progress(done,total):
                     progress(index*100+int(done*80/max(1,total)),len(entries)*100,'Importando: '+entry['source']['title'],entry['source']['id'])
-                await upload_audio(afc,entry,bytes_progress)
+                if not artwork_only:await upload_audio(afc,entry,bytes_progress)
                 await channel.send({'Command':'FileComplete','Session':2,'Params':{
-                    'AssetID':identifier,'Dataclass':'Media','AssetPath':entry['destination']}})
+                    'AssetID':identifier,'Dataclass':'Media','AssetPath':'' if artwork_only else entry['destination']}})
                 completed.add(identifier)
                 receipt['completed_assets'] = sorted(completed)
                 save_receipt(directory,receipt)
@@ -433,7 +456,7 @@ async def import_selected(selected, backup_root, progress, expected_snapshot=Non
                     return {'imported':0,'already_imported':len(already),'source_ids':list(hashes),'backup':str(directory)}
                 identity, voice = await preferences(afc,directory,before)
                 await check_empty_staging(afc)
-                entries = await plan_entries(afc,before,sources)
+                entries = await plan_entries(afc,before,sources,directory)
                 receipt.update(entries=entries,anchor=before['anchor'],database=before['database'],primary=before['primary'])
                 save_receipt(directory,receipt)
                 connection = await lockdown.start_lockdown_service('com.apple.atc')
@@ -442,6 +465,8 @@ async def import_selected(selected, backup_root, progress, expected_snapshot=Non
                 progress(90,100,'Comprobando las canciones en la biblioteca…')
                 after = await capture(afc,directory/'after')
                 verify_before_after(before,after,entries)
+                from .sync.artwork import verify as verify_artwork
+                await verify_artwork(afc,after,entries)
                 for entry in entries:
                     _, digest, size = await read_remote(afc,entry['destination'])
                     require(size == entry['source']['size'] and digest == entry['source']['id'], 'verify-permanent-audio')
@@ -470,6 +495,8 @@ def transfer_error(error, mode):
                 code += '-'+str(int(status))
     if mode == 'export':
         message = 'No se completó la exportación. Los archivos ya exportados se conservan; no se modificó el iPhone.'
+    elif mode == 'repair':
+        message = 'La actualización de portadas y fecha se detuvo o no pudo verificarse. Conserva el respaldo y copia el diagnóstico.'
     else:
         message = 'La importación se detuvo o no pudo verificarse. Revisa el diagnóstico y el respaldo del catálogo antes de repetirla.'
     messages = {
@@ -480,6 +507,11 @@ def transfer_error(error, mode):
         'recovery-mixed-state':'La operación contiene canciones en estados diferentes. No se ha reenviado. Conserva el respaldo y copia el diagnóstico.',
         'recovery-file-exists':'Ya hay un archivo en el destino o en el área de envío. Se detuvo la recuperación para evitar sobrescribirlo. Prueba Revisar importación y copia el diagnóstico si falla.',
         'recovery-anchor':'La biblioteca avanzó o cambió desde la operación pendiente. No se ha reenviado. Conserva los registros y copia el diagnóstico.',
+        'metadata-no-owned-tracks':'No hay importaciones registradas por TUPAQ en este ordenador que se puedan actualizar.',
+        'metadata-selection-limit':'No se encontraron canciones registradas para actualizar o son más de 49. Añade con Elegir canciones los originales del lote que quieras actualizar y vuelve a Preferencias.',
+        'metadata-owned-track-changed':'Una canción cambió desde su importación. Se detuvo la actualización; conserva el registro y copia el diagnóstico.',
+        'recovery-metadata-only':'Esta operación actualiza portadas y fechas. Usa Revisar importación pendiente para comprobar su resultado; no requiere reenviar el audio.',
+        'artwork-image-profile':'La portada incrustada no tiene un formato o unas dimensiones admitidas. No se ha enviado una actualización de biblioteca.',
         'identity-not-configured':'No se encontró una identidad de sincronización configurada en el iPhone. No se ha enviado una actualización de biblioteca.',
         'identity-missing':'No se encontró la identidad existente de la biblioteca. No se ha enviado una actualización de biblioteca.',
         'host-anchor-unavailable':'El estado de sincronización guardado no es compatible todavía. No se ha enviado una actualización de biblioteca.',
@@ -507,6 +539,8 @@ async def verify_pending(backup_root, progress):
         with tempfile.TemporaryDirectory(prefix='tupaq-verify-') as temporary:
             after = await capture(afc,Path(temporary)/'catalogue')
             verify_before_after(before,after,receipt['entries'])
+            from .sync.artwork import verify as verify_artwork
+            await verify_artwork(afc,after,receipt['entries'])
         for index, entry in enumerate(receipt['entries']):
             _, digest, size = await read_remote(afc,entry['destination'])
             require(digest == entry['source']['id'] and size == entry['source']['size'], 'verify-permanent-audio')
@@ -518,10 +552,12 @@ async def verify_pending(backup_root, progress):
 
 def run_transfer(mode, selected, destination, progress):
     try:
-        require(mode in ('import','export','verify','resume'), 'transfer-mode')
+        require(mode in ('import','export','verify','resume','repair'), 'transfer-mode')
         from .recovery import resume_pending
+        from .metadata_update import repair_imported
         work = (import_selected(selected,destination,progress) if mode == 'import' else
                 verify_pending(destination,progress) if mode == 'verify' else
+                repair_imported(destination,selected,progress) if mode == 'repair' else
                 resume_pending(destination,selected,progress) if mode == 'resume' else export_selected(selected,destination,progress))
         return asyncio.run(asyncio.wait_for(work,timeout=1800))
     except Exception as error:

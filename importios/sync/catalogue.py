@@ -44,13 +44,33 @@ def snapshot(path):
         state_columns = {row[1] for row in db.execute('PRAGMA table_info(item_state)')}
         item_columns = {row[1] for row in db.execute('PRAGMA table_info(item)')}
         states = {}
+        artwork_ids = set()
+        artwork_tracks = {}
+        artwork_known = True
+        for table in ('artwork','artwork_token'):
+            columns = {row[1] for row in db.execute(f'PRAGMA table_info({table})')}
+            if not {'artwork_token','artwork_source_type'} <= columns:
+                artwork_known = False
+                continue
+            for token, in db.execute(f'SELECT artwork_token FROM {table} WHERE artwork_source_type=300'):
+                require(isinstance(token,str) and token.isascii() and token.isdigit() and
+                        100<=int(token)<=0xffffffff and str(int(token))==token, 'artwork-cache-token')
+                artwork_ids.add(int(token))
+        if artwork_known:
+            item_to_wire = {item:wire for wire,item in wire_to_item.items()}
+            for pid,token in db.execute('SELECT entity_pid,artwork_token FROM artwork_token WHERE artwork_source_type=300 AND entity_type=0'):
+                wire = item_to_wire.get(str(pid))
+                if wire is not None:artwork_tracks[wire]=int(token)
+        dates_known = 'date_added' in item_columns
+        dates = {str(pid):value for pid,value in db.execute('SELECT item_pid,date_added FROM item')} if dates_known else {}
         if {'item_pid','is_placeholder','is_library_added','has_non_purgeable_asset','is_supported_type'} <= state_columns and 'remote_location_id' in item_columns:
             states = {str(pid):(placeholder,added,asset,supported,remote) for pid,placeholder,added,asset,supported,remote in
                 db.execute('''SELECT i.item_pid,s.is_placeholder,s.is_library_added,s.has_non_purgeable_asset,
                     s.is_supported_type,i.remote_location_id FROM item i JOIN item_state s ON s.item_pid=i.item_pid''')}
     return {'database':database,'primary':primary,'anchor':anchor,'ids':ids,'originals':originals,
             'wire_to_item':wire_to_item,'tracks':{t['id']:t for t in tracks},'artists':artist_groups,'albums':albums,
-            'groups':groups,'states':states}
+            'groups':groups,'states':states,'artwork_ids':artwork_ids,'artwork_known':artwork_known,
+            'artwork_tracks':artwork_tracks,'dates':dates,'dates_known':dates_known}
 
 
 def verify_originals(before, after):
@@ -65,8 +85,16 @@ def verify_originals(before, after):
 def verify_before_after(before, after, entries):
     verify_originals(before,after)
     require(after['anchor'] == before['anchor']+1, 'verify-anchor')
+    targets={after['wire_to_item'].get(str(entry['track_id'])) for entry in entries}
+    if before['dates_known'] and after['dates_known']:
+        require(all(after['dates'].get(pid)==value for pid,value in before['dates'].items() if pid not in targets),
+                'verify-original-date-changed')
     for entry in entries:
         item_id = after['wire_to_item'].get(str(entry['track_id']))
         track = after['tracks'].get(item_id)
         require(track is not None and track.get('afc_path') == entry['destination'], 'verify-new-item')
         require(all(track[k] == entry['source'][k] for k in ('title','artist','album')), 'verify-new-metadata')
+        if entry.get('added_at') and after['dates_known']:
+            value=after['dates'].get(item_id)
+            require(type(value) in (int,float) and value>0 and
+                    any(abs(value+offset-entry['added_at'])<=5 for offset in (0,978307200,-2082844800)), 'verify-added-date')

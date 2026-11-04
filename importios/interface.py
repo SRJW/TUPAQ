@@ -3,7 +3,7 @@ from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import (QWidget,QFrame,QLabel,QVBoxLayout,QHBoxLayout,QPushButton,
     QButtonGroup,QStackedWidget,QComboBox,QCheckBox,QGridLayout,QHeaderView,
-    QTableView,QTableWidget,QTabWidget,QAbstractItemView,QProgressBar,QListWidget,QApplication)
+    QTableView,QTableWidget,QSplitter,QAbstractItemView,QProgressBar,QListWidget,QApplication)
 
 from .models import LibraryModel
 from .visuals import music_icon,line_icon
@@ -20,7 +20,7 @@ def build(window):
     brand_row.addWidget(mark);brand_row.addWidget(brand);brand_row.addStretch()
     side.addLayout(brand_row);side.addSpacing(32)
     window.navigation = QButtonGroup(window);window.nav_buttons=[]
-    for number,(label,icon) in enumerate([('Inicio','home'),('Biblioteca','library'),('Importación USB','usb'),('Preferencias','settings')]):
+    for number,(label,icon) in enumerate([('Biblioteca','library'),('Preferencias','settings')]):
         button=QPushButton(label);button.setObjectName('nav');button.setCheckable(True)
         button.setIconSize(QSize(22,22));button.setMinimumHeight(48)
         button.setProperty('iconKind',icon)
@@ -42,8 +42,7 @@ def build(window):
     window.heading=QLabel('Tu música, en un solo lugar.');window.heading.setObjectName('title');window.heading.setWordWrap(True)
     intro=QLabel('Elige o arrastra MP3, WAV, M4A (AAC/ALAC) y AIFF. Los originales se conservan.');intro.setWordWrap(True);intro.setObjectName('muted')
     hero_text.addWidget(window.heading);hero_text.addWidget(intro);hero.addLayout(hero_text,1);layout.addLayout(hero)
-    notice=QLabel('Importación experimental por USB, con copia previa del catálogo y comprobación del resultado.\n'
-                  'Exporta los originales al ordenador. Los archivos protegidos conservan su protección.')
+    notice=QLabel('Importa y exporta por USB. La importación conserva un respaldo del catálogo y comprueba el resultado.')
     notice.setObjectName('notice');notice.setWordWrap(True);layout.addWidget(notice)
     connection=QHBoxLayout()
     window.device_status=QLabel('Conecta tu iPhone. Su biblioteca aparecerá automáticamente.');window.device_status.setWordWrap(True)
@@ -58,16 +57,18 @@ def build(window):
     window.remove=QPushButton('Quitar selección');window.remove.setProperty('iconKind','trash');window.remove.clicked.connect(window.remove_selection)
     window.clear=QPushButton('Vaciar lista');window.clear.setProperty('iconKind','close');window.clear.clicked.connect(window.clear_tracks)
     window.export=QPushButton('Guardar lista CSV');window.export.setProperty('iconKind','folder');window.export.clicked.connect(window.choose_export)
-    for button in (window.choose,window.remove,window.clear):buttons.addWidget(button)
-    buttons.addStretch();buttons.addWidget(window.export);layout.addWidget(window.local_tools)
+    buttons.addWidget(window.choose)
+    layout.addWidget(window.local_tools)
     preview=QFrame();preview.setObjectName('preview');preview_layout=QHBoxLayout(preview);preview_layout.setContentsMargins(0,0,0,0)
     window.now_cover=QLabel('♪');window.now_cover.setFixedSize(64,64);window.now_cover.setAlignment(Qt.AlignmentFlag.AlignCenter);window.now_cover.setObjectName('cover')
     window.now_title=QLabel('La portada de la canción aparecerá aquí.');window.now_title.setWordWrap(True);window.now_title.setTextFormat(Qt.TextFormat.PlainText)
     preview_layout.addWidget(window.now_cover);preview_layout.addSpacing(8);preview_layout.addWidget(window.now_title,1);layout.addWidget(preview)
-    actions=QHBoxLayout()
+    actions=buttons
     window.import_phone=QPushButton('Importar al iPhone');window.import_phone.setObjectName('primary');window.import_phone.setProperty('iconKind','upload');window.import_phone.clicked.connect(window.import_songs)
+    window.import_phone.setToolTip('Envía la selección de la cola del ordenador. Sin selección, envía toda la cola.')
     window.export_phone=QPushButton('Exportar selección');window.export_phone.setObjectName('primary');window.export_phone.setProperty('iconKind','download');window.export_phone.clicked.connect(window.export_songs)
-    actions.addWidget(window.import_phone);actions.addWidget(window.export_phone);actions.addStretch();layout.addLayout(actions)
+    window.export_phone.setToolTip('Guarda las canciones seleccionadas en la tabla del iPhone. Requiere un original accesible por USB.')
+    actions.addWidget(window.import_phone);actions.addWidget(window.export_phone);actions.addStretch()
     window.table=QTableWidget(0,6);window.table.setHorizontalHeaderLabels(['Canción','Artista','Álbum','Formato','Duración','Tamaño'])
     window.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
     window.table.horizontalHeader().setSectionResizeMode(0,QHeaderView.ResizeMode.Stretch)
@@ -75,7 +76,7 @@ def build(window):
     window.library_model=LibraryModel(window);window.library_table=QTableView();window.library_table.setModel(window.library_model)
     window.library_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
     window.library_table.horizontalHeader().setSectionResizeMode(0,QHeaderView.ResizeMode.Stretch)
-    for section,width in [(1,175),(2,155),(3,75),(4,125)]:window.library_table.setColumnWidth(section,width)
+    for section,width in [(1,150),(2,140),(3,110),(4,75),(5,90),(6,120)]:window.library_table.setColumnWidth(section,width)
     window.library_table.selectionModel().selectionChanged.connect(window.library_selection_changed)
     for table in (window.table,window.library_table):
         table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -83,9 +84,29 @@ def build(window):
         table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         table.verticalHeader().hide();table.setShowGrid(False);table.setAlternatingRowColors(True)
         table.setIconSize(QSize(40,40));table.verticalHeader().setDefaultSectionSize(56)
-    window.tabs=QTabWidget();window.tabs.addTab(window.table,'Ordenador');window.tabs.addTab(window.library_table,'iPhone');window.tabs.tabBar().hide()
-    window.tabs.currentChanged.connect(window.view_changed)
-    frame=QFrame();frame.setObjectName('tableCard');frame_layout=QVBoxLayout(frame);frame_layout.setContentsMargins(8,6,8,6);frame_layout.addWidget(window.tabs);layout.addWidget(frame,1)
+    window.table.setSortingEnabled(True);window.table.sortItems(0,Qt.SortOrder.AscendingOrder)
+    window.table.horizontalHeader().setSectionsClickable(True)
+    window.library_table.setSortingEnabled(True);window.library_table.sortByColumn(0,Qt.SortOrder.AscendingOrder)
+    window.library_table.horizontalHeader().sortIndicatorChanged.connect(window.schedule_artwork)
+    window.library_table.horizontalHeader().setSectionsClickable(True)
+    window.library_table.setWordWrap(False)
+    splitter=QSplitter(Qt.Orientation.Vertical)
+    splitter.splitterMoved.connect(window.schedule_artwork)
+    window.library_panel=QFrame();window.library_panel.setObjectName('tableCard')
+    frame_layout=QVBoxLayout(window.library_panel);frame_layout.setContentsMargins(10,10,10,8)
+    phone_header=QHBoxLayout()
+    window.library_heading=QLabel('En el iPhone');phone_header.addWidget(window.library_heading,1)
+    window.phone_filter=QComboBox();window.phone_filter.addItems(['Descargadas en el iPhone','Todo el catálogo'])
+    window.phone_filter.currentIndexChanged.connect(window.filter_library);phone_header.addWidget(window.phone_filter)
+    frame_layout.addLayout(phone_header);frame_layout.addWidget(window.library_table,1)
+    splitter.addWidget(window.library_panel)
+    window.queue_panel=QFrame();window.queue_panel.setObjectName('tableCard');queue_layout=QVBoxLayout(window.queue_panel)
+    queue_layout.setContentsMargins(10,8,10,8)
+    queue_header=QHBoxLayout();queue_header.addWidget(QLabel('Para importar desde el ordenador'),1)
+    for button in (window.remove,window.clear,window.export):queue_header.addWidget(button)
+    queue_layout.addLayout(queue_header);queue_layout.addWidget(window.table,1)
+    window.queue_panel.setMaximumHeight(260);splitter.addWidget(window.queue_panel)
+    splitter.setStretchFactor(0,3);splitter.setStretchFactor(1,1);splitter.setSizes([420,210]);layout.addWidget(splitter,1)
     window.status=QLabel('Sin canciones. Puedes arrastrar archivos sobre esta ventana.');window.status.setWordWrap(True);window.status.setTextFormat(Qt.TextFormat.PlainText);layout.addWidget(window.status)
     window.progress=QProgressBar();window.progress.hide();layout.addWidget(window.progress)
     window.errors=QListWidget();window.errors.setMaximumHeight(68);window.errors.hide();layout.addWidget(window.errors)
@@ -108,6 +129,11 @@ def build(window):
     window.resume_import=QPushButton('Completar importación pendiente');window.resume_import.setProperty('iconKind','upload')
     window.resume_import.clicked.connect(lambda:window.start_transfer('resume',list(window.tracks.values()),window.backup_root))
     maintenance_layout.insertWidget(1,window.resume_import)
+    window.repair_metadata=QPushButton('Actualizar portadas y fecha');window.repair_metadata.setProperty('iconKind','refresh')
+    window.repair_metadata.clicked.connect(lambda:window.start_transfer('repair',list(window.tracks.values()),window.backup_root))
+    maintenance_layout.insertWidget(2,window.repair_metadata)
+    ownership_note=QLabel('Actualizar portadas y fecha se aplica solo a importaciones registradas por TUPAQ en este ordenador.')
+    ownership_note.setWordWrap(True);ownership_note.setObjectName('muted');maintenance_layout.addWidget(ownership_note)
     recovery_note=QLabel('Completar usa el archivo original y el registro guardado de la operación. Función experimental: conserva los respaldos.')
     recovery_note.setWordWrap(True);recovery_note.setObjectName('muted');maintenance_layout.addWidget(recovery_note)
     window.pages.addWidget(settings)
@@ -145,7 +171,7 @@ def apply_theme(window):
         QPushButton:hover {{background:{c['hover']};}}
         QPushButton:focus {{border:1px solid {c['blue']};}}
         QPushButton#primary {{background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #2487ff,stop:1 #0059f5);border:1px solid #368bff;color:white;font-weight:600;}}
-        QPushButton:disabled {{background:{c['bg']};color:{c['muted']};border-color:{c['border']};}}
+        QPushButton:disabled,QPushButton#primary:disabled {{background:{c['bg']};color:{c['muted']};border-color:{c['border']};}}
         QPushButton#nav {{background:transparent;border:0;text-align:left;padding:12px;font-size:15px;}}
         QPushButton#nav:checked {{background:{c['selected']};color:{c['blue']};font-weight:600;}}
         QTableWidget,QTableView {{background:{c['card']};alternate-background-color:{c['row']};border:0;selection-background-color:{c['selected']};selection-color:{c['text']};outline:0;}}

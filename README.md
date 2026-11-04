@@ -6,15 +6,17 @@ Aplicación de escritorio para Windows y macOS, en español, con ventana propia.
 El objetivo es importar música local a la app Música del iPhone sin usar la
 aplicación iTunes ni 3uTools.
 
-La lectura del catálogo ya fue confirmada por el usuario en su iPhone.
-La versión 0.3.0-preview.4 admite solicitudes de audio con Genius desactivado
-(AssetParts 1/5) y añade **Preferencias → Completar importación pendiente**.
-Comprueba el registro y la biblioteca antes de entregar el audio que falta;
-si iOS ya retiró todas las entradas incompletas, permite una importación nueva
-tras comprobar que no quedan esas canciones. Mantiene la interfaz con barra lateral,
-temas claro/oscuro, lectura automática y miniaturas por USB.
-Las transferencias pasan pruebas con un dispositivo simulado; todavía deben
-verificarse en el iPhone real. Véase [cómo transferir](docs/TRANSFERENCIAS.md).
+El usuario confirmó la lectura y la incorporación de canciones en Música del iPhone.
+La **0.3.0-preview.5** reúne importar y exportar en Biblioteca y deja solo Biblioteca
+y Preferencias en la barra lateral. Muestra las descargadas por defecto, conserva
+el catálogo completo como filtro y añade formato, tamaño y ordenación por columnas.
+Las nuevas importaciones preparan una portada separada y fechas de incorporación.
+Para las ya importadas existe **Preferencias → Actualizar portadas y fecha**,
+limitado a los registros de TUPAQ de ese ordenador y a los originales comprobados.
+
+Los cambios de portadas/fechas pasan pruebas con un dispositivo simulado y la
+interfaz empaquetada; todavía deben verificarse en el iPhone real. Véase
+[cómo transferir y actualizar](docs/TRANSFERENCIAS.md).
 
 ![TUPAQ en modo claro, con audio sintético de prueba](docs/interfaz-nativa.png)
 
@@ -38,7 +40,10 @@ notarización de Apple.
 
 - Interfaz nativa inspirada en Apple: barra lateral, tipografía del sistema y apariencia Sistema/Claro/Oscuro en Preferencias. Sin motor web ni animaciones.
 - Detección USB automática cada cinco segundos cuando la conexión está libre. Lee la biblioteca al conectar el teléfono y al reconectarlo; no vuelve a copiar el catálogo en cada sondeo. Se puede desactivar en Preferencias. Nunca importa automáticamente.
-- Tabla de biblioteca con celdas dibujadas bajo demanda, sin crear un objeto por celda.
+- Tabla de biblioteca con celdas dibujadas bajo demanda. Cabeceras clicables para ordenar por canción, artista, álbum, formato, duración, tamaño y acceso USB. Duración y tamaño se ordenan numéricamente conservando la selección por canción.
+- Dos secciones en la misma página: canciones del iPhone y cola del ordenador. Importar y exportar están juntos.
+- Descargadas por defecto: usa estado local y el indicador de descarga protegida de suscripción; nube y pendientes permanecen en Todo el catálogo. No fusiona por título: solo evita contar dos referencias al mismo archivo físico.
+- Formato y tamaño: catálogo como lectura inicial, verificación de cabeceras y stat por USB para filas visibles. Se muestra — cuando no hay información; no se descarga cada audio completo para mostrarlo.
 - Errores de conexión por etapa y botón **Copiar diagnóstico**, también cuando la consulta devuelve cero resultados. Incluye versión, recuentos por tipo y presencia/tamaño del WAL, sin títulos ni credenciales ni identificadores del dispositivo.
 - Las canciones sin fila de metadatos complementarios se muestran como «Sin título» en lugar de descartarse.
 
@@ -62,6 +67,7 @@ notarización de Apple.
 - **Exportar selección**: copia los originales accesibles por USB a la carpeta
   elegida, comprueba SHA-256 y evita sobrescribir archivos existentes. Los archivos
   protegidos se copian conservando su protección; no hay descifrado ni conversión.
+- **Actualizar portadas y fecha**: usa originales y registros de TUPAQ, verifica los audios y envía solo metadatos/portadas de esas canciones. No duplica filas ni vuelve a subir audio; hasta 49 canciones por lote.
 - **Completar importación pendiente**: recuperación experimental con el original y el registro local. Para una canción pendiente representada, solicita el audio sin volver a insertar metadatos; no garantiza aceptación de esa sesión por un iPhone físico. Si el estado no coincide, se detiene.
 - **Revisar importación**: vuelve a comprobar una operación cuya confirmación se
   perdió. Una operación sin comprobar bloquea otra importación; no se reenvía sola.
@@ -118,7 +124,7 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m importios.native --smoke-fixtures 
 .venv/bin/python scripts/build_desktop.py
 ```
 
-La suite contiene 86 pruebas de formatos, HTTP local, descubrimiento USB simulado,
+La suite contiene 98 pruebas de formatos, HTTP local, descubrimiento USB simulado,
 paquetes de investigación, firmas candidatas, conexión automática y portadas remotas. La prueba nativa comprueba una
 ventana Qt real, lectura en un hilo de trabajo, los AAC/ALAC dentro de M4A, portadas, duplicados,
 archivos dañados, CSV, quitar/vaciar y las firmas. En Linux se ha probado también

@@ -114,12 +114,16 @@ def encode_operations(database, primary, anchor, entries):
     operations = [{'operation':'update_db_info','pid':database,'db_info':{'primary_container_pid':primary}}]
     for entry in entries:
         source = entry['source']
+        created = datetime.fromtimestamp(entry.get('added_at',int(datetime.now(timezone.utc).timestamp())),timezone.utc).replace(tzinfo=None)
         item = {'album_pid':entry['album_id'],'artist_pid':entry['artist_id'],
                 'title':source['title'],'artist':source['artist'],'album':source['album'],
                 'sort_name':source['title'],'sort_artist':source['artist'],'sort_album':source['album'],
                 'album_artist':source['album_artist'],'sort_album_artist':source['album_artist'],
                 'is_song':True,'remember_bookmark':False,'artwork_checksum':0,
                 'total_time_ms':source['samples']*1000//source['sample_rate']}
+        item.update(date_created=created,date_modified=created)
+        if entry.get('artwork'):
+            item.update(artwork_cache_id=entry['artwork']['cache_id'],artwork_checksum=entry['artwork']['checksum'])
         for key in ['genre','composer','year','track_number','track_count','disc_number','disc_count']:
             if source.get(key):
                 item[key] = source[key]
@@ -137,7 +141,9 @@ def encode_operations(database, primary, anchor, entries):
             audio.update(gapless_encoding_delay=0,gapless_encoding_drain=0,
                          gapless_heuristic_info=1,gapless_last_frame_resynch=0,analysis_inhibit_flags=2)
         operations.append({'operation':'insert_track','pid':entry['track_id'],'item':item,
-                           'avformat_info':audio,'location':{'kind':source['kind']},
+                           'avformat_info':audio,'location':{'kind':source['kind'],
+                               'file_size':source['size'],'date_created':created,
+                               'extension':{'.m4a':'M4A ','.mp3':'MP3 ','.wav':'WAV ','.aif':'AIFF','.aiff':'AIFF'}[source['extension']]},
                            'item_stats':{'play_count_recent':0,'play_count_user':0,'skip_count_recent':0,
                                          'skip_count_user':0,'has_been_played':False}})
     result = plistlib.dumps({'revision':anchor+1,'timestamp':datetime.now(timezone.utc).replace(tzinfo=None),'operations':operations},
@@ -251,12 +257,12 @@ async def handshake(channel, identity, anchor, voice):
     raise ProtocolError('handshake-limit')
 
 
-def validate_manifest(message, own_ids, existing_ids):
+def validate_manifest(message, own_ids, existing_ids, declared_parts=None):
     require(message.get('Session') == 2, 'manifest-session')
     manifest = message.get('Params',{}).get('AssetManifest',{})
     require(isinstance(manifest,dict) and set(manifest) == {'Media'}, 'manifest-dataclasses')
     assets = manifest['Media']
-    require(isinstance(assets,list) and 1 <= len(assets) <= 1024, 'manifest-size')
+    require(isinstance(assets,list) and (1 if own_ids else 0) <= len(assets) <= 1024, 'manifest-size')
     seen, audio, ancillary = set(), [], []
     for asset in assets:
         require(isinstance(asset,dict) and asset.get('AssetType') == 'Music' and asset.get('IsDownload') is True, 'manifest-kind')
@@ -267,7 +273,9 @@ def validate_manifest(message, own_ids, existing_ids):
             # Bit 4 is disabled Genius, not a second audio/artwork payload.
             # Native AMP gives audio precedence for masks 1 and 5. Do not
             # accept artwork/lyrics/unknown bits without delivering them.
-            if parts not in (1,5):
+            declared = (declared_parts or {}).get(identifier,1)
+            require(declared in (1,2,3), 'manifest-declared-parts')
+            if parts not in (declared,declared|4):
                 raise ProtocolError('manifest-own-parts',{'asset_parts':parts})
             audio.append(identifier)
         else:

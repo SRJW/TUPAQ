@@ -16,20 +16,20 @@ def main():
     if subprocess.run(view, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         with tempfile.TemporaryDirectory() as directory:
             notes = Path(directory)/'notes.md'
-            notes.write_text('''TUPAQ 0.3.0-preview.4: audio/Genius y recuperación de importación pendiente.
+            notes.write_text('''TUPAQ 0.3.0-preview.5: biblioteca unificada, recuento local, columnas y portadas.
 
-- Admite solicitudes de audio con Genius desactivado (AssetParts 1/5). Los bits de portada/letras no preparados siguen deteniendo el envío y el diagnóstico incluye el valor numérico recibido.
-- Preferencias → Completar importación pendiente usa el registro de TUPAQ y el archivo original: si la canción sigue esperando audio, intenta entregarlo sin volver a insertarla; si iOS ya retiró todas las entradas, verifica su ausencia antes de una importación nueva.
-- Conserva el bloqueo de nuevas importaciones mientras haya una operación sin comprobar. Revisar importación continúa siendo una comprobación de solo lectura.
-- 86 pruebas, incluida simulación con metadatos aplicados antes del manifiesto, audio/Genius, recuperación sin duplicados, fuente movida/modificada, entradas cloud, colisiones y finalización temprana. Prueba de la interfaz empaquetada y del botón de recuperación.
+- Solo Biblioteca y Preferencias en la barra lateral. Importar/exportar y la cola del ordenador comparten una página.
+- Descargadas por defecto; Todo el catálogo conserva nube y pendientes. Incluye descargas protegidas de Apple Music. No fusiona canciones por título; evita referencias repetidas al mismo archivo.
+- Formato y tamaño, con verificación de cabeceras/stat por USB para filas visibles. Cabeceras clicables y ordenación numérica sin perder la selección.
+- Nuevas importaciones: portada JPEG separada con registro Artwork, entrega antes del audio y comprobación posterior. Fechas UTC para incorporación; se comprueba date_added.
+- Preferencias → Actualizar portadas y fecha: para canciones ya importadas con registros de TUPAQ en este ordenador y originales coincidentes. Envía solo metadatos y JPEG; no duplica filas ni reenvía audio. Hasta 49 canciones por lote.
+- 98 pruebas y comprobación de la aplicación empaquetada. Incluye nube/local, descargas protegidas, selección al ordenar, formatos reales, entrega de portada, fechas y actualización sin reinsertar canciones.
 
-**La entrega de audio y la recuperación siguen siendo experimentales y no están verificadas en un iPhone físico.** La referencia también deja sin calificar la aceptación nativa de la sesión vacía para completar audio. Si se detiene, conserva los registros y copia el diagnóstico completo. No borres la biblioteca ni los respaldos para forzar otro intento.
+El usuario confirmó la incorporación básica a Música con la preview.4. **Las nuevas portadas, fechas y actualizaciones pasan replay de protocolo y aún deben comprobarse en el iPhone físico**, incluida su aparición visual en Recientes. Si se detiene una operación, conserva los respaldos y copia el diagnóstico.
 
-Para el error de la preview.3: abre esta versión en el mismo ordenador, conecta el mismo iPhone, conserva el original y pulsa Preferencias → Completar importación pendiente. Si moviste el original, añádelo con Elegir canciones y vuelve a Completar. No uses Importar para reenviar la misma canción mientras haya una operación pendiente.
+No se envía Reset, eliminaciones ni se escribe SQLite en el teléfono. Una operación pendiente sigue bloqueando importaciones. La copia del catálogo no es un respaldo completo ni una restauración automática. No se inventan carátulas para archivos sin portada.
 
-Mantiene importación MP3/M4A AAC-ALAC/WAV/AIFF, exportación verificada, barra lateral, temas, lectura automática y miniaturas por USB. No envía Reset, eliminaciones ni escribe SQLite en el teléfono. La copia del catálogo no es un respaldo de todos los audios ni una restauración automática. Todavía no registra las portadas separadas en Artwork de Música.
-
-No necesitas Python ni abrir iTunes. Windows requiere el servicio/controlador USB de Apple. Paquetes sin firma de desarrollador ni notarización. Cada descarga se publica al pasar las comprobaciones de su plataforma. Instrucciones y límites: docs/TRANSFERENCIAS.md.
+Windows y Mac: no necesitas Python ni abrir iTunes. Windows requiere el controlador/servicio USB de Apple. Paquetes sin firma de desarrollador ni notarización. Cada paquete se publica al pasar las pruebas de su plataforma. Instrucciones y límites: docs/TRANSFERENCIAS.md.
 ''', encoding='utf-8')
             created = subprocess.run(['gh','release','create',tag,'--repo',repo,'--title',
                 'TUPAQ '+tag,'--notes-file',str(notes),'--prerelease','--verify-tag'])

@@ -68,7 +68,9 @@ class PendingPeer(Peer):
                     {'AssetType':'Music','IsDownload':True,'AssetID':identifier,'Variant':{'AssetParts':p.parts}}
                     for identifier in sorted(self.remaining)]}}})
             for record in self.queue[-1]['Params']['AssetManifest']['Media']:
-                if record['AssetID'] in self.remaining:record['Variant']['AssetParts']=p.parts
+                if record['AssetID'] in self.remaining:
+                    covered=next(op for op in p.operations if str(op['pid'])==record['AssetID'])['item'].get('artwork_cache_id')
+                    record['Variant']['AssetParts']=7 if covered and p.parts==5 else p.parts
             return
         if msg['Command']=='FileComplete':
             p.sent.append(msg);identifier=msg['Params']['AssetID'];destination=msg['Params']['AssetPath']
@@ -80,6 +82,7 @@ class PendingPeer(Peer):
                 db.execute('UPDATE item_extra SET location=? WHERE item_pid=?',(Path(destination).name,item))
                 db.execute('UPDATE item_state SET has_non_purgeable_asset=1 WHERE item_pid=?',(item,))
                 db.commit();p.files[PREF+'MediaLibrary.sqlitedb']=db.serialize()
+            p.register_art(next(op for op in p.operations if str(op['pid'])==identifier),item)
             self.remaining.remove(identifier)
             if not self.remaining:self.queue.append({'Command':'SyncFinished','Session':2})
             return
@@ -134,7 +137,8 @@ class RecoveryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             journal,record=self.pending(phone,root)
             phone.modify('''DELETE FROM item WHERE item_pid!=1;DELETE FROM item_extra WHERE item_pid!=1;
-                DELETE FROM item_store WHERE item_pid!=1;DELETE FROM item_state WHERE item_pid!=1;''')
+                DELETE FROM item_store WHERE item_pid!=1;DELETE FROM item_state WHERE item_pid!=1;
+                DELETE FROM item_playback WHERE item_pid!=1;''')
             result=self.call(phone,'resume',[],root)
             self.assertEqual(result['imported'],1)
             self.assertEqual(json.loads(journal.read_text(encoding='utf-8'))['phase'],'resolved-items-removed')

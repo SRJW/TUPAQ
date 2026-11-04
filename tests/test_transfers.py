@@ -11,6 +11,7 @@ import struct
 import tempfile
 import unittest
 import zlib
+from datetime import datetime
 from unittest.mock import patch
 
 import mutagen
@@ -48,8 +49,11 @@ def host_database():
 def initial_catalogue():
     with closing(sqlite3.connect(':memory:')) as db:
         db.executescript('''PRAGMA user_version=2410000;
-          CREATE TABLE item(item_pid INTEGER PRIMARY KEY,media_type INTEGER,item_artist_pid INTEGER,album_pid INTEGER,base_location_id INTEGER);
-          CREATE TABLE item_extra(item_pid INTEGER PRIMARY KEY,title TEXT,total_time_ms REAL,location TEXT);
+          CREATE TABLE item(item_pid INTEGER PRIMARY KEY,media_type INTEGER,item_artist_pid INTEGER,album_pid INTEGER,base_location_id INTEGER,date_added INTEGER DEFAULT 0);
+          CREATE TABLE item_extra(item_pid INTEGER PRIMARY KEY,title TEXT,total_time_ms REAL,location TEXT,file_size INTEGER DEFAULT 0);
+          CREATE TABLE item_playback(item_pid INTEGER PRIMARY KEY,audio_format INTEGER);
+          CREATE TABLE artwork(artwork_token TEXT,artwork_source_type INTEGER,artwork_type INTEGER,artwork_variant_type INTEGER,relative_path TEXT);
+          CREATE TABLE artwork_token(entity_pid INTEGER,entity_type INTEGER,artwork_token TEXT,artwork_source_type INTEGER,artwork_type INTEGER,artwork_variant_type INTEGER);
           CREATE TABLE item_artist(item_artist_pid INTEGER PRIMARY KEY,item_artist TEXT);
           CREATE TABLE album(album_pid INTEGER PRIMARY KEY,album TEXT,album_artist_pid INTEGER,sync_id INTEGER);
           CREATE TABLE album_artist(album_artist_pid INTEGER PRIMARY KEY,album_artist TEXT,sync_id INTEGER);
@@ -59,8 +63,8 @@ def initial_catalogue():
           CREATE TABLE _MLDatabaseProperties(key TEXT,value TEXT);
           INSERT INTO db_info VALUES(11,12);
           INSERT INTO _MLDatabaseProperties VALUES('MLSyncClientSyncAnchor','7');
-          INSERT INTO item VALUES(1,8,2,3,1);
-          INSERT INTO item_extra VALUES(1,'Original',1044,'AAAA.mp3');
+          INSERT INTO item(item_pid,media_type,item_artist_pid,album_pid,base_location_id) VALUES(1,8,2,3,1);
+          INSERT INTO item_extra(item_pid,title,total_time_ms,location) VALUES(1,'Original',1044,'AAAA.mp3');
           INSERT INTO item_artist VALUES(2,'Artista original');
           INSERT INTO album_artist VALUES(4,'Artista original',21);
           INSERT INTO album VALUES(3,'Álbum original',4,31);
@@ -102,6 +106,7 @@ class Phone:
 
     async def fclose(self,h):del self.handles[h]
     async def lock(self,h,op):pass
+    async def mkdir(self,path):self.dirs.add(self.path(path))
 
     async def fread(self,h,size):
         p,off,mode=self.handles[h]
@@ -142,8 +147,25 @@ class Phone:
             db.execute('INSERT INTO item(item_pid,media_type,item_artist_pid,album_pid,base_location_id) VALUES(?,8,?,?,1)',(pid,artist,album))
             ms=item.get('total_time_ms')
             if ms is None:ms=mutagen.File(io.BytesIO(audio)).info.length*1000
-            db.execute('INSERT INTO item_extra VALUES(?,?,?,?)',(pid,item['title'],ms,Path(destination).name))
+            db.execute('INSERT INTO item_extra(item_pid,title,total_time_ms,location,file_size) VALUES(?,?,?,?,?)',(pid,item['title'],ms,Path(destination).name,len(audio)))
+            db.execute('INSERT INTO item_playback VALUES(?,?)',(pid,operation['avformat_info']['audio_format']))
+            db.execute('UPDATE item SET date_added=? WHERE item_pid=?',(int((item['date_created']-datetime(2001,1,1)).total_seconds()),pid))
             db.execute('INSERT INTO item_store VALUES(?,?)',(pid,wire))
+            db.commit();self.files[PREF+'MediaLibrary.sqlitedb']=db.serialize()
+        self.register_art(operation,pid)
+
+    def register_art(self,operation,pid):
+        cache=operation['item'].get('artwork_cache_id');path=f"/Airlock/Media/Artwork/{operation['pid']}"
+        if not cache or path not in self.files:return
+        data=self.files.pop(path);sha=hashlib.sha1(data).hexdigest();relative=sha[:2]+'/'+sha[2:]
+        self.files[PREF+'Artwork/Originals/'+relative]=data
+        with closing(sqlite3.connect(':memory:')) as db:
+            db.deserialize(self.files[PREF+'MediaLibrary.sqlitedb'])
+            album=db.execute('SELECT album_pid FROM item WHERE item_pid=?',(pid,)).fetchone()[0]
+            db.execute('INSERT INTO artwork VALUES(?,300,6,0,?)',(str(cache),relative))
+            for entity,kind in [(pid,0),(album,4)]:
+                db.execute('DELETE FROM artwork_token WHERE entity_pid=? AND entity_type=? AND artwork_source_type=300',(entity,kind))
+                db.execute('INSERT INTO artwork_token VALUES(?,?,?,300,6,0)',(entity,kind,str(cache)))
             db.commit();self.files[PREF+'MediaLibrary.sqlitedb']=db.serialize()
 
 
@@ -185,7 +207,7 @@ class Peer:
             p.operations=envelope['operations'][1:]
             assert all(op['operation']=='insert_track' for op in p.operations)
             self.remaining={str(op['pid']) for op in p.operations}
-            assets=[{'AssetType':'Music','IsDownload':True,'AssetID':i,'Variant':{'AssetParts':1}} for i in sorted(self.remaining)]
+            assets=[{'AssetType':'Music','IsDownload':True,'AssetID':i,'Variant':{'AssetParts':3 if next(op for op in p.operations if str(op['pid'])==i)['item'].get('artwork_cache_id') else 1}} for i in sorted(self.remaining)]
             assets.append({'AssetType':'Music','IsDownload':True,'AssetID':'77','Variant':{'AssetParts':4}})
             if p.fail=='manifest':assets[-1]['AssetID']='999999'
             self.queue.append({'Command':'AssetManifest','Session':2,'Params':{'AssetManifest':{'Media':assets}}})

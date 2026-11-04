@@ -97,6 +97,7 @@ async def resume_pending(root, selected, progress):
     from pymobiledevice3.services.afc import AFC_LOCK_EX, AFC_LOCK_UN
     root = Path(root)
     journal,receipt = pending_receipt(root)
+    require(receipt.get('operation')!='metadata-update','recovery-metadata-only')
     directory,entries = journal.parent,receipt['entries']
     require(receipt.get('import_phase',receipt['phase']) in ('metadata-announced','verifying'), 'recovery-phase')
     before = snapshot(directory/'before'/'1'/'MediaLibrary.sqlitedb')
@@ -120,6 +121,8 @@ async def resume_pending(root, selected, progress):
                 if status == 'complete':
                     verify_before_after(before,current,entries)
                     await check_audio(afc,entries)
+                    from .sync.artwork import verify as verify_artwork
+                    await verify_artwork(afc,current,entries)
                 else:
                     bind_sources(entries,selected)
                     # Never overwrite a permanent file or a previous upload.
@@ -157,6 +160,8 @@ async def resume_pending(root, selected, progress):
                         after = await capture(afc,temporary/'after')
                         verify_before_after(before,after,entries)
                         await check_audio(afc,entries)
+                        from .sync.artwork import verify as verify_artwork
+                        await verify_artwork(afc,after,entries)
             if not retry:
                 receipt['phase'] = 'completed'
                 save_receipt(directory,receipt)

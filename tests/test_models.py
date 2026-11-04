@@ -15,7 +15,7 @@ class LibraryModelTests(unittest.TestCase):
         self.assertEqual(model.rowCount(), 100_000)
         self.assertEqual(model.data(model.index(0, 0)), 'Canción 0')
         self.assertEqual(model.data(model.index(99_999, 0)), 'Canción 99999')
-        self.assertEqual(model.data(model.index(99_999, 3)), '2:05')
+        self.assertEqual(model.data(model.index(99_999, 4)), '2:05')
         self.assertIsNone(model.data(model.index(0, 0), Qt.ItemDataRole.DecorationRole))
         self.assertEqual(model.rowCount(model.index(0, 0)), 0)
         model.replace([])

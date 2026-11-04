@@ -97,18 +97,28 @@ def read_catalogue(path, diagnostics=None):
                 and {'base_location_id','path'} <= {r[1] for r in db.execute('PRAGMA table_info(base_location)')})
             paths = ', bl.path, e.location' if locations else ', NULL, NULL'
             location_join = 'LEFT JOIN base_location bl ON bl.base_location_id=i.base_location_id' if locations else ''
-            rows = db.execute('''SELECT i.item_pid, e.title, a.item_artist, b.album, e.total_time_ms'''+paths+''', i.album_pid
+            state_columns = {r[1] for r in db.execute('PRAGMA table_info(item_state)')}
+            state_schema = {'item_pid','is_placeholder','is_library_added','has_non_purgeable_asset'} <= state_columns
+            playback_schema = {'item_pid','audio_format'} <= {r[1] for r in db.execute('PRAGMA table_info(item_playback)')}
+            extra_fields = ', e.file_size' if 'file_size' in layout['item_extra'] else ', NULL'
+            extra_fields += ', st.is_placeholder, st.is_library_added, st.has_non_purgeable_asset' if state_schema else ', NULL, NULL, NULL'
+            extra_fields += ', pb.audio_format' if playback_schema else ', NULL'
+            protected_local = state_schema and 'has_non_purgeable_subscription_protected_local_asset' in state_columns
+            extra_fields += ', st.has_non_purgeable_subscription_protected_local_asset' if protected_local else ', NULL'
+            metadata_joins = (' LEFT JOIN item_state st ON st.item_pid=i.item_pid' if state_schema else '')
+            metadata_joins += ' LEFT JOIN item_playback pb ON pb.item_pid=i.item_pid' if playback_schema else ''
+            rows = db.execute('''SELECT i.item_pid, e.title, a.item_artist, b.album, e.total_time_ms'''+paths+', i.album_pid'+extra_fields+'''
                 FROM item i LEFT JOIN item_extra e ON e.item_pid=i.item_pid
                 LEFT JOIN item_artist a ON a.item_artist_pid=i.item_artist_pid
                 LEFT JOIN album b ON b.album_pid=i.album_pid
-                '''+location_join+'''
+                '''+location_join+metadata_joins+'''
                 WHERE i.media_type = ? ORDER BY e.title, i.item_pid LIMIT ?''', (MUSIC_MEDIA_TYPE, MAX_TRACKS+1)).fetchall()
             if len(rows) > MAX_TRACKS:
                 raise LibraryError('La biblioteca supera el límite de 100.000 canciones de esta versión.')
             tracks = []
             from .remote_artwork import catalogue_artwork
             artwork = catalogue_artwork(db)
-            for pid, title, artist, album, ms, base, leaf, album_pid in rows:
+            for pid, title, artist, album, ms, base, leaf, album_pid, size, placeholder, added, asset, codec, protected in rows:
                 if any(value is not None and not isinstance(value, str) for value in [title, artist, album]):
                     raise LibraryError('El catálogo contiene metadatos de un tipo no admitido.')
                 duration = float(ms or 0)/1000
@@ -118,6 +128,18 @@ def read_catalogue(path, diagnostics=None):
                                'album': album or 'Sin álbum', 'duration': max(0, duration)})
                 if locations:
                     tracks[-1]['afc_path'] = media_path(base, leaf)
+                if state_schema:
+                    if any(type(value) is not int or value not in (0,1) for value in (placeholder,added,asset)):
+                        tracks[-1]['is_local'] = False
+                    else:
+                        tracks[-1]['is_local'] = placeholder == 0 and added == 1 and (asset == 1 or (type(protected) is int and protected == 1))
+                if type(size) is int and size > 0:
+                    tracks[-1]['size'] = size
+                    tracks[-1]['size_source'] = 'catalogue'
+                if type(codec) is int and codec > 0:
+                    from .library_fields import format_label
+                    tracks[-1]['format_label'] = format_label(codec,tracks[-1].get('afc_path'))
+                    tracks[-1]['format_source'] = 'catalogue'
                 covers = [artwork[key] for key in ((str(pid),0),(str(album_pid),4)) if key in artwork]
                 if covers:
                     tracks[-1]['artwork_paths'] = list(dict.fromkeys(covers))
@@ -125,6 +147,9 @@ def read_catalogue(path, diagnostics=None):
                 diagnostics['tracks_returned'] = len(tracks)
                 diagnostics['location_schema'] = locations
                 diagnostics['usb_audio_paths'] = sum(bool(t.get('afc_path')) for t in tracks)
+                from .library_fields import local_tracks
+                diagnostics['local_state_schema'] = state_schema
+                diagnostics['local_tracks'] = len(local_tracks(tracks))
             return tracks
     except (sqlite3.Error, OSError, ValueError, TypeError) as error:
         raise LibraryError('No se pudo leer una copia válida de la biblioteca de Música.') from error

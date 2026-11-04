@@ -1,15 +1,15 @@
 # Transferir audio con TUPAQ 0.3
 
 La lectura del catálogo fue confirmada por el usuario con 0.2.0-preview.11.
-La importación y la exportación son nuevas y experimentales: se han probado con
-un dispositivo simulado y con la interfaz real empaquetada, aún no con un iPhone
-físico. No hace falta instalar Python ni abrir iTunes. Windows necesita el servicio
+El usuario confirmó la incorporación de canciones con la preview.4. Los cambios
+de portada y fecha de la preview.5, las actualizaciones de metadatos y la
+recuperación mantienen carácter experimental y requieren comprobación física. No hace falta instalar Python ni abrir iTunes. Windows necesita el servicio
 y controlador USB de Apple que ya permite leer la biblioteca.
 
 ## Importar del ordenador a Música
 
 1. Conecta un solo iPhone por USB y desbloquéalo.
-2. Entra en **Inicio** o **Importación USB**. Usa **Elegir canciones** o arrastra los archivos a TUPAQ.
+2. Entra en **Biblioteca**. Usa **Elegir canciones** o arrastra los archivos a TUPAQ.
 3. En la lista del ordenador, selecciona las canciones y pulsa **Importar al
    iPhone**. Sin selección se usa toda la cola. Se admiten hasta 49 archivos y
    2 GiB por operación, con un máximo de 256 MiB por archivo.
@@ -29,8 +29,12 @@ No hay conversión. Para MP3 no se inventan campos de duración/gapless: se usa
 la forma sin esos campos del protocolo para que iOS interprete el archivo.
 
 La portada incrustada se conserva dentro del original y se muestra en TUPAQ.
-La versión actual no registra un asset separado de portada en Artwork de iOS;
-no garantiza que Música muestre esa portada después de importar.
+Desde la preview.5 también se prepara un asset JPEG separado para Artwork,
+se registra con un ID de caché libre y se verifica tras el envío. Los originales
+JPEG válidos se conservan; las portadas PNG se proyectan a un JPEG separado.
+El audio no se reescribe. Se incluyen date_created/date_modified como fechas
+plist y se comprueba item.date_added; la aparición en Recientes aún necesita
+confirmación visual en el iPhone.
 
 ## Exportar del iPhone al ordenador
 
@@ -103,7 +107,7 @@ catálogo puede dejar una operación pendiente. No se reintenta automáticamente
 
 ## Validación disponible
 
-Las 86 pruebas incluyen replay de importación de los cinco perfiles base,
+Las 98 pruebas incluyen replay de importación de los cinco perfiles base,
 originales conservados, exportación byte por byte, nombres existentes,
 rechazo por cambio de ancla, identidad sin configurar, manifest desconocido,
 audio permanente alterado, interrupción después de aplicar cambios, verificación
@@ -188,7 +192,7 @@ además de la anterior simulación de finalización.
 
 ### Qué hacer con la operación de la preview.3
 
-1. Abre la preview.4 en el mismo ordenador y conserva sus datos de TUPAQ.
+1. Abre la preview.4 o posterior en el mismo ordenador y conserva sus datos de TUPAQ.
 2. Conecta y desbloquea el mismo iPhone. Conserva el archivo original en el ordenador.
 3. Ve a **Preferencias → Completar importación pendiente**. No vuelvas a añadir
    la canción mediante Importar mientras su operación siga pendiente.
@@ -227,3 +231,63 @@ a SQL, Reset ni eliminación de canciones.
 Referencia MIT: [contrato de audio/Genius y estado pendiente](https://github.com/fbiba/rustunes/blob/057ee8fc9c9da65795a6f14497fc408c2fe23c76/crates/music-protocol/src/protocol/ancillary.rs),
 [sesión vacía](https://github.com/fbiba/rustunes/blob/057ee8fc9c9da65795a6f14497fc408c2fe23c76/crates/music-protocol/src/protocol/session.rs),
 [entrega pendiente](https://github.com/fbiba/rustunes/blob/057ee8fc9c9da65795a6f14497fc408c2fe23c76/crates/music-protocol/src/protocol/session/pending_completion.rs).
+
+## Vista unificada, descargas y columnas (preview.5)
+
+Biblioteca reúne la tabla del iPhone, la cola de importación y ambas acciones.
+Preferencias es la única otra opción lateral. La cola se muestra al añadir
+archivos y puede redimensionarse respecto a la tabla del iPhone.
+
+La vista inicial usa item_state: pertenencia a biblioteca, ausencia de placeholder
+y has_non_purgeable_asset o has_non_purgeable_subscription_protected_local_asset.
+Así las descargas protegidas de Apple Music cuentan aunque no tengan un audio
+exportable por AFC. Los registros de nube o aún sin audio no se cuentan como
+descargadas, y se conservan en Todo el catálogo. Dos títulos iguales con archivos
+diferentes siguen siendo dos canciones; dos referencias a la misma ruta se
+cuentan una vez. No se elimina ninguna fila del teléfono. Si el esquema no
+expone esos estados, se muestran referencias USB y se indica que el estado
+de descarga no está disponible: eso no certifica que los archivos existan.
+
+Formato y tamaño se leen inicialmente de item_playback/item_extra cuando están
+disponibles. Para las filas visibles se comprueba el contenedor real mediante
+cabeceras y átomos MP4 acotados; se salta mdat y no se descarga todo el audio.
+stat aporta el tamaño real por USB. El tooltip indica el origen y un valor
+desconocido se muestra como —. Las cabeceras permiten ordenar en ambos sentidos,
+con orden numérico para duración/tamaño y selección persistente por canción.
+
+## Portadas y fecha de incorporación
+
+En una importación nueva, la portada incrustada válida (hasta 5 MiB, 16 millones
+de píxeles) se prepara como JPEG independiente. Para PNG se limita la proyección
+a 1600 px; el audio original, incluida su portada incrustada, no se modifica.
+La nueva caché se asigna por encima de los IDs source300 ocupados en el catálogo.
+Cada entrada declara su caché y checksum (un JPEG proyectado +17 para M4A, +1
+para ID3). El manifiesto debe pedir exactamente lo declarado, con Genius opcional:
+1/5 sin portada, 3/7 con portada, 2/6 para actualizar solo portada.
+
+El JPEG se escribe primero en Airlock/Media/Artwork/ID y se verifica por hash.
+Después se entrega audio y una única confirmación conjunta. Tras la sesión
+se comprueban el registro de Artwork y los bytes de Originals, además del audio.
+Las fechas de creación/modificación de la entrada son fechas plist UTC del
+momento de importación y se verifica date_added contra la fecha prevista.
+Las fechas de otras canciones deben conservarse. Eso prueba el valor recibido
+en el replay; la vista Recientes de Música debe verificarse en un iPhone físico.
+
+### Actualizar canciones ya importadas
+
+1. Abre TUPAQ en el ordenador donde se hizo la importación y conecta el mismo iPhone.
+2. Conserva los originales. Si los moviste o quieres limitar el lote, añádelos
+   con Elegir canciones (máximo 49 por actualización, 2 GiB de originales).
+3. Entra en Preferencias → Actualizar portadas y fecha.
+4. Espera la comprobación final. Si falla, usa Copiar diagnóstico y conserva
+   los registros; no fuerces otra importación.
+
+Solo se toman recibos completados cuya biblioteca, IDs, metadatos, rutas y
+hashes de audio coincidan. Se envían update_track de fecha/caché y el JPEG;
+no insert_track, audio nuevo, eliminaciones ni SQL remoto. Sin portada incrustada
+se actualiza solo la fecha. Se verifican los audios antes y después. Una
+actualización sin confirmar bloquea otra importación; Revisar importación puede
+comprobarla sin reenvío. Estas actualizaciones todavía requieren validación física.
+
+Referencia independiente MIT: [campos de fecha y protocolo de Artwork](https://github.com/fbiba/rustunes/blob/057ee8fc9c9da65795a6f14497fc408c2fe23c76/docs/04-media-library-database.md),
+secciones 4 y 10. El cliente no modifica ArtworkDB del host ni la SQLite del teléfono.
