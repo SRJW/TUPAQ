@@ -1,5 +1,6 @@
 """Virtual song rows with stable selection while sorting by values, not labels."""
 from collections import OrderedDict
+from .i18n import tr, Text, render
 import unicodedata
 import math
 
@@ -29,6 +30,13 @@ def byte_label(size):
 
 
 class SortableItem(QTableWidgetItem):
+    def __init__(self, value):
+        self._message=value if isinstance(value,Text) else None
+        super().__init__(str(value))
+
+    def retranslate(self):
+        if self._message is not None:self.setText(render(self._message.source))
+
     def __lt__(self, other):
         left,right = self.data(SORT_ROLE),other.data(SORT_ROLE)
         if isinstance(left,(int,float)) and isinstance(right,(int,float)):
@@ -146,7 +154,7 @@ class LibraryModel(QAbstractTableModel):
         return 0 if parent is not None and parent.isValid() else len(HEADERS)
 
     def headerData(self,section,orientation,role=Qt.ItemDataRole.DisplayRole):
-        if role==Qt.ItemDataRole.DisplayRole and orientation==Qt.Orientation.Horizontal and 0<=section<len(HEADERS):return HEADERS[section]
+        if role==Qt.ItemDataRole.DisplayRole and orientation==Qt.Orientation.Horizontal and 0<=section<len(HEADERS):return str(tr(HEADERS[section]))
 
     def data(self,index,role=Qt.ItemDataRole.DisplayRole):
         if not index.isValid() or not 0<=index.row()<len(self.tracks):return None

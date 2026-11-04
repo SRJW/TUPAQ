@@ -1,13 +1,13 @@
 # TUPAQ
 
-Antes llamado Importios. El código interno conserva el módulo `importios` y el repositorio actual.
+Antes llamado Importios. El código interno conserva el módulo `importios`; el repositorio es `SRJW/TUPAQ`.
 
 Aplicación de escritorio para Windows y macOS, en español, con ventana propia.
 El objetivo es importar música local a la app Música del iPhone sin usar la
 aplicación iTunes ni 3uTools.
 
 El usuario confirmó la lectura y la importación con metadatos y portada en Música del iPhone.
-La **0.3.0-preview.12** conserva la biblioteca visible mientras se actualiza después
+La **0.3.0-preview.13** conserva la biblioteca visible mientras se actualiza después
 de una importación, incluidas selección, marcas, posición de lectura y carátulas.
 Si falla la lectura, mantiene la última vista válida e indica que no está actualizada.
 El diseño toma la composición de las referencias de Apple Music: portada grande,
@@ -19,6 +19,11 @@ sin eliminar registros ni omitir comprobaciones. Estas correcciones requieren pr
 Windows permite elegir cualquier familia instalada o cargar una fuente de archivo,
 ver una muestra y pulsar **Aplicar** para cambiar toda la interfaz. En Mac se usa
 siempre la fuente del sistema. Hay [propuestas concretas para continuar](docs/MEJORAS-PROPUESTAS.md).
+En **Preferencias → Idioma** puedes elegir **Español** o **English**. El cambio
+es inmediato, se conserva al cerrar y alcanza navegación, cabeceras, diálogos,
+ayudas y mensajes de progreso/error, sin reiniciar ni vaciar la cola. Los metadatos
+de las canciones, nombres de dispositivos y códigos técnicos no se traducen.
+Los selectores nativos de archivos también dependen del idioma del sistema operativo.
 Véase [cómo transferir y recuperar](docs/TRANSFERENCIAS.md).
 
 **Tipografía:** en Windows, Preferencias permite seleccionar familias instaladas y
@@ -30,6 +35,10 @@ No se redistribuyen archivos de fuentes de Apple. Las capturas se generan en Lin
 con su fuente disponible, no con San Francisco.
 [Información de Apple sobre sus fuentes](https://developer.apple.com/fonts/).
 
+![Selector de idioma de TUPAQ, con datos sintéticos de prueba](docs/preferencias-idioma.png)
+
+![TUPAQ en inglés, con datos y portada sintéticos de prueba](docs/interfaz-ingles.png)
+
 ![TUPAQ en modo claro, con audio sintético de prueba](docs/interfaz-nativa.png)
 
 ![TUPAQ Aurora, con datos y portada sintéticos de prueba](docs/interfaz-oscura.png)
@@ -40,7 +49,7 @@ con su fuente disponible, no con San Francisco.
 
 ## Descargar y abrir
 
-[Versiones descargables](https://github.com/SRJW/importios/releases) ·
+[Versiones descargables](https://github.com/SRJW/TUPAQ/releases) ·
 [Instrucciones de descarga](DESCARGAR.md)
 
 - Windows 11: abre `TUPAQ.exe` con doble clic.
@@ -145,7 +154,7 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m importios.native --smoke-fixtures 
 .venv/bin/python scripts/build_desktop.py
 ```
 
-La suite contiene 142 pruebas de formatos, HTTP local, descubrimiento USB simulado,
+La suite contiene 146 pruebas de formatos, HTTP local, descubrimiento USB simulado,
 paquetes de investigación, firmas candidatas, conexión automática y portadas remotas. La prueba nativa comprueba una
 ventana Qt real, lectura en un hilo de trabajo, los AAC/ALAC dentro de M4A, portadas, duplicados,
 archivos dañados, CSV, quitar/vaciar y las firmas. En Linux se ha probado también

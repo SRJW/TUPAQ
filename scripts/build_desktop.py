@@ -27,6 +27,13 @@ def main():
                '--name', 'TUPAQ', '--windowed',
                '--add-data', 'third_party:third_party',
                '--collect-submodules', 'mutagen', '--exclude-module', 'tkinter']
+    from PySide6.QtCore import QLibraryInfo
+    translations=Path(QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath))
+    spanish=translations/'qtbase_es.qm'
+    if not spanish.is_file():raise RuntimeError('Spanish Qt translations are missing')
+    from PyInstaller.utils.hooks.qt import pyside6_library_info
+    destination=Path(pyside6_library_info.qt_rel_dir)/'translations'
+    command += ['--add-data', str(spanish)+':'+str(destination)]
     if system == 'Windows':
         command += ['--onefile']
     else:

@@ -109,7 +109,7 @@ catálogo puede dejar una operación pendiente. No se reintenta automáticamente
 
 ## Validación disponible
 
-Las 142 pruebas incluyen replay de importación de los cinco perfiles base,
+Las 146 pruebas incluyen replay de importación de los cinco perfiles base,
 originales conservados, exportación byte por byte, nombres existentes,
 rechazo por cambio de ancla, identidad sin configurar, manifest desconocido,
 audio permanente alterado, interrupción después de aplicar cambios, verificación
@@ -461,3 +461,26 @@ registro como fallo anterior a cambios. Un estado diferente o ambiguo sigue
 bloqueando otro envío. Cinco importaciones consecutivas simuladas, confirmación
 inmediata, catálogo cambiante, cancelación y conservación de archivos exportados
 tienen pruebas; esto no sustituye la comprobación con el iPhone físico.
+
+
+## Idioma de la interfaz (preview.13)
+
+**Preferencias → Idioma** ofrece Español y English. Se cambia sin reiniciar y se
+guarda en la configuración local del usuario. El idioma inicial es español; un
+valor guardado desconocido también vuelve a español. Se traducen navegación,
+preferencias, cabeceras, botones, ayudas, confirmaciones, progreso y mensajes de
+error de TUPAQ. Los diálogos nativos de selección de archivos también pueden
+seguir el idioma del sistema operativo. Las etiquetas de CSV siguen el idioma
+elegido; sus datos y medidas conservan el mismo contenido.
+
+El cambio no vuelve a leer el iPhone ni recrea la biblioteca. Conserva cola,
+casillas, selección, búsqueda, apariencia, tipografía y operación en curso. Los
+títulos, artistas, álbumes, nombres de dispositivo y rutas permanecen intactos.
+El diagnóstico que se copia conserva el texto original y los códigos técnicos
+para poder investigar un problema con independencia del idioma visual.
+
+Las traducciones son locales, sin consultas de red ni traducción automática. El
+catálogo inglés está en importios/translations.py; las frases españolas son la
+referencia y el respaldo cuando no hay traducción. Las pruebas comprueban el
+cambio en ambos sentidos, persistencia, conservación de canciones/cola/marcas,
+mensajes de transferencia y diagnóstico y los campos variables del catálogo.

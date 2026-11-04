@@ -16,19 +16,18 @@ def main():
     if subprocess.run(view, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         with tempfile.TemporaryDirectory() as directory:
             notes = Path(directory)/'notes.md'
-            notes.write_text('''TUPAQ 0.3.0-preview.12: cristal, cancelación y confirmación de importaciones sucesivas.
+            notes.write_text('''TUPAQ 0.3.0-preview.13: interfaz en español e inglés.
 
-- Composición inspirada en las referencias de Apple Music: portada grande, acciones a su derecha, paneles translúcidos, álbumes en la barra lateral y barra inferior integrada. Nocturno, Aurora y Atardecer en Preferencias. Fondo atmosférico en caché, sin motor web ni desenfoque continuo.
-- Cancelar importación antes de enviar cambios; cancelar exportación conservando archivos completos y eliminando el temporal parcial. Si Música ya recibe metadatos, se finaliza y verifica el lote actual completo: no es una interrupción inmediata ni una reversión.
-- Corregida una carrera que rechazaba confirmaciones rápidas durante el último FileComplete o guardado local. Se conservan el rechazo de confirmaciones prematuras y la verificación del catálogo y audio.
-- Lectura del catálogo cambiante: hasta tres intentos, dos lecturas coincidentes y una copia conservada. Mensajes separados para lectura, operaciones pendientes y envío. No se borra el historial para desbloquear.
-- Solo se resuelve un registro anterior a cambios cuando catálogo y ausencia de todos sus destinos lo demuestran. Los estados ambiguos siguen bloqueados.
-- Biblioteca visible durante actualización. Casillas, orden, búsqueda por formato y eliminación con confirmación. Windows: fuente global mediante Aplicar; Mac: fuente nativa del sistema.
-- 142 pruebas, incluidas cinco importaciones consecutivas simuladas, cancelación y confirmación rápida, más comprobación de cada aplicación empaquetada.
+- Preferencias → Idioma: Español o English, aplicado al instante y guardado entre aperturas.
+- Traducción de navegación, preferencias, cabeceras, botones, ayudas, confirmaciones, progreso y errores de TUPAQ. Los diálogos nativos de archivos también dependen del idioma del sistema.
+- El cambio conserva cola, biblioteca, selección, marcas, búsqueda, apariencia y fuente. No vuelve a consultar el teléfono ni modifica música.
+- Títulos, artistas, álbumes, nombres de dispositivo, rutas y códigos de diagnóstico permanecen intactos. Las etiquetas del CSV siguen el idioma elegido.
+- Traducciones locales, sin servicios externos. Se incluye el catálogo de controles estándar de Qt en español.
+- 146 pruebas y comprobación de cada ejecutable empaquetado, con cambio de idioma y persistencia verificados en simulación.
 
-El usuario confirmó importaciones con metadatos y portada en revisiones anteriores. Estas correcciones se validan en simulación y necesitan comprobación con el dispositivo; no puede atribuirse con certeza el fallo histórico sin su diagnóstico. No borres catalogue-backups: sus registros permiten comprobar operaciones pendientes.
+Se mantienen las funciones de preview.12: importación/exportación, casillas y eliminación con confirmación, tres ambientes de cristal, tipografía global y Cancelar. Si Música ya recibe cambios, la cancelación termina y verifica el lote actual. Conserva catalogue-backups para comprobar operaciones pendientes.
 
-Windows y Mac: no necesitas Python ni abrir iTunes. Cada paquete aparece después de pasar las comprobaciones de su plataforma. Paquetes sin firma ni notarización. No se redistribuyen fuentes de Apple. La copia del catálogo no incluye todos los audios ni permite restaurarlos automáticamente. Instrucciones: docs/TRANSFERENCIAS.md.
+Windows y Mac: no necesitas Python ni abrir iTunes. Cada paquete aparece después de pasar sus comprobaciones. Paquetes sin firma ni notarización. No se redistribuyen fuentes de Apple. La copia del catálogo no incluye todos los audios ni permite restaurarlos automáticamente. Instrucciones: docs/TRANSFERENCIAS.md.
 ''', encoding='utf-8')
             created = subprocess.run(['gh','release','create',tag,'--repo',repo,'--title',
                 'TUPAQ '+tag,'--notes-file',str(notes),'--prerelease','--verify-tag'])

@@ -5,7 +5,7 @@ el intérprete y las dependencias: no necesitas instalar Python.
 
 ## Descarga recomendada
 
-Entra en [Releases](https://github.com/SRJW/importios/releases) y abre la versión
+Entra en [Releases](https://github.com/SRJW/TUPAQ/releases) y abre la versión
 preliminar de escritorio. Sus archivos aparecen en **Assets**, una vez que la
 compilación termine. Elige `.exe` para Windows y el `.dmg` correspondiente a tu
 Mac. No necesitas Python, terminal, navegador para usar la aplicación ni iTunes.
@@ -13,7 +13,7 @@ La detección USB en Windows sí necesita el controlador/servicio local de Apple
 
 ## Windows 11 (descarga desde Actions)
 
-1. Entra en [las compilaciones de GitHub](https://github.com/SRJW/importios/actions/workflows/desktop.yml).
+1. Entra en [las compilaciones de GitHub](https://github.com/SRJW/TUPAQ/actions/workflows/desktop.yml).
 2. Abre la ejecución más reciente de la etiqueta de versión más reciente
    que tenga un indicador verde. Si está en curso, espera a que termine.
 3. Al final de la página, en **Artifacts**, descarga **TUPAQ-Windows-x64**.
@@ -32,7 +32,7 @@ GitHub compila cada aplicación en su sistema correspondiente.
 ## Versiones publicadas
 
 Cuando se publique una etiqueta `v…`, GitHub generará una versión preliminar en
-[Releases](https://github.com/SRJW/importios/releases) con el EXE y los dos DMG
+[Releases](https://github.com/SRJW/TUPAQ/releases) con el EXE y los dos DMG
 como descargas directas. Las compilaciones normales se guardan durante 30 días;
 los archivos de una release se conservan hasta que se retire esa versión.
 

@@ -15,6 +15,7 @@ from PySide6.QtCore import Qt, QThread, Signal, QSize, QStandardPaths, QLockFile
 from PySide6.QtGui import QIcon, QPixmap, QDesktopServices, QFont, QFontInfo, QFontDatabase
 from PySide6.QtWidgets import QApplication,QFileDialog,QMainWindow,QMessageBox,QAbstractItemView,QListWidgetItem
 
+from .i18n import tr, set_language, language, LANGUAGES, QMessageBox
 from .audio import inspect_audio, read_artwork
 from .artwork import thumbnail
 from .devices import discover, DiscoveryError
@@ -192,6 +193,8 @@ class Window(QMainWindow):
         self.artwork_attempted = set()
         self.duplicates = 0
         self.activity_message=''
+        saved_language=QSettings().value('language','es') if auto_connect else 'es'
+        set_language(saved_language)
         from .typography import configure
         app=QApplication.instance()
         font_path=QSettings().value('font_path','') if auto_connect else ''
@@ -204,6 +207,8 @@ class Window(QMainWindow):
         self.font_applying=False
         from .interface import build, apply_theme
         build(self)
+        self.language_choice.setCurrentIndex(self.language_choice.findData(language()))
+        self.language_choice.currentIndexChanged.connect(self.change_language)
         self.persist_settings = auto_connect
         if self.persist_settings:
             settings = QSettings()
@@ -251,7 +256,7 @@ class Window(QMainWindow):
         self.repair_metadata.setEnabled(not phone_busy and self.backup_root.exists())
         self.open_backup.setEnabled(self.backup_root.exists())
         self.queue_toggle.setVisible(bool(self.tracks) or self.worker is not None)
-        self.queue_toggle.setText(f'Cola ({len(self.tracks)})')
+        self.queue_toggle.setText(tr(f'Cola ({len(self.tracks)})'))
         self.queue_panel.setVisible((bool(self.tracks) or self.worker is not None) and self.queue_toggle.isChecked())
         self.queue_panel.setMinimumHeight(min(210,100+44*len(self.tracks)) if self.tracks else 110)
 
@@ -260,6 +265,19 @@ class Window(QMainWindow):
         self.nav_buttons[1 if number == 1 else 0].setChecked(True)
         self.update_buttons()
         self.schedule_artwork()
+
+    def change_language(self, *ignored):
+        code=self.language_choice.currentData()
+        set_language(code,self)
+        self.library_model.headerDataChanged.emit(Qt.Orientation.Horizontal,0,5)
+        sorting=self.table.isSortingEnabled();self.table.setSortingEnabled(False)
+        try:
+            for row in range(self.table.rowCount()):
+                for column in range(self.table.columnCount()):
+                    self.table.item(row,column).retranslate()
+        finally:self.table.setSortingEnabled(sorting)
+        self.update_album_shortcuts()
+        if self.persist_settings:QSettings().setValue('language',language())
 
     def refresh_workspace(self):
         self.update_buttons()
@@ -298,9 +316,9 @@ class Window(QMainWindow):
         else:view.verticalScrollBar().setValue(scroll)
         view.setUpdatesEnabled(True);view.viewport().update()
         title = 'En el iPhone'
-        self.library_heading.setText(f'{title} · {len(displayed)}')
+        self.library_heading.setText(tr(f'{title} · {len(displayed)}'))
         if self.worker is None and self.transfer_worker is None and not self.activity_message:
-            self.status.setText(f"{len(local)} {'canciones' if known else 'canciones disponibles'} · {len(self.tracks)} para importar")
+            self.status.setText(tr(f"{len(local)} {'canciones' if known else 'canciones disponibles'} · {len(self.tracks)} para importar"))
         if not self.library_table.selectionModel().selectedRows() and not self.table.selectionModel().selectedRows() and self.transfer_worker is None:self.clear_inspector()
         self.library_selection_changed()
         self.update_library_summary()
@@ -313,7 +331,7 @@ class Window(QMainWindow):
         local=local_tracks(self.phone_tracks)
         missing=sum(track.get('usb_exists') is False for track in self.phone_tracks)
         text=f'{len(local)} canciones en el iPhone'
-        self.device_status.setText(text if self.phone_tracks else 'Conecta tu iPhone para mostrar su música.')
+        self.device_status.setText(tr(text if self.phone_tracks else 'Conecta tu iPhone para mostrar su música.'))
 
     def change_mood(self,*ignored):
         from .interface import apply_theme
@@ -329,7 +347,7 @@ class Window(QMainWindow):
         counts=Counter(t.get('album') for t in local_tracks(self.phone_tracks) if t.get('album') and t['album']!='Sin álbum')
         self.album_shortcuts.clear()
         for album,count in counts.most_common(6):
-            item=QListWidgetItem(f'{album}\n{count} canciones');item.setData(Qt.ItemDataRole.UserRole,album);item.setToolTip(album);item.setSizeHint(QSize(180,56));self.album_shortcuts.addItem(item)
+            item=QListWidgetItem(tr(f'{album}\n{count} canciones'));item.setData(Qt.ItemDataRole.UserRole,album);item.setToolTip(album);item.setSizeHint(QSize(180,56));self.album_shortcuts.addItem(item)
         self.update_album_icons()
 
     def update_album_icons(self):
@@ -382,8 +400,8 @@ class Window(QMainWindow):
             self.filter_library()
             self.artwork_attempted.clear()
             self.device_name.setText('iPhone')
-            self.connection_badge.setText('○ Sin conexión USB' if not devices else '● Conecta un solo iPhone')
-            self.device_status.setText('Conecta tu iPhone. Su biblioteca aparecerá automáticamente.' if not devices else 'Se detectó más de un dispositivo Apple. Conecta un solo iPhone para continuar.')
+            self.connection_badge.setText(tr('○ Sin conexión USB' if not devices else '● Conecta un solo iPhone'))
+            self.device_status.setText(tr('Conecta tu iPhone. Su biblioteca aparecerá automáticamente.' if not devices else 'Se detectó más de un dispositivo Apple. Conecta un solo iPhone para continuar.'))
             return
         token = devices[0].get('token','usb')
         changed = token != self.connection_token
@@ -396,7 +414,7 @@ class Window(QMainWindow):
             self.library_model.checked.clear()
             self.filter_library()
             self.artwork_attempted.clear()
-        self.connection_badge.setText('● Conectado por USB')
+        self.connection_badge.setText(tr('● Conectado por USB'))
         if not self.library_ready and time.monotonic() >= self.retry_library_at:
             self.load_library(automatic=True)
 
@@ -408,9 +426,9 @@ class Window(QMainWindow):
         self.library_model.checked.clear()
         self.filter_library()
         self.artwork_attempted.clear()
-        self.connection_badge.setText('○ Servicio USB no disponible')
+        self.connection_badge.setText(tr('○ Servicio USB no disponible'))
         if self.connection_token is None:
-            self.device_status.setText(message)
+            self.device_status.setText(tr(message))
 
     def schedule_artwork(self, *ignored):
         if self.background_enabled and hasattr(self,'artwork_timer'):
@@ -470,14 +488,14 @@ class Window(QMainWindow):
 
     def clear_inspector(self):
         self.now_cover.setPixmap(QPixmap());self.now_cover.setText('♪')
-        self.now_title.setText('Tu música, siempre contigo.');self.info_artist.setText('Selecciona una canción para ver sus detalles.');self.info_origin.setText('TU COLECCIÓN')
+        self.now_title.setText(tr('Tu música, siempre contigo.'));self.info_artist.setText(tr('Selecciona una canción para ver sus detalles.'));self.info_origin.setText(tr('TU COLECCIÓN'))
         for value in self.info_fields.values():value.setText('—')
 
     def show_track_details(self,track,origin):
-        self.now_title.setText(track.get('title') or 'Sin título');self.info_artist.setText(track.get('artist') or 'Sin artista')
-        self.info_origin.setText(origin.upper())
+        self.now_title.setText(track.get('title') or tr('Sin título'));self.info_artist.setText(track.get('artist') or tr('Sin artista'))
+        self.info_origin.setText(tr(origin.upper()))
         fmt=track.get('format_label') or (f"M4A · {track['format']}" if track.get('container')=='M4A' else track.get('format'))
-        values={'album':track.get('album') or 'Sin álbum','format':fmt or '—','duration':duration_label(track.get('duration')),
+        values={'album':track.get('album') or tr('Sin álbum'),'format':fmt or '—','duration':duration_label(track.get('duration')),
                 'size':byte_label(track.get('size')),'availability':'Original del ordenador' if track.get('path') else
                 'Disponible por USB' if track.get('afc_path') and track.get('usb_exists') is not False else 'Sin acceso USB'}
         for key,value in values.items():
@@ -501,12 +519,12 @@ class Window(QMainWindow):
         from .typography import css_family
         family=self.pending_font_family or QFontInfo(QFontDatabase.systemFont(QFontDatabase.SystemFont.GeneralFont)).family()
         self.font_preview.setStyleSheet(f'font-family:"{css_family(family)}";font-size:18px;')
-        self.font_pending.setText('Archivo: '+Path(self.pending_font_path).name if self.pending_font_path else f'Por aplicar: {family}')
+        self.font_pending.setText(tr('Archivo: '+Path(self.pending_font_path).name if self.pending_font_path else f'Por aplicar: {family}'))
         self.apply_font_button.setEnabled(True)
 
     def choose_font(self):
         if sys.platform=='darwin':return
-        path,_=QFileDialog.getOpenFileName(self,'Elegir archivo de fuente','', 'Fuentes (*.ttf *.otf *.ttc *.otc)')
+        path,_=QFileDialog.getOpenFileName(self,tr('Elegir archivo de fuente'),'', tr('Fuentes (*.ttf *.otf *.ttc *.otc)'))
         if path:
             self.pending_font_path=path;self.pending_font_family=None;self.update_font_preview()
 
@@ -525,17 +543,17 @@ class Window(QMainWindow):
             app=QApplication.instance();self.setFont(app.font())
             from .interface import apply_theme
             apply_theme(self)
-            self.font_status.setText(status)
+            self.font_status.setText(tr(status))
             self.font_choice.blockSignals(True);self.font_choice.setCurrentFont(app.font());self.font_choice.blockSignals(False)
             self.pending_font_family=app.font().family();self.pending_font_path=app.typography_font_path
-            self.font_preview.setStyleSheet('font-size:18px;');self.font_pending.setText('Aplicada a toda la interfaz')
+            self.font_preview.setStyleSheet('font-size:18px;');self.font_pending.setText(tr('Aplicada a toda la interfaz'))
             self.apply_font_button.setEnabled(False)
             if self.persist_settings:
                 settings=QSettings();settings.setValue('font_family',self.pending_font_family)
                 if self.pending_font_path:settings.setValue('font_path',self.pending_font_path)
                 else:settings.remove('font_path')
         except (OSError,ValueError):
-            QMessageBox.warning(self,'No se pudo aplicar','Elige una fuente instalada o un archivo TTF, OTF o colección admitida de hasta 128 MiB.')
+            QMessageBox.warning(self,tr('No se pudo aplicar'),tr('Elige una fuente instalada o un archivo TTF, OTF o colección admitida de hasta 128 MiB.'))
         finally:self.font_applying=False
 
     def artwork_finished(self):
@@ -562,7 +580,7 @@ class Window(QMainWindow):
         return [dict(track) for track in local_tracks(self.phone_tracks) if track['id'] in self.library_model.checked]
 
     def checks_changed(self):
-        count=len(self.marked_tracks());self.selection_count.setText(f'{count} seleccionadas' if count else '')
+        count=len(self.marked_tracks());self.selection_count.setText(tr(f'{count} seleccionadas' if count else ''))
         visible={track['id'] for track in self.library_model.tracks};checked=visible & self.library_model.checked
         self.select_visible.blockSignals(True)
         self.select_visible.setCheckState(Qt.CheckState.Checked if visible and checked==visible else Qt.CheckState.PartiallyChecked if checked else Qt.CheckState.Unchecked)
@@ -572,22 +590,22 @@ class Window(QMainWindow):
         selected=self.marked_tracks()
         if not selected:return
         if len(selected)>100:
-            QMessageBox.information(self,'Eliminar canciones','Puedes eliminar hasta 100 canciones por operación.');return
-        dialog=QMessageBox(self);dialog.setWindowTitle('Eliminar del iPhone')
+            QMessageBox.information(self,tr('Eliminar canciones'),tr('Puedes eliminar hasta 100 canciones por operación.'));return
+        dialog=QMessageBox(self);dialog.setWindowTitle(tr('Eliminar del iPhone'))
         dialog.setTextFormat(Qt.TextFormat.PlainText)
-        dialog.setText(f"¿Eliminar {len(selected)} canciones de la biblioteca de Música del iPhone?")
-        dialog.setInformativeText('Esta acción elimina las canciones del iPhone. Conserva los audios que quieras guardar en el ordenador. La copia del catálogo no permite recuperar por sí sola los audios.\n\n'+'\n'.join(t['title'] for t in selected[:5]))
+        dialog.setText(tr(f"¿Eliminar {len(selected)} canciones de la biblioteca de Música del iPhone?"))
+        dialog.setInformativeText(tr('Esta acción elimina las canciones del iPhone. Conserva los audios que quieras guardar en el ordenador. La copia del catálogo no permite recuperar por sí sola los audios.\n\n'+'\n'.join(t['title'] for t in selected[:5])))
         dialog.setStandardButtons(QMessageBox.StandardButton.Cancel|QMessageBox.StandardButton.Yes)
         dialog.setDetailedText('\n'.join(f"{t['title']} — {t.get('artist','Sin artista')}" for t in selected))
-        dialog.button(QMessageBox.StandardButton.Cancel).setText('Cancelar')
-        dialog.setDefaultButton(QMessageBox.StandardButton.Cancel);dialog.button(QMessageBox.StandardButton.Yes).setText('Eliminar canciones')
+        dialog.button(QMessageBox.StandardButton.Cancel).setText(tr('Cancelar'))
+        dialog.setDefaultButton(QMessageBox.StandardButton.Cancel);dialog.button(QMessageBox.StandardButton.Yes).setText(tr('Eliminar canciones'))
         if dialog.exec()==QMessageBox.StandardButton.Yes:self.start_transfer('delete',selected,self.backup_root)
 
     def export_songs(self):
         selected=self.marked_tracks()
         if not selected:
             return
-        folder = QFileDialog.getExistingDirectory(self,'Guardar audio del iPhone en…')
+        folder = QFileDialog.getExistingDirectory(self,tr('Guardar audio del iPhone en…'))
         if folder:
             self.start_transfer('export',selected,Path(folder))
 
@@ -598,7 +616,7 @@ class Window(QMainWindow):
             return
         if self.thumbnail_worker is not None:
             self.after_artwork = ('transfer',mode,selected,destination)
-            self.cancel_transfer_button.setText('Cancelar');self.cancel_transfer_button.setEnabled(True);self.cancel_transfer_button.setVisible(mode in ('import','export'))
+            self.cancel_transfer_button.setText(tr('Cancelar'));self.cancel_transfer_button.setEnabled(True);self.cancel_transfer_button.setVisible(mode in ('import','export'))
             self.thumbnail_worker.stop()
             self.update_buttons()
             return
@@ -619,9 +637,9 @@ class Window(QMainWindow):
         self.progress.setRange(0,100)
         self.progress.setValue(0)
         self.progress.show()
-        self.cancel_transfer_button.setText('Cancelar');self.cancel_transfer_button.setEnabled(True)
+        self.cancel_transfer_button.setText(tr('Cancelar'));self.cancel_transfer_button.setEnabled(True)
         self.cancel_transfer_button.setVisible(mode in ('import','export'))
-        self.status.setText('Preparando transferencia…')
+        self.status.setText(tr('Preparando transferencia…'))
         self.update_buttons()
         self.transfer_worker.start()
 
@@ -629,19 +647,19 @@ class Window(QMainWindow):
         worker=self.transfer_worker
         if worker is None:
             if self.after_artwork and self.after_artwork[0]=='transfer' and self.after_artwork[1] in ('import','export'):
-                self.after_artwork=None;self.cancel_transfer_button.hide();self.status.setText('Operación cancelada antes de iniciar el envío.');self.update_buttons()
+                self.after_artwork=None;self.cancel_transfer_button.hide();self.status.setText(tr('Operación cancelada antes de iniciar el envío.'));self.update_buttons()
             return
         if worker.mode not in ('import','export'):return
         immediate=worker.cancel()
         self.cancel_transfer_button.setEnabled(False)
-        self.cancel_transfer_button.setText('Cancelando…' if immediate else 'Finalizando…')
-        self.status.setText('Cancelando la operación…' if immediate else 'El envío de cambios ya comenzó. Se finalizará este lote para no dejar canciones incompletas.')
+        self.cancel_transfer_button.setText(tr('Cancelando…' if immediate else 'Finalizando…'))
+        self.status.setText(tr('Cancelando la operación…' if immediate else 'El envío de cambios ya comenzó. Se finalizará este lote para no dejar canciones incompletas.'))
 
     def transfer_progress(self, value, total, label, identifier=''):
         self.progress.setRange(0,max(1,total))
         self.progress.setValue(value)
         control=self.transfer_worker.control if self.transfer_worker is not None else None
-        if not (control and control.event.is_set()):self.status.setText(label)
+        if not (control and control.event.is_set()):self.status.setText(tr(label))
         if identifier and identifier != self.progress_track_id and identifier in self.tracks:
             self.progress_track_id = identifier
             track = self.tracks[identifier]
@@ -649,28 +667,28 @@ class Window(QMainWindow):
 
     def transfer_problem(self, message):
         self.show_library_error(message)
-        self.status.setText('Transferencia detenida. Consulta el diagnóstico antes de repetirla.')
+        self.status.setText(tr('Transferencia detenida. Consulta el diagnóstico antes de repetirla.'))
         self.activity_message=self.status.text()
 
     def transfer_result(self, result):
         self.transfer_outcome = result
         if result.get('cancelled'):
-            self.status.setText(f"Exportación cancelada. Se conservaron {result.get('exported',0)} archivos completos." if 'exported' in result else 'Importación cancelada antes de enviar cambios a Música.')
+            self.status.setText(tr(f"Exportación cancelada. Se conservaron {result.get('exported',0)} archivos completos." if 'exported' in result else 'Importación cancelada antes de enviar cambios a Música.'))
         elif 'deleted' in result:
-            self.status.setText(f"{result['deleted']} canciones eliminadas de la biblioteca.")
+            self.status.setText(tr(f"{result['deleted']} canciones eliminadas de la biblioteca."))
             self.library_model.checked.difference_update(result.get('item_ids',[]))
         elif 'exported' in result:
-            self.status.setText(f"{result['exported']} archivos exportados y comprobados.")
+            self.status.setText(tr(f"{result['exported']} archivos exportados y comprobados."))
         elif 'reconciled' in result and 'imported' not in result:
-            self.status.setText(f"{result.get('verified',0)} audios comprobados · {result.get('metadata_unverified',0)} con metadatos por revisar · {result.get('retired',0)} retirados por el iPhone · {result.get('removed',0)} eliminaciones comprobadas")
+            self.status.setText(tr(f"{result.get('verified',0)} audios comprobados · {result.get('metadata_unverified',0)} con metadatos por revisar · {result.get('retired',0)} retirados por el iPhone · {result.get('removed',0)} eliminaciones comprobadas"))
         elif 'updated' in result:
-            self.status.setText(f"{result['updated']} canciones actualizadas · {result['covers']} portadas comprobadas.")
+            self.status.setText(tr(f"{result['updated']} canciones actualizadas · {result['covers']} portadas comprobadas."))
         else:
             count = result.get('imported',result.get('verified',0))
             skipped = result.get('already_imported',0)
-            self.status.setText(f'{count} canciones importadas y comprobadas. Ya importadas: {skipped}. Copia del catálogo en Ver respaldo.')
+            self.status.setText(tr(f'{count} canciones importadas y comprobadas. Ya importadas: {skipped}. Copia del catálogo en Ver respaldo.'))
 
-        if result.get('cancel_deferred'):self.status.setText('El lote ya enviado se completó y verificó. La solicitud de cancelación llegó después de iniciar los cambios en Música.')
+        if result.get('cancel_deferred'):self.status.setText(tr('El lote ya enviado se completó y verificó. La solicitud de cancelación llegó después de iniciar los cambios en Música.'))
         self.activity_message=self.status.text()
 
     def transfer_finished(self):
@@ -690,8 +708,8 @@ class Window(QMainWindow):
             self.load_library()
 
     def choose_files(self):
-        paths, _ = QFileDialog.getOpenFileNames(self, 'Elegir canciones', '',
-            'Audio (*.mp3 *.wav *.m4a *.alac *.aif *.aiff);;Todos los archivos (*)')
+        paths, _ = QFileDialog.getOpenFileNames(self, tr('Elegir canciones'), '',
+            tr('Audio (*.mp3 *.wav *.m4a *.alac *.aif *.aiff);;Todos los archivos (*)'))
         self.add_paths(paths)
 
     def check_device(self, automatic=False):
@@ -699,7 +717,7 @@ class Window(QMainWindow):
             return
         self.device_button.setEnabled(False)
         if not automatic:
-            self.device_status.setText('Consultando el servicio local de Apple…')
+            self.device_status.setText(tr('Consultando el servicio local de Apple…'))
         self.device_worker = DeviceReader(self)
         self.device_worker.result.connect(self.devices_found)
         self.device_worker.problem.connect(self.device_problem)
@@ -726,12 +744,12 @@ class Window(QMainWindow):
         self.library_epoch += 1
         self.artwork_attempted.clear()
         self.library_ready = False
-        if not self.phone_tracks:self.library_heading.setText('En el iPhone · leyendo…')
+        if not self.phone_tracks:self.library_heading.setText(tr('En el iPhone · leyendo…'))
         self.library_button.setEnabled(False)
         self.copy_diagnostic.setEnabled(False)
         if not self.phone_tracks and (not automatic or (not self.tracks and self.pages.currentIndex() == 0)):
             self.navigate(0)
-        self.device_status.setText('Actualizando biblioteca… Puedes seguir viendo tus canciones.' if self.phone_tracks else 'Leyendo la biblioteca del iPhone…')
+        self.device_status.setText(tr('Actualizando biblioteca… Puedes seguir viendo tus canciones.' if self.phone_tracks else 'Leyendo la biblioteca del iPhone…'))
         self.library_worker = LibraryReader(self)
         self.library_worker.result.connect(self.show_library)
         self.library_worker.problem.connect(self.library_problem)
@@ -755,9 +773,9 @@ class Window(QMainWindow):
         self.copy_diagnostic.setEnabled(True)
         self.library_ready = True
         self.retry_library_at = 0
-        self.connection_badge.setText('● Conectado por USB')
+        self.connection_badge.setText(tr('● Conectado por USB'))
         self.update_library_summary()
-        if not tracks:self.device_status.setText('No se encontraron canciones. Esto no confirma que Música esté vacía. Copia el diagnóstico.')
+        if not tracks:self.device_status.setText(tr('No se encontraron canciones. Esto no confirma que Música esté vacía. Copia el diagnóstico.'))
         self.update_buttons()
         self.schedule_artwork()
 
@@ -765,11 +783,11 @@ class Window(QMainWindow):
         self.library_ready = False
         self.retry_library_at = time.monotonic()+20
         self.show_library_error(message)
-        if self.phone_tracks:self.device_status.setText('No se pudo actualizar. Se mantiene la vista anterior.\n'+message)
+        if self.phone_tracks:self.device_status.setText(tr('No se pudo actualizar. Se mantiene la vista anterior.\n'+message))
 
     def show_library_error(self, message):
         self.last_diagnostic = message
-        self.device_status.setText(message)
+        self.device_status.setText(tr(message))
         self.copy_diagnostic.setEnabled(True)
 
     def library_finished(self):
@@ -791,7 +809,7 @@ class Window(QMainWindow):
         self.progress.setRange(0, len(paths))
         self.progress.setValue(0)
         self.progress.show()
-        self.status.setText('Revisando canciones…')
+        self.status.setText(tr('Revisando canciones…'))
         self.worker = Reader([Path(path) for path in paths], self)
         self.worker.track.connect(self.accept_track)
         self.worker.problem.connect(self.show_problem)
@@ -812,7 +830,7 @@ class Window(QMainWindow):
         self.table.setSortingEnabled(False)
         row = self.table.rowCount()
         self.table.insertRow(row)
-        values = [track['title'], track['artist'] or 'Sin artista', track['album'] or 'Sin álbum',
+        values = [track['title'], track['artist'] or tr('Sin artista'), track['album'] or tr('Sin álbum'),
                   (f"M4A · {track['format']}" if track.get('container') == 'M4A' else track['format']), duration_label(track.get('duration')), byte_label(track['size'])]
         for column, value in enumerate(values):
             item = SortableItem(value)
@@ -830,7 +848,7 @@ class Window(QMainWindow):
         self.table.setSortingEnabled(sorting)
 
     def show_problem(self, message):
-        self.errors.addItem(message)
+        self.errors.addItem(tr(message))
         self.errors.show()
 
     def read_finished(self):
@@ -839,8 +857,8 @@ class Window(QMainWindow):
         if worker is not None:
             worker.deleteLater()
         self.progress.hide()
-        self.status.setText(f'{len(self.tracks)} para importar · Duplicadas omitidas: {self.duplicates}'
-                            f' · No añadidas: {self.errors.count()}')
+        self.status.setText(tr(f'{len(self.tracks)} para importar · Duplicadas omitidas: {self.duplicates}'
+                            f' · No añadidas: {self.errors.count()}'))
         self.update_buttons()
 
     def remove_selection(self):
@@ -848,7 +866,7 @@ class Window(QMainWindow):
         for row in sorted({index.row() for index in self.table.selectionModel().selectedRows()}, reverse=True):
             self.tracks.pop(self.table.item(row, 0).data(Qt.ItemDataRole.UserRole))
             self.table.removeRow(row)
-        self.status.setText(f'{len(self.tracks)} para importar. Los archivos originales se conservan.')
+        self.status.setText(tr(f'{len(self.tracks)} para importar. Los archivos originales se conservan.'))
         self.update_buttons()
 
     def clear_tracks(self):
@@ -858,25 +876,25 @@ class Window(QMainWindow):
         self.tracks.clear()
         self.errors.clear()
         self.errors.hide()
-        self.status.setText('Lista vaciada. Los archivos originales se conservan.')
+        self.status.setText(tr('Lista vaciada. Los archivos originales se conservan.'))
         self.update_buttons()
 
     def export_list(self, path):
         with Path(path).open('w', encoding='utf-8-sig', newline='') as stream:
             writer = csv.writer(stream)
-            writer.writerow(['Archivo', 'Título', 'Artista', 'Álbum', 'Formato', 'Duración (segundos)', 'Tamaño (bytes)', 'SHA-256'])
+            writer.writerow([str(tr(label)) for label in ['Archivo', 'Título', 'Artista', 'Álbum', 'Formato', 'Duración (segundos)', 'Tamaño (bytes)', 'SHA-256']])
             for track in self.tracks.values():
                 writer.writerow([csv_value(track[key]) for key in
                     ['filename', 'title', 'artist', 'album', 'format', 'duration', 'size', 'id']])
 
     def choose_export(self):
-        path, _ = QFileDialog.getSaveFileName(self, 'Guardar lista', 'tupaq-canciones.csv', 'CSV (*.csv)')
+        path, _ = QFileDialog.getSaveFileName(self, tr('Guardar lista'), 'tupaq-canciones.csv', tr('CSV (*.csv)'))
         if path:
             try:
                 self.export_list(path)
-                self.status.setText('Lista guardada.')
+                self.status.setText(tr('Lista guardada.'))
             except OSError:
-                QMessageBox.warning(self, 'No se pudo guardar', 'Elige una carpeta donde tengas permiso para escribir.')
+                QMessageBox.warning(self, tr('No se pudo guardar'), tr('Elige una carpeta donde tengas permiso para escribir.'))
 
     def dragEnterEvent(self, event):
         if self.worker is None and event.mimeData().hasUrls():
@@ -889,15 +907,15 @@ class Window(QMainWindow):
 
     def closeEvent(self, event):
         if self.transfer_worker is not None:
-            self.status.setText('Espera a que termine la transferencia y su comprobación antes de cerrar.')
+            self.status.setText(tr('Espera a que termine la transferencia y su comprobación antes de cerrar.'))
             event.ignore()
             return
         if self.library_worker is not None:
-            self.device_status.setText('Espera a que termine la lectura de la biblioteca antes de cerrar la ventana.')
+            self.device_status.setText(tr('Espera a que termine la lectura de la biblioteca antes de cerrar la ventana.'))
             event.ignore()
             return
-        if self.tracks and QMessageBox.question(self, 'Cerrar TUPAQ',
-            'La lista no se conserva al cerrar. ¿Quieres salir?',
+        if self.tracks and QMessageBox.question(self, tr('Cerrar TUPAQ'),
+            tr('La lista no se conserva al cerrar. ¿Quieres salir?'),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
             event.ignore()
@@ -1088,6 +1106,16 @@ def smoke(app, window, fixtures, output=None):
         window.device_status.setText('Otro estado de prueba')
         window.copy_diagnostic.click()
         assert QApplication.clipboard().text() == 'Error de prueba\nDiagnóstico: usb:ConnectionRefusedError'
+        # Exercise the actual frozen translations, not only source-level mocks.
+        assert not app._tupaq_qt_translator.isEmpty()
+        queued=set(window.tracks);marked=set(window.library_model.checked)
+        window.language_choice.setCurrentIndex(1)
+        assert window.heading.text()=='Library' and window.nav_buttons[1].text()=='Settings'
+        assert window.table.horizontalHeaderItem(0).text()=='Song'
+        assert window.library_model.headerData(5,Qt.Orientation.Horizontal)=='Size'
+        assert queued==set(window.tracks) and marked==window.library_model.checked
+        window.language_choice.setCurrentIndex(0)
+        assert window.heading.text()=='Biblioteca' and not app._tupaq_qt_translator.isEmpty()
 
 
 def main():
