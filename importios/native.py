@@ -199,6 +199,7 @@ class Window(QMainWindow):
             settings = QSettings()
             choice=int(settings.value('appearance',2)) if settings.value('design_version','')=='peel' else 2
             settings.setValue('design_version','peel')
+            settings.setValue('appearance',choice)
             self.theme_choice.setCurrentIndex(choice)
             self.auto_read.setChecked(settings.value('automatic_library',True,type=bool))
         self.theme_choice.currentIndexChanged.connect(self.change_theme)

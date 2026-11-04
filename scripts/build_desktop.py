@@ -16,7 +16,7 @@ def checked_run(command, **options):
     print(result.stdout, end='', flush=True)
     if result.returncode:
         if os.environ.get('GITHUB_ACTIONS') == 'true':
-            message = result.stdout[-8000:].replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+            message = result.stdout[-3500:].replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
             print('::error title=Error al empaquetar::'+message, flush=True)
         raise subprocess.CalledProcessError(result.returncode, command)
 

@@ -7,7 +7,7 @@ El objetivo es importar música local a la app Música del iPhone sin usar la
 aplicación iTunes ni 3uTools.
 
 El usuario confirmó la lectura y la importación con metadatos y portada en Música del iPhone.
-La **0.3.0-preview.6** adopta una interfaz compacta inspirada en Peel: barra lateral,
+La **0.3.0-preview.7** adopta una interfaz compacta inspirada en Peel: barra lateral,
 búsqueda, biblioteca y cola central, con inspector de canción a la derecha.
 Mantiene solo Biblioteca y Preferencias, con importar y exportar en la misma página.
 Comprueba las carpetas USB para ocultar referencias a audios eliminados, recupera

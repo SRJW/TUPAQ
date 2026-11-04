@@ -19,7 +19,10 @@ class TypographyTests(unittest.TestCase):
         self.assertIsNone(APP.typography_font_id)
 
     def test_mac_fallback_is_never_mislabelled_as_san_francisco(self):
-        with patch('importios.typography.sys.platform','darwin'),patch('importios.typography.QFontDatabase.systemFont',return_value=QFont('DejaVu Sans')):
+        # Force the resolved family: DejaVu is absent on stock macOS, where
+        # requesting it may legitimately resolve to San Francisco instead.
+        with patch('importios.typography.sys.platform','darwin'),patch('importios.typography.QFontInfo') as resolved:
+            resolved.return_value.family.return_value='Helvetica'
             status=configure(APP)
             self.assertFalse(APP.typography_is_apple)
             self.assertIn('no está disponible',status)

@@ -242,7 +242,7 @@ La vista inicial usa item_state: pertenencia a biblioteca, ausencia de placehold
 y has_non_purgeable_asset o has_non_purgeable_subscription_protected_local_asset.
 Así las descargas protegidas de Apple Music cuentan aunque no tengan un audio
 exportable por AFC. Los registros de nube o aún sin audio no se cuentan como
-descargadas. Desde preview.6 el catálogo bruto se conserva internamente para verificar transferencias, sin ofrecerlo como lista de canciones reales. Dos títulos iguales con archivos
+descargadas. Desde preview.7 el catálogo bruto se conserva internamente para verificar transferencias, sin ofrecerlo como lista de canciones reales. Dos títulos iguales con archivos
 diferentes siguen siendo dos canciones; dos referencias a la misma ruta se
 cuentan una vez. No se elimina ninguna fila del teléfono. Si el esquema no
 expone esos estados, se muestran referencias USB y se indica que el estado
@@ -293,7 +293,7 @@ Referencia independiente MIT: [campos de fecha y protocolo de Artwork](https://g
 secciones 4 y 10. El cliente no modifica ArtworkDB del host ni la SQLite del teléfono.
 
 
-## Interfaz y recuperación (preview.6)
+## Interfaz y recuperación (preview.7)
 
 La referencia visual vigente es Peel: panel lateral compacto, lista central con
 búsqueda por canción/artista/álbum y un inspector derecho plegable. Los controles
