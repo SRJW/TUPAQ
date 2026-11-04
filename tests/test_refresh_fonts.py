@@ -54,17 +54,20 @@ class FontApplicationTests(unittest.TestCase):
         with patch('importios.native.sys.platform','win32'):
             w=Window(auto_connect=False);w.show();APP.processEvents()
             try:
-                current=QFontInfo(APP.font()).family()
-                family=next(f for f in QFontDatabase.families() if f!=current and QFontInfo(QFont(f)).family()==f)
+                current=w.font_choice.currentFont().family()
+                family=next(f for f in QFontDatabase.families() if f!=current)
                 old=QFontInfo(w.choose.font()).family();w.font_choice.setCurrentFont(QFont(family));APP.processEvents()
                 self.assertEqual(QFontInfo(w.choose.font()).family(),old);self.assertTrue(w.apply_font_button.isEnabled())
                 w.apply_font();APP.processEvents()
+                resolved=QFontInfo(APP.font()).family()
+                self.assertEqual(APP.font().family(),family)
                 for widget in (w.choose,w.nav_buttons[0],w.now_title,w.library_table,w.library_table.horizontalHeader(),w.theme_choice,w.status):
-                    self.assertEqual(QFontInfo(widget.font()).family(),family,widget.objectName())
+                    self.assertEqual(QFontInfo(widget.font()).family(),resolved,widget.objectName())
+                    self.assertIn(family,widget.font().families())
                 from PySide6.QtWidgets import QMessageBox
-                dialog=QMessageBox(w);self.assertEqual(QFontInfo(dialog.font()).family(),family);dialog.deleteLater()
+                dialog=QMessageBox(w);self.assertEqual(QFontInfo(dialog.font()).family(),resolved);dialog.deleteLater()
                 self.assertFalse(w.apply_font_button.isEnabled())
-                w.reset_font();self.assertEqual(QFontInfo(w.choose.font()).family(),family)
+                w.reset_font();self.assertEqual(QFontInfo(w.choose.font()).family(),resolved)
                 w.apply_font();APP.processEvents()
             finally:w.close();w.deleteLater();APP.processEvents()
 
