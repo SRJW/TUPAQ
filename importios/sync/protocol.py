@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 import plistlib
 import struct
 import zlib
+import time
 
 from .signing import HOST_REQUEST, FixedHostSession
 
@@ -152,6 +153,7 @@ class Atc:
         self.write_lock = asyncio.Lock()
         self.task = None
         self.broken = False
+        self.last_received_at = None
 
     async def __aenter__(self):
         self.task = asyncio.create_task(self._pump())
@@ -178,7 +180,10 @@ class Atc:
     async def _pump(self):
         try:
             while True:
-                header = await self.connection.recvall(4)
+                first = await self.connection.recvall(1)
+                require(len(first) == 1, 'atc-header')
+                received_at = time.monotonic_ns()
+                header = first+await self.connection.recvall(3)
                 require(len(header) == 4, 'atc-header')
                 size = struct.unpack('<I',header)[0]
                 require(0 < size <= 16*1024*1024, 'atc-frame-size')
@@ -190,7 +195,7 @@ class Atc:
                     require(message['Session'] == 2, 'atc-ping-session')
                     await self.send({'Command':'Pong','Session':2})
                 elif message.get('Command') not in ('Progress','AssetMetrics','InstalledAssets'):
-                    self.queue.put_nowait(message)
+                    self.queue.put_nowait((message,received_at))
         except asyncio.CancelledError:
             raise
         except Exception as error:
@@ -203,6 +208,7 @@ class Atc:
         result = await asyncio.wait_for(self.queue.get(), timeout=90)
         if isinstance(result, Exception):
             raise result
+        result,self.last_received_at = result
         if result.get('Command') in ('SyncFailed','ConnectionInvalid','FileError'):
             code = result.get('Params',{}).get('ErrorCode')
             suffix = '-'+str(code) if type(code) is int and 0 <= code <= 255 else ''
@@ -258,7 +264,11 @@ def validate_manifest(message, own_ids, existing_ids):
         require(isinstance(identifier,str) and identifier not in seen and type(parts) is int, 'manifest-record')
         seen.add(identifier)
         if identifier in own_ids:
-            require(parts == 1, 'manifest-own-parts')
+            # Bit 4 is disabled Genius, not a second audio/artwork payload.
+            # Native AMP gives audio precedence for masks 1 and 5. Do not
+            # accept artwork/lyrics/unknown bits without delivering them.
+            if parts not in (1,5):
+                raise ProtocolError('manifest-own-parts',{'asset_parts':parts})
             audio.append(identifier)
         else:
             require(identifier in existing_ids and parts in (2,4), 'manifest-unknown-asset')

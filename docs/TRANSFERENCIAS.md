@@ -103,7 +103,7 @@ catálogo puede dejar una operación pendiente. No se reintenta automáticamente
 
 ## Validación disponible
 
-Las 73 pruebas incluyen replay de importación de los cinco perfiles base,
+Las 86 pruebas incluyen replay de importación de los cinco perfiles base,
 originales conservados, exportación byte por byte, nombres existentes,
 rechazo por cambio de ancla, identidad sin configurar, manifest desconocido,
 audio permanente alterado, interrupción después de aplicar cambios, verificación
@@ -169,3 +169,61 @@ borrar la biblioteca ni los registros para probar la versión corregida.
 Referencias independientes MIT: [ATC, anclas de host y actuales](https://github.com/fbiba/rustunes/blob/057ee8fc9c9da65795a6f14497fc408c2fe23c76/docs/02-atc-sync-protocol.md),
 sección 6; [vinculación del CDB para inserciones](https://github.com/fbiba/rustunes/blob/057ee8fc9c9da65795a6f14497fc408c2fe23c76/crates/rustunes/src/engine/execution/native_insert.rs),
 `bind_copied_cdb`. La referencia no impone la desigualdad que causaba este rechazo.
+
+## Canción atenuada y `import:manifest-own-parts`
+
+La preview.3 exigía que el manifiesto pidiera exclusivamente audio (AssetParts 1).
+El protocolo también contempla audio con el bit de Genius desactivado (5).
+La preview.4 admite exactamente 1/5. Continúa rechazando portadas, letras y bits
+desconocidos cuando no se han declarado ni preparado esos componentes. No
+envía FileError para el audio propio ni inventa archivos para satisfacer bits.
+El diagnóstico anterior no incluía el número solicitado, por lo que no permite
+confirmar cuál pidió este iPhone. Si es otro valor, el nuevo diagnóstico lo incluye
+como `asset_parts`, sin títulos ni identificadores privados.
+
+Este error se produce después de anunciar los metadatos y antes de subir
+el audio: el teléfono puede conservar una entrada atenuada y avanzar el ancla.
+La recuperación usa una simulación que aplica los metadatos ANTES del manifiesto,
+además de la anterior simulación de finalización.
+
+### Qué hacer con la operación de la preview.3
+
+1. Abre la preview.4 en el mismo ordenador y conserva sus datos de TUPAQ.
+2. Conecta y desbloquea el mismo iPhone. Conserva el archivo original en el ordenador.
+3. Ve a **Preferencias → Completar importación pendiente**. No vuelvas a añadir
+   la canción mediante Importar mientras su operación siga pendiente.
+4. Si el original cambió de carpeta, usa **Elegir canciones** para seleccionarlo
+   y vuelve a Completar. Solo se admite el mismo contenido, comprobado por SHA-256.
+5. Espera la verificación final. Si se detiene, copia el diagnóstico completo,
+   incluyendo la línea Datos del protocolo si aparece. No borres canciones o registros
+   para forzar un reintento.
+
+La recuperación es **experimental y aún no está validada en un iPhone físico**.
+Comprueba que exista un único registro pendiente, sus copias originales, identidad
+de biblioteca, incremento de una única ancla y conservación de canciones anteriores.
+Se detiene ante un estado mixto, rutas inesperadas, archivos de envío existentes,
+fuentes modificadas, objetos desconocidos o entradas cloud/placeholder.
+
+- Si todas las entradas tienen su audio y los hashes coinciden, solo verifica.
+- Si siguen representadas pero sin archivo, valida IDs wire y grupos originales,
+  estado local soportado y la identidad. Abre una sesión de delta vacío con
+  Request/Ready iguales al ancla actual y FinishedSyncingMetadata con esa MISMA
+  ancla: no inserta filas, no firma ni escribe operaciones, no incrementa la
+  revisión. Solo entrega audio si el manifiesto de esa sesión lo solicita
+  para los IDs propios con partes admitidas. Espera una finalización posterior
+  a la entrega y comprueba catálogo y hashes permanentes.
+- Si iOS retiró todas las entradas propias, verifica que no haya archivos ni
+  filas de esas canciones, conserva el registro como `resolved-items-removed`
+  e inicia una importación nueva con catálogo actual, nuevo contador y nuevos IDs.
+  Se vuelve a capturar el estado bajo lock antes del envío para evitar una carrera.
+  No se borran los grupos vacíos que iOS haya conservado.
+
+La aceptación nativa del delta vacío para entregar audio pendiente está
+**sin calificar** en la referencia independiente; los replay locales no prueban
+que el iPhone la acepte. Una respuesta sin manifiesto, una finalización temprana
+o una verificación fallida conserva la operación pendiente. No hay fallback
+a SQL, Reset ni eliminación de canciones.
+
+Referencia MIT: [contrato de audio/Genius y estado pendiente](https://github.com/fbiba/rustunes/blob/057ee8fc9c9da65795a6f14497fc408c2fe23c76/crates/music-protocol/src/protocol/ancillary.rs),
+[sesión vacía](https://github.com/fbiba/rustunes/blob/057ee8fc9c9da65795a6f14497fc408c2fe23c76/crates/music-protocol/src/protocol/session.rs),
+[entrega pendiente](https://github.com/fbiba/rustunes/blob/057ee8fc9c9da65795a6f14497fc408c2fe23c76/crates/music-protocol/src/protocol/session/pending_completion.rs).

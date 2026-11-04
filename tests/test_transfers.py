@@ -139,7 +139,7 @@ class Phone:
             db.execute('INSERT INTO item_artist VALUES(?,?)',(artist,item['artist']))
             db.execute('INSERT OR IGNORE INTO album_artist VALUES(?,?,?)',(album_artist,item['album_artist'],album_artist))
             db.execute('INSERT OR IGNORE INTO album VALUES(?,?,?,?)',(album,item['album'],album_artist,album))
-            db.execute('INSERT INTO item VALUES(?,8,?,?,1)',(pid,artist,album))
+            db.execute('INSERT INTO item(item_pid,media_type,item_artist_pid,album_pid,base_location_id) VALUES(?,8,?,?,1)',(pid,artist,album))
             ms=item.get('total_time_ms')
             if ms is None:ms=mutagen.File(io.BytesIO(audio)).info.length*1000
             db.execute('INSERT INTO item_extra VALUES(?,?,?,?)',(pid,item['title'],ms,Path(destination).name))
@@ -157,7 +157,7 @@ class Peer:
         if message['Command']=='ReadyForSync' and self.phone.fail=='catalogue-after-ready':
             with closing(sqlite3.connect(':memory:')) as db:
                 db.deserialize(self.phone.files[PREF+'MediaLibrary.sqlitedb'])
-                db.execute("UPDATE _MLDatabaseProperties SET value='8' WHERE key='MLSyncClientSyncAnchor'")
+                db.execute("UPDATE _MLDatabaseProperties SET value=? WHERE key='MLSyncClientSyncAnchor'",(str(self.anchor+1),))
                 db.commit();self.phone.files[PREF+'MediaLibrary.sqlitedb']=db.serialize()
         return message
     async def send(self,msg):
@@ -170,13 +170,16 @@ class Peer:
         elif command=='RequestingSync':
             assert msg['Params']['HostInfo']['LibraryID']=='000000000000129F'
             reply=plistlib.loads((FIXTURES/'sync/grappa-fixed-vectors.plist').read_bytes())[0]['reply']
-            anchor=str(8 if p.fail=='anchor' else 7)
+            with closing(sqlite3.connect(':memory:')) as db:
+                db.deserialize(p.files[PREF+'MediaLibrary.sqlitedb'])
+                self.anchor=int(db.execute("SELECT value FROM _MLDatabaseProperties WHERE key='MLSyncClientSyncAnchor'").fetchone()[0])
+            anchor=str(self.anchor+1 if p.fail=='anchor' else self.anchor)
             self.queue.append({'Command':'ReadyForSync','Session':2,'Params':{'DataclassAnchors':{'Media':anchor,'Book':'0'},'DeviceInfo':{'Grappa':reply}}})
         elif command=='FinishedSyncingMetadata':
             assert msg['Params']['SyncTypes']['Media']==1
-            assert msg['Params']['DataclassAnchors']['Media']=='8'
+            assert msg['Params']['DataclassAnchors']['Media']==str(self.anchor+1)
             envelope=plistlib.loads(p.files[MEDIA+'/Sync_00000000.plist'])
-            assert envelope['revision']==8
+            assert envelope['revision']==self.anchor+1
             assert len(p.files[MEDIA+'/Sync_00000000.plist.cig'])==21
             assert envelope['operations'][0]['operation']=='update_db_info'
             p.operations=envelope['operations'][1:]
@@ -199,7 +202,7 @@ class Peer:
             if not self.remaining:
                 with closing(sqlite3.connect(':memory:')) as db:
                     db.deserialize(p.files[PREF+'MediaLibrary.sqlitedb'])
-                    db.execute("UPDATE _MLDatabaseProperties SET value='8'")
+                    db.execute("UPDATE _MLDatabaseProperties SET value=?",(str(self.anchor+1),))
                     db.commit();p.files[PREF+'MediaLibrary.sqlitedb']=db.serialize()
                 if p.fail!='lost-finished':self.queue.append({'Command':'SyncFinished','Session':2})
 

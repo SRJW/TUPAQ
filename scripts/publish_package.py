@@ -16,32 +16,20 @@ def main():
     if subprocess.run(view, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         with tempfile.TemporaryDirectory() as directory:
             notes = Path(directory)/'notes.md'
-            notes.write_text('''TUPAQ 0.3.0-preview.3: corrección de import:host-anchor-ahead.
+            notes.write_text('''TUPAQ 0.3.0-preview.4: audio/Genius y recuperación de importación pendiente.
 
-Se elimina una comparación incorrecta del contador guardado en el catálogo de host. RequestingSync continúa usando el contador actual de SQLite, que debe coincidir con ReadyForSync. Se conserva la segunda captura previa al delta y la comprobación posterior: el contador del host nunca sustituye al actual y no se envía Reset.
+- Admite solicitudes de audio con Genius desactivado (AssetParts 1/5). Los bits de portada/letras no preparados siguen deteniendo el envío y el diagnóstico incluye el valor numérico recibido.
+- Preferencias → Completar importación pendiente usa el registro de TUPAQ y el archivo original: si la canción sigue esperando audio, intenta entregarlo sin volver a insertarla; si iOS ya retiró todas las entradas, verifica su ausencia antes de una importación nueva.
+- Conserva el bloqueo de nuevas importaciones mientras haya una operación sin comprobar. Revisar importación continúa siendo una comprobación de solo lectura.
+- 86 pruebas, incluida simulación con metadatos aplicados antes del manifiesto, audio/Genius, recuperación sin duplicados, fuente movida/modificada, entradas cloud, colisiones y finalización temprana. Prueba de la interfaz empaquetada y del botón de recuperación.
 
-El error host-anchor-ahead de la preview.2 ocurría antes de anunciar metadatos o enviar audio. No borres tu biblioteca ni los registros para probar esta corrección.
+**La entrega de audio y la recuperación siguen siendo experimentales y no están verificadas en un iPhone físico.** La referencia también deja sin calificar la aceptación nativa de la sesión vacía para completar audio. Si se detiene, conserva los registros y copia el diagnóstico completo. No borres la biblioteca ni los respaldos para forzar otro intento.
 
-Mantiene la interfaz y funciones de la preview.2:
+Para el error de la preview.3: abre esta versión en el mismo ordenador, conecta el mismo iPhone, conserva el original y pulsa Preferencias → Completar importación pendiente. Si moviste el original, añádelo con Elegir canciones y vuelve a Completar. No uses Importar para reenviar la misma canción mientras haya una operación pendiente.
 
-- Barra lateral organizada, apariencia Sistema/Claro/Oscuro y preferencias guardadas.
-- Detección del iPhone y lectura automática de su biblioteca al conectarlo.
-- Miniaturas de la biblioteca por USB, con lecturas parciales y caché limitada.
-- Corrección de la restricción de cabecera fija que provocaba import:host-catalogue-layout. Se mantiene la validación contra la biblioteca actual; si el formato sigue sin admitirse, el diagnóstico añade tamaños/versiones sin datos privados.
-- 73 pruebas y comprobación de la interfaz empaquetada, incluida conexión simulada y ambos temas.
+Mantiene importación MP3/M4A AAC-ALAC/WAV/AIFF, exportación verificada, barra lateral, temas, lectura automática y miniaturas por USB. No envía Reset, eliminaciones ni escribe SQLite en el teléfono. La copia del catálogo no es un respaldo de todos los audios ni una restauración automática. Todavía no registra las portadas separadas en Artwork de Música.
 
-Conserva la importación y exportación experimental por USB:
-
-- Importar al iPhone: MP3, M4A AAC/ALAC, WAV y AIFF en perfiles admitidos, sin convertir los originales; miniatura y progreso.
-- Delta ATC firmado con la identidad existente, copia local previa del catálogo y verificación posterior de las canciones y sus archivos. No envía un reset ni escribe SQLite en el teléfono.
-- Exportar selección: copia los originales accesibles por USB, verifica sus bytes y evita sobrescribir archivos existentes. Un original protegido conserva su protección.
-- Revisar importación: comprueba una operación cuya confirmación se perdió; bloquea nuevos envíos mientras quede una operación sin verificar.
-
-**La lectura del catálogo ya fue confirmada por el usuario. Las transferencias todavía no se han validado en un iPhone físico.** Pasan pruebas con un dispositivo simulado y la prueba de la interfaz empaquetada. La copia del catálogo no es un respaldo completo del teléfono ni una restauración automática.
-
-Importación: hasta 49 archivos y 2 GiB por operación; 256 MiB por archivo. Requiere identidad de biblioteca configurada, anclas/preferencias compatibles y área de sincronización vacía. Si falta esa información, se detiene sin enviar un delta. No se registra todavía la portada en el catálogo de Artwork; los bytes de las portadas incrustadas se conservan en el archivo.
-
-No necesitas Python ni abrir iTunes. Paquetes sin firma de desarrollador ni notarización de Apple. Cada paquete se añade solo cuando pasa las comprobaciones de su plataforma. Instrucciones y límites: docs/TRANSFERENCIAS.md.
+No necesitas Python ni abrir iTunes. Windows requiere el servicio/controlador USB de Apple. Paquetes sin firma de desarrollador ni notarización. Cada descarga se publica al pasar las comprobaciones de su plataforma. Instrucciones y límites: docs/TRANSFERENCIAS.md.
 ''', encoding='utf-8')
             created = subprocess.run(['gh','release','create',tag,'--repo',repo,'--title',
                 'TUPAQ '+tag,'--notes-file',str(notes),'--prerelease','--verify-tag'])

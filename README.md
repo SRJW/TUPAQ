@@ -7,10 +7,12 @@ El objetivo es importar música local a la app Música del iPhone sin usar la
 aplicación iTunes ni 3uTools.
 
 La lectura del catálogo ya fue confirmada por el usuario en su iPhone.
-La versión 0.3.0-preview.3 corrige la comprobación incorrecta `host-anchor-ahead`: utiliza
-el contador actual confirmado por el iPhone, sin sustituirlo por el del host. Mantiene una interfaz con barra lateral, temas claro/oscuro,
-lectura automática de la biblioteca y miniaturas por USB. Incluye compatibilidad
-con cabeceras variables del catálogo de host para la importación experimental.
+La versión 0.3.0-preview.4 admite solicitudes de audio con Genius desactivado
+(AssetParts 1/5) y añade **Preferencias → Completar importación pendiente**.
+Comprueba el registro y la biblioteca antes de entregar el audio que falta;
+si iOS ya retiró todas las entradas incompletas, permite una importación nueva
+tras comprobar que no quedan esas canciones. Mantiene la interfaz con barra lateral,
+temas claro/oscuro, lectura automática y miniaturas por USB.
 Las transferencias pasan pruebas con un dispositivo simulado; todavía deben
 verificarse en el iPhone real. Véase [cómo transferir](docs/TRANSFERENCIAS.md).
 
@@ -60,6 +62,7 @@ notarización de Apple.
 - **Exportar selección**: copia los originales accesibles por USB a la carpeta
   elegida, comprueba SHA-256 y evita sobrescribir archivos existentes. Los archivos
   protegidos se copian conservando su protección; no hay descifrado ni conversión.
+- **Completar importación pendiente**: recuperación experimental con el original y el registro local. Para una canción pendiente representada, solicita el audio sin volver a insertar metadatos; no garantiza aceptación de esa sesión por un iPhone físico. Si el estado no coincide, se detiene.
 - **Revisar importación**: vuelve a comprobar una operación cuya confirmación se
   perdió. Una operación sin comprobar bloquea otra importación; no se reenvía sola.
 - Calcular firmas candidatas de 21 bytes con un protocolo de solicitud fijo,
@@ -115,7 +118,7 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m importios.native --smoke-fixtures 
 .venv/bin/python scripts/build_desktop.py
 ```
 
-La suite contiene 73 pruebas de formatos, HTTP local, descubrimiento USB simulado,
+La suite contiene 86 pruebas de formatos, HTTP local, descubrimiento USB simulado,
 paquetes de investigación, firmas candidatas, conexión automática y portadas remotas. La prueba nativa comprueba una
 ventana Qt real, lectura en un hilo de trabajo, los AAC/ALAC dentro de M4A, portadas, duplicados,
 archivos dañados, CSV, quitar/vaciar y las firmas. En Linux se ha probado también

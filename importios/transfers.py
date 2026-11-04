@@ -16,6 +16,7 @@ import secrets
 import shutil
 import string
 import tempfile
+import time
 import uuid
 
 from .library import LibraryError, copy_catalogue
@@ -320,45 +321,54 @@ async def transact(afc, channel, before, identity, voice, entries, receipt, dire
         await channel.send({'Command':'FinishedSyncingMetadata','Session':2,'Params':{
             'DataclassAnchors':{'Media':str(before['anchor']+1),'VoiceMemo':str(voice)},
             'SyncTypes':{'Media':1,'Book':0,'Keybag':1}}})
-        own = {str(e['track_id']):e for e in entries}
-        manifest_seen, completed = False, set()
-        for _ in range(256):
-            message = await channel.receive()
-            require(message.get('Session') == 2, 'terminal-session')
-            command = message.get('Command')
-            require(command not in ('SyncFailed','ConnectionInvalid','FileError'), 'device-sync-failed')
-            if command == 'AssetManifest':
-                require(not manifest_seen, 'manifest-repeated')
-                existing_music = {wire for wire,item in before['wire_to_item'].items() if item in before['tracks']}
-                audio, ancillary = validate_manifest(message,set(own),existing_music)
-                manifest_seen = True
-                # Every request is checked before any completion/refusal is sent.
-                for index, identifier in enumerate(audio):
-                    entry = own[identifier]
-                    def bytes_progress(done,total):
-                        progress(index*100+int(done*80/max(1,total)),len(entries)*100,'Importando: '+entry['source']['title'],entry['source']['id'])
-                    await upload_audio(afc,entry,bytes_progress)
-                    await channel.send({'Command':'FileComplete','Session':2,'Params':{
-                        'AssetID':identifier,'Dataclass':'Media','AssetPath':entry['destination']}})
-                    completed.add(identifier)
-                    receipt['completed_assets'] = sorted(completed)
-                    save_receipt(directory,receipt)
-                for identifier in ancillary:
-                    await channel.send({'Command':'FileError','Session':2,'Params':{
-                        'AssetID':identifier,'Dataclass':'Media','ErrorCode':16,'ErrorIsVisible':False}})
-            elif command == 'SyncFinished':
-                require(completed == set(own), 'finished-without-audio')
-                receipt['phase'] = 'verifying'
-                save_receipt(directory,receipt)
-                return
-            elif command != 'SyncAllowed':
-                raise ProtocolError('terminal-command')
-        raise ProtocolError('terminal-limit')
+        await deliver_assets(afc,channel,before,entries,receipt,directory,progress)
     finally:
         signer.close()
 
 
-async def import_selected(selected, backup_root, progress):
+async def deliver_assets(afc,channel,before,entries,receipt,directory,progress):
+    own = {str(e['track_id']):e for e in entries}
+    manifest_seen, completed = False, set()
+    settled_at = None
+    for _ in range(256):
+        message = await channel.receive()
+        require(message.get('Session') == 2, 'terminal-session')
+        command = message.get('Command')
+        require(command not in ('SyncFailed','ConnectionInvalid','FileError'), 'device-sync-failed')
+        if command == 'AssetManifest':
+            require(not manifest_seen, 'manifest-repeated')
+            existing_music = {wire for wire,item in before['wire_to_item'].items() if item in before['tracks']}
+            audio, ancillary = validate_manifest(message,set(own),existing_music)
+            manifest_seen = True
+            receipt['manifest_parts'] = sorted({asset['Variant']['AssetParts'] for asset in message['Params']['AssetManifest']['Media']})
+            save_receipt(directory,receipt)
+            # Every request is checked before any completion/refusal is sent.
+            for index, identifier in enumerate(audio):
+                entry = own[identifier]
+                def bytes_progress(done,total):
+                    progress(index*100+int(done*80/max(1,total)),len(entries)*100,'Importando: '+entry['source']['title'],entry['source']['id'])
+                await upload_audio(afc,entry,bytes_progress)
+                await channel.send({'Command':'FileComplete','Session':2,'Params':{
+                    'AssetID':identifier,'Dataclass':'Media','AssetPath':entry['destination']}})
+                completed.add(identifier)
+                receipt['completed_assets'] = sorted(completed)
+                save_receipt(directory,receipt)
+            for identifier in ancillary:
+                await channel.send({'Command':'FileError','Session':2,'Params':{
+                    'AssetID':identifier,'Dataclass':'Media','ErrorCode':16,'ErrorIsVisible':False}})
+            settled_at = time.monotonic_ns()
+        elif command == 'SyncFinished':
+            observed = getattr(channel,'last_received_at',None)
+            require(settled_at is not None and (observed is None or observed >= settled_at), 'terminal-before-settlement')
+            require(completed == set(own), 'finished-without-audio')
+            receipt['phase'] = 'verifying'
+            save_receipt(directory,receipt)
+            return
+        elif command != 'SyncAllowed':
+            raise ProtocolError('terminal-command')
+    raise ProtocolError('terminal-limit')
+
+async def import_selected(selected, backup_root, progress, expected_snapshot=None):
     require(1 <= len(selected) <= 49, 'import-selection-limit')
     require(sum(Path(chosen['path']).stat().st_size for chosen in selected) <= 2*1024*1024*1024, 'import-batch-size')
     sources, hashes = [], set()
@@ -370,10 +380,12 @@ async def import_selected(selected, backup_root, progress):
     require(sum(s['size'] for s in sources) <= 2*1024*1024*1024, 'import-batch-size')
     root = Path(backup_root)
     root.mkdir(parents=True,exist_ok=True)
-    completed_receipts = []
+    completed_receipts, retired_receipts = [], []
     for journal in root.glob('*/journal.json'):
         record = json.loads(journal.read_text(encoding='utf-8'))
-        require(record.get('phase') in ('completed','before-write-failed'), 'previous-import-unverified')
+        require(record.get('phase') in ('completed','before-write-failed','resolved-items-removed'), 'previous-import-unverified')
+        if record.get('phase') == 'resolved-items-removed':
+            retired_receipts.append(record)
         if record.get('phase') == 'completed':
             matches = [{'track_id':e['track_id'],'destination':e['destination'],
                         'source':{'id':e['source']['id'],'size':e['source']['size']}}
@@ -395,6 +407,11 @@ async def import_selected(selected, backup_root, progress):
                 locked = True
                 progress(0,100,'Guardando una copia del catálogo…')
                 before = await capture(afc,directory/'before')
+                require(expected_snapshot is None or before == expected_snapshot, 'recovery-catalogue-changed')
+                for retired in retired_receipts:
+                    if retired.get('database') == before['database']:
+                        require(not any(str(e['track_id']) in before['wire_to_item'] for e in retired.get('entries',[])),
+                                'recovery-retired-item-returned')
                 already = set()
                 for old in completed_receipts:
                     if (old.get('database'),old.get('primary')) != (before['database'],before['primary']):
@@ -456,7 +473,13 @@ def transfer_error(error, mode):
     else:
         message = 'La importación se detuvo o no pudo verificarse. Revisa el diagnóstico y el respaldo del catálogo antes de repetirla.'
     messages = {
-        'previous-import-unverified':'Hay una importación anterior sin comprobar. Pulsa Revisar importación antes de enviar otra.',
+        'previous-import-unverified':'Hay una importación anterior pendiente. Ve a Preferencias: Revisar importación comprueba el resultado; Completar importación pendiente intenta entregar el audio que falta.',
+        'manifest-own-parts':'El iPhone solicitó componentes que esta versión no puede entregar. No repitas la importación. Copia el diagnóstico completo; los metadatos podrían estar ya en Música.',
+        'recovery-source-missing':'No se encuentra el archivo original. Añádelo con Elegir canciones y vuelve a usar Preferencias → Completar importación pendiente.',
+        'recovery-pending-state':'La canción no tiene el estado local pendiente admitido para completar su audio. No se ha reenviado la canción. Copia el diagnóstico.',
+        'recovery-mixed-state':'La operación contiene canciones en estados diferentes. No se ha reenviado. Conserva el respaldo y copia el diagnóstico.',
+        'recovery-file-exists':'Ya hay un archivo en el destino o en el área de envío. Se detuvo la recuperación para evitar sobrescribirlo. Prueba Revisar importación y copia el diagnóstico si falla.',
+        'recovery-anchor':'La biblioteca avanzó o cambió desde la operación pendiente. No se ha reenviado. Conserva los registros y copia el diagnóstico.',
         'identity-not-configured':'No se encontró una identidad de sincronización configurada en el iPhone. No se ha enviado una actualización de biblioteca.',
         'identity-missing':'No se encontró la identidad existente de la biblioteca. No se ha enviado una actualización de biblioteca.',
         'host-anchor-unavailable':'El estado de sincronización guardado no es compatible todavía. No se ha enviado una actualización de biblioteca.',
@@ -472,20 +495,13 @@ def transfer_error(error, mode):
     }
     message = messages.get(code,message)
     if isinstance(error,ProtocolError) and error.facts is not None:
-        code += '\nFormato del catálogo: '+json.dumps(error.facts,sort_keys=True)
+        code += '\nDatos del protocolo: '+json.dumps(error.facts,sort_keys=True)
     return TransferError(message, mode+':'+code)
 
 
 async def verify_pending(backup_root, progress):
-    root = Path(backup_root)
-    pending = []
-    for journal in sorted(root.glob('*/journal.json')):
-        record = json.loads(journal.read_text(encoding='utf-8'))
-        if record.get('phase') not in ('completed','before-write-failed'):
-            pending.append((journal,record))
-    require(len(pending) == 1, 'pending-import-count')
-    journal, receipt = pending[0]
-    require(bool(receipt.get('entries')), 'pending-no-entries')
+    from .recovery import pending_receipt
+    journal, receipt = pending_receipt(backup_root)
     before = snapshot(journal.parent/'before'/'1'/'MediaLibrary.sqlitedb')
     async with device() as (_,afc):
         with tempfile.TemporaryDirectory(prefix='tupaq-verify-') as temporary:
@@ -502,9 +518,11 @@ async def verify_pending(backup_root, progress):
 
 def run_transfer(mode, selected, destination, progress):
     try:
-        require(mode in ('import','export','verify'), 'transfer-mode')
+        require(mode in ('import','export','verify','resume'), 'transfer-mode')
+        from .recovery import resume_pending
         work = (import_selected(selected,destination,progress) if mode == 'import' else
-                verify_pending(destination,progress) if mode == 'verify' else export_selected(selected,destination,progress))
+                verify_pending(destination,progress) if mode == 'verify' else
+                resume_pending(destination,selected,progress) if mode == 'resume' else export_selected(selected,destination,progress))
         return asyncio.run(asyncio.wait_for(work,timeout=1800))
     except Exception as error:
         raise transfer_error(error,mode) from None

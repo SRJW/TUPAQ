@@ -218,6 +218,7 @@ class Window(QMainWindow):
         self.export_phone.setEnabled(not phone_busy and self.tabs.currentIndex() == 1 and bool(rows)
             and all(self.library_model.tracks[r.row()].get('afc_path') for r in rows))
         self.verify_import.setEnabled(not phone_busy and self.backup_root.exists())
+        self.resume_import.setEnabled(not phone_busy and self.backup_root.exists())
         self.open_backup.setEnabled(self.backup_root.exists())
 
     def navigate(self, number):
@@ -699,6 +700,13 @@ def smoke(app, window, fixtures, output=None):
     files = [fixtures/name for name in ['sample.mp3', 'sample.wav', 'sample.aiff', 'sample.m4a', 'covered-aac.m4a']]
     with tempfile.TemporaryDirectory(prefix='importios-native-test-') as temporary:
         folder = Path(temporary)
+        from .recovery import pending_receipt
+        from .sync.protocol import ProtocolError
+        try:
+            pending_receipt(folder)
+            raise AssertionError('Empty folder cannot own a pending import')
+        except ProtocolError as error:
+            assert str(error) == 'pending-import-count'
         invalid = folder/'broken.wav'
         invalid.write_bytes(b'not audio')
         window.add_paths(files+[files[0], invalid])
@@ -785,8 +793,15 @@ def smoke(app, window, fixtures, output=None):
         original_transfer = globals()['run_transfer']
         original_backup = window.backup_root
         def simulated_transfer(mode, selected, destination, progress):
-            assert mode == 'export' and selected[0]['afc_path'].endswith('.m4a')
+            if mode == 'export':
+                assert selected[0]['afc_path'].endswith('.m4a')
+            else:
+                assert mode == 'resume' and selected[0]['id'] == track['id']
             progress(1,2,'Transferencia de prueba',track['id'])
+            # Return no completion claim in the resume UI smoke: the real
+            # verifier is covered by metadata-first transport replay tests.
+            if mode == 'resume':
+                return {}
             return {'exported':1,'files':[]}
         try:
             globals()['run_transfer'] = simulated_transfer
@@ -802,6 +817,17 @@ def smoke(app, window, fixtures, output=None):
             assert '1 archivos exportados' in window.status.text()
             assert window.progress_track_id == track['id']
             assert not window.now_cover.pixmap().isNull()
+            window.backup_root.mkdir()
+            window.update_buttons()
+            window.navigate(3)
+            assert window.resume_import.isEnabled()
+            window.resume_import.click()
+            deadline = time.monotonic()+10
+            while window.transfer_worker is not None:
+                app.processEvents()
+                if time.monotonic() > deadline:
+                    raise RuntimeError('Pending import control did not finish')
+                time.sleep(0.005)
         finally:
             globals()['run_transfer'] = original_transfer
             window.backup_root = original_backup

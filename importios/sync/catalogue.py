@@ -37,18 +37,34 @@ def snapshot(path):
                 LEFT JOIN album_artist aa ON aa.album_artist_pid=a.album_artist_pid'''):
             if wire and isinstance(name,str) and isinstance(artist,str):
                 albums.setdefault((name,artist),[]).append(wire)
+        groups = {str(wire):(album,artist) for wire,album,artist in db.execute('''
+            SELECT s.sync_id,a.sync_id,aa.sync_id FROM item i
+            JOIN item_store s ON s.item_pid=i.item_pid JOIN album a ON a.album_pid=i.album_pid
+            JOIN album_artist aa ON aa.album_artist_pid=a.album_artist_pid''') if wire}
+        state_columns = {row[1] for row in db.execute('PRAGMA table_info(item_state)')}
+        item_columns = {row[1] for row in db.execute('PRAGMA table_info(item)')}
+        states = {}
+        if {'item_pid','is_placeholder','is_library_added','has_non_purgeable_asset','is_supported_type'} <= state_columns and 'remote_location_id' in item_columns:
+            states = {str(pid):(placeholder,added,asset,supported,remote) for pid,placeholder,added,asset,supported,remote in
+                db.execute('''SELECT i.item_pid,s.is_placeholder,s.is_library_added,s.has_non_purgeable_asset,
+                    s.is_supported_type,i.remote_location_id FROM item i JOIN item_state s ON s.item_pid=i.item_pid''')}
     return {'database':database,'primary':primary,'anchor':anchor,'ids':ids,'originals':originals,
-            'wire_to_item':wire_to_item,'tracks':{t['id']:t for t in tracks},'artists':artist_groups,'albums':albums}
+            'wire_to_item':wire_to_item,'tracks':{t['id']:t for t in tracks},'artists':artist_groups,'albums':albums,
+            'groups':groups,'states':states}
 
 
-def verify_before_after(before, after, entries):
+def verify_originals(before, after):
     require((before['database'],before['primary']) == (after['database'],after['primary']), 'verify-library-identity')
-    require(after['anchor'] == before['anchor']+1, 'verify-anchor')
     require(before['originals'] <= after['originals'], 'verify-original-items-missing')
     for identifier, old in before['tracks'].items():
         new = after['tracks'].get(identifier)
         require(new is not None and all(old.get(k) == new.get(k) for k in ('title','artist','album','duration','afc_path')),
                 'verify-original-music-changed')
+
+
+def verify_before_after(before, after, entries):
+    verify_originals(before,after)
+    require(after['anchor'] == before['anchor']+1, 'verify-anchor')
     for entry in entries:
         item_id = after['wire_to_item'].get(str(entry['track_id']))
         track = after['tracks'].get(item_id)
