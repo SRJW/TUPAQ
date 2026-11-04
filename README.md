@@ -1,5 +1,7 @@
 # TUPAQ
 
+<img src="importios/assets/tupaq.png" alt="TUPAQ · Encuentro" width="100">
+
 Antes llamado Importios. El código interno conserva el módulo `importios`; el repositorio es `SRJW/TUPAQ`.
 
 Aplicación de escritorio para Windows y macOS, en español, con ventana propia.
@@ -7,9 +9,12 @@ El objetivo es importar música local a la app Música del iPhone sin usar la
 aplicación iTunes ni 3uTools.
 
 El usuario confirmó la lectura y la importación con metadatos y portada en Música del iPhone.
-La **0.3.0-preview.14** conserva la biblioteca visible mientras se actualiza después
+La **0.3.0-preview.15** conserva la biblioteca visible mientras se actualiza después
 de una importación, incluidas selección, marcas, posición de lectura y carátulas.
 Si falla la lectura, mantiene la última vista válida e indica que no está actualizada.
+La identidad **Encuentro** está integrada en la barra lateral, barra inferior,
+ventana y aplicación, con iconos nativos ICO para Windows e ICNS para Mac.
+Los botones usan naranja y se conservan los tres ambientes de cristal.
 El diseño toma la composición de las referencias de Apple Music: portada grande,
 información y acciones a su derecha, paneles translúcidos, sombras y barra inferior
 integrada. Preferencias ofrece Nocturno, Aurora y Atardecer. El fondo atmosférico

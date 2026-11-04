@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (QWidget,QFrame,QLabel,QVBoxLayout,QHBoxLayout,QPu
     QTableView,QTableWidget,QSplitter,QAbstractItemView,QProgressBar,QListWidget,QApplication,
     QLineEdit,QScrollArea,QFormLayout,QGraphicsDropShadowEffect)
 from .models import LibraryModel,SelectionDelegate
-from .visuals import music_icon,line_icon
+from .visuals import app_icon,line_icon
 from .version import VERSION
 from .surfaces import Atmosphere
 from .i18n import tr, QLabel, QPushButton, QCheckBox, QComboBox, QLineEdit, QTableWidget, QListWidget
@@ -27,7 +27,7 @@ def build(window):
     sidebar=QFrame();sidebar.setObjectName('sidebar');sidebar.setFixedWidth(238)
     side=QVBoxLayout(sidebar);side.setContentsMargins(14,18,14,16);side.setSpacing(6)
     brand_card=QFrame();brand_card.setObjectName('brandCard');brand_row=QHBoxLayout(brand_card);brand_row.setContentsMargins(10,10,10,10)
-    mark=QLabel();mark.setPixmap(music_icon(34).pixmap(34,34));brand_row.addWidget(mark)
+    mark=QLabel();mark.setPixmap(app_icon().pixmap(40,40));brand_row.addWidget(mark)
     brand_labels=QVBoxLayout();brand_labels.setSpacing(0)
     brand=QLabel('TUPAQ');brand.setObjectName('brand');brand_labels.addWidget(brand)
     version=QLabel(VERSION);version.setObjectName('muted');brand_labels.addWidget(version);brand_row.addLayout(brand_labels,1)
@@ -109,7 +109,7 @@ def build(window):
     window.main_splitter.setStretchFactor(0,1)
     window.inspector_toggle.hide();layout.addWidget(window.main_splitter,1)
     activity=QFrame();activity.setObjectName('activityBar');activity_layout=QHBoxLayout(activity);activity_layout.setContentsMargins(16,12,16,12);activity_layout.setSpacing(12)
-    activity_icon=QLabel();activity_icon.setPixmap(music_icon(25).pixmap(25,25));activity_layout.addWidget(activity_icon)
+    activity_icon=QLabel();activity_icon.setPixmap(app_icon().pixmap(25,25));activity_layout.addWidget(activity_icon)
     window.status=QLabel(tr('Sin canciones para importar.'));window.status.setObjectName('muted');window.status.setWordWrap(True);window.status.setTextFormat(Qt.TextFormat.PlainText);activity_layout.addWidget(window.status,1)
     window.progress=QProgressBar();window.progress.setFixedWidth(180);window.progress.setFixedHeight(12);window.progress.setTextVisible(False);window.progress.hide();activity_layout.addWidget(window.progress)
     window.cancel_transfer_button=button('Cancelar','close',window.cancel_transfer);window.cancel_transfer_button.hide()
@@ -197,17 +197,17 @@ def build(window):
     for surface in (sidebar,window.inspector,activity):
         shadow=QGraphicsDropShadowEffect(surface);shadow.setBlurRadius(22);shadow.setOffset(0,6);shadow.setColor(QColor(0,0,0,65));surface.setGraphicsEffect(shadow)
     window.queue_toggle.toggled.connect(window.update_buttons)
-    window.setWindowIcon(music_icon())
+    window.setWindowIcon(app_icon())
 
 
 def apply_theme(window):
     selection=window.theme_choice.currentIndex()
     dark=selection==2 or selection==0 and QApplication.styleHints().colorScheme()==Qt.ColorScheme.Dark
     c=({'bg':'#111925','side':'#101d2c','card':'#182436','text':'#f4f5fa','muted':'#a7b2c3','border':'#304052',
-        'button':'#263346','hover':'#34445b','selected':'#36465c','blue':'#ff375f','accent':'#ff375f',
+        'button':'#263346','hover':'#34445b','selected':'#36465c','blue':'#F09A58','accent':'#B8430A',
         'top':'#223c53','bottom':'#222137','hero':'#1d3144','heroEnd':'#1b2331'} if dark else
        {'bg':'#f6f7fb','side':'#eaeef5','card':'#ffffff','text':'#222633','muted':'#626c7d','border':'#d9deea',
-        'button':'#ffffff','hover':'#edf0f6','selected':'#e2e7f2','blue':'#fa2456','accent':'#e82752',
+        'button':'#ffffff','hover':'#edf0f6','selected':'#e2e7f2','blue':'#B8430A','accent':'#B8430A',
         'top':'#e1eaf4','bottom':'#efe7f1','hero':'#ffffff','heroEnd':'#edf2fa'})
     palette=QPalette()
     for role,key in [(QPalette.ColorRole.Window,'bg'),(QPalette.ColorRole.WindowText,'text'),(QPalette.ColorRole.Base,'bg'),
@@ -251,7 +251,7 @@ def apply_theme(window):
         QPushButton:hover {{background:{c['hover']};}}
         QPushButton:focus {{border:1px solid {c['muted']};}}
         QPushButton#primary {{background:{c['accent']};color:white;font-weight:600;border:1px solid rgba(255,255,255,35);padding:10px 22px;}}
-        QPushButton#primary:hover {{background:#ff5076;}}
+        QPushButton#primary:hover {{background:#A93A08;}}
         QPushButton:disabled,QPushButton#primary:disabled {{background:{c['bg']};color:{c['muted']};border:1px solid {c['border']};}}
         QPushButton#nav {{background:transparent;border:0;text-align:left;border-radius:8px;padding:8px 10px;}}
         QPushButton#nav:checked {{background:{selected};font-weight:600;}}

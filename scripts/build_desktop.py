@@ -26,6 +26,7 @@ def main():
     command = [sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean',
                '--name', 'TUPAQ', '--windowed',
                '--add-data', 'third_party:third_party',
+               '--add-data', 'importios/assets/tupaq.png:importios/assets',
                '--collect-submodules', 'mutagen', '--exclude-module', 'tkinter']
     from PySide6.QtCore import QLibraryInfo
     translations=Path(QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath))
@@ -35,11 +36,12 @@ def main():
     destination=Path(pyside6_library_info.qt_rel_dir)/'translations'
     command += ['--add-data', str(spanish)+':'+str(destination)]
     if system == 'Windows':
-        command += ['--onefile']
+        command += ['--onefile','--icon',str(ROOT/'importios'/'assets'/'tupaq.ico')]
     else:
         command += ['--onedir']
     if system == 'Darwin':
-        command += ['--osx-bundle-identifier', 'io.importios.desktop']
+        command += ['--osx-bundle-identifier', 'io.importios.desktop',
+                    '--icon',str(ROOT/'importios'/'assets'/'tupaq.icns')]
     checked_run(command + ['desktop.py'], cwd=ROOT, check=True)
     if system == 'Darwin':
         destination = ROOT/'dist'/f'TUPAQ-macOS-{platform.machine()}.dmg'

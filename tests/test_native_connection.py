@@ -12,7 +12,7 @@ from PySide6.QtCore import Qt, QEvent
 from PySide6.QtGui import QCloseEvent,QFontDatabase
 from PySide6.QtWidgets import QApplication, QMessageBox
 from importios.native import Window
-from importios.visuals import music_icon
+from importios.visuals import app_icon
 
 APP = QApplication.instance() or QApplication([])
 # Qt's Windows offscreen plugin does not enumerate the system font collection.
@@ -105,7 +105,7 @@ class NativeConnectionTests(unittest.TestCase):
             self.assertEqual(self.window.pages.currentIndex(),0)
         model=self.window.library_model
         model.replace([dict(TRACK,id=str(n)) for n in range(260)])
-        icon=music_icon(40)
+        icon=app_icon()
         for n in range(260):model.set_icon(str(n),icon)
         self.assertEqual(len(model.icons),96)
         self.assertNotIn('0',model.icons)

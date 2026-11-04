@@ -501,3 +501,16 @@ que inspecciona los mensajes de UI abre el código explícitamente como UTF-8,
 evita depender de cp1252 y puede ejecutarse con la configuración de Windows.
 Referencia: implementación oficial de relojes de
 [CPython 3.12](https://github.com/python/cpython/blob/3.12/Python/pytime.c).
+
+
+## Identidad Encuentro (preview.15)
+
+El icono elegido se integra en la aplicación Qt, ventana, barra lateral y barra
+inferior. El EXE incluye los siete tamaños del ICO y el paquete de Mac usa el
+ICNS en sus recursos e Info.plist. La comprobación del ejecutable real verifica
+los recursos nativos además de abrir la ventana con el PNG incluido.
+
+La paleta de referencia combina naranja, marfil y ciruela. Los botones usan un
+naranja más oscuro para conservar el contraste con texto blanco; se mantienen
+los ambientes Nocturno, Aurora y Atardecer y los ajustes guardados. El cambio
+no modifica canciones, carátulas ni las comprobaciones de importación/exportación.

@@ -1127,6 +1127,8 @@ def main():
     app = QApplication([sys.argv[0]])
     app.setApplicationName('TUPAQ')
     app.setOrganizationName('TUPAQ')
+    from .visuals import app_icon
+    app.setWindowIcon(app_icon())
     window = Window(auto_connect=not bool(args.smoke_fixtures))
     window.show()
     if args.smoke_fixtures:

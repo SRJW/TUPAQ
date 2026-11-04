@@ -1,26 +1,16 @@
 """Small painted native icons; no web view, animation or external icon font."""
+from functools import lru_cache
+from pathlib import Path
 from PySide6.QtCore import Qt, QRectF, QPointF
-from PySide6.QtGui import QColor, QIcon, QPixmap, QPainter, QPen, QLinearGradient, QFont, QPainterPath
+from PySide6.QtGui import QColor, QIcon, QPixmap, QPainter, QPen, QFont, QPainterPath
 
 
-def music_icon(size=64):
-    image = QPixmap(size*2,size*2)
-    image.setDevicePixelRatio(2)
-    image.fill(Qt.GlobalColor.transparent)
-    painter = QPainter(image)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    gradient = QLinearGradient(0,0,size,size)
-    for stop,color in [(0,'#ffb37c'),(.4,'#ff3d91'),(1,'#6238ff')]:
-        gradient.setColorAt(stop,QColor(color))
-    painter.setPen(Qt.PenStyle.NoPen)
-    painter.setBrush(gradient)
-    painter.drawRoundedRect(QRectF(1,1,size-2,size-2),size*.23,size*.23)
-    painter.setPen(QColor('white'))
-    font = QFont();font.setPixelSize(int(size*.8));font.setBold(True)
-    painter.setFont(font)
-    painter.drawText(QRectF(0,-size*.03,size,size),Qt.AlignmentFlag.AlignCenter,'♪')
-    painter.end()
-    return QIcon(image)
+@lru_cache(maxsize=1)
+def app_icon():
+    """The approved Encuentro artwork, shared by all app-brand surfaces."""
+    icon=QIcon(str(Path(__file__).with_name('assets')/'tupaq.png'))
+    if icon.isNull():raise RuntimeError('TUPAQ brand icon is missing or unreadable')
+    return icon
 
 
 def line_icon(kind, color='#52576d', size=22):
