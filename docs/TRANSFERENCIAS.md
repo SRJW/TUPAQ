@@ -39,8 +39,8 @@ confirmación visual en el iPhone.
 ## Exportar del iPhone al ordenador
 
 1. Conecta el iPhone: su biblioteca se carga automáticamente. Puedes entrar en **Biblioteca** o pulsar **Actualizar** para releerla.
-2. Selecciona filas con archivo accesible en la columna **Archivo por USB**.
-3. Pulsa **Exportar selección** y elige una carpeta del ordenador.
+2. Marca las casillas de las canciones que quieras exportar. Seleccionar una fila sin marcarla solo abre sus detalles.
+3. Pulsa **Exportar** y elige una carpeta del ordenador.
 4. Espera a que finalice la comprobación. Los archivos se guardan con artista y
    título; los caracteres incompatibles se sustituyen y los nombres repetidos
    reciben un sufijo. No se sobrescriben archivos existentes.
@@ -101,13 +101,13 @@ del ancla, los IDs wire frente a `item_store.sync_id` (no `item_pid`), los nuevo
 metadatos/rutas, los bytes permanentes y la conservación de canciones anteriores.
 SQLite solo abre copias locales; nunca se abre la base del iPhone para escribir.
 
-El código no envía eliminaciones ni reset de la biblioteca. Esto no reemplaza
+La importación no envía eliminaciones ni reset de la biblioteca. Desde preview.8 existe una acción Eliminar separada, que requiere marcar canciones y confirmar. Esto no reemplaza
 la validación física de un protocolo privado: un fallo, desconexión o cambio de
 catálogo puede dejar una operación pendiente. No se reintenta automáticamente.
 
 ## Validación disponible
 
-Las 108 pruebas incluyen replay de importación de los cinco perfiles base,
+Las 122 pruebas incluyen replay de importación de los cinco perfiles base,
 originales conservados, exportación byte por byte, nombres existentes,
 rechazo por cambio de ancla, identidad sin configurar, manifest desconocido,
 audio permanente alterado, interrupción después de aplicar cambios, verificación
@@ -306,7 +306,7 @@ Al leer la biblioteca se enumeran los nombres de cada carpeta de audio validada
 una sola vez (máximo 512 carpetas); no se descargan los audios. Una referencia a
 un archivo ausente se excluye. Un fallo de acceso no se interpreta como borrado,
 y las descargas protegidas sin ruta AFC conservan su indicador de estado local.
-El segundo filtro muestra solo archivos cuya presencia USB se comprobó.
+Desde preview.8 se retira el segundo filtro y la columna de acceso USB. La vista única mantiene el filtrado por estado local y presencia, conservando las descargas protegidas que iOS no expone como archivo.
 
 Una duración desconocida se muestra como —. Se usa total_time_ms, o duración en
 muestras / frecuencia de item_playback; las filas visibles comprueban también
@@ -329,3 +329,63 @@ Un preflight interrumpido sin escrituras se cierra localmente. Un lote cuyos IDs
 y todos sus archivos propios ya están ausentes puede retirarse del estado pendiente
 tras comprobar también el área temporal. Revisar importación ejecuta estas mismas
 comprobaciones de solo lectura y no abre una nueva sesión ATC.
+
+
+## Marcar, buscar y eliminar (preview.8)
+
+Las casillas seleccionan canciones por identidad, incluso al ordenar o buscar.
+Seleccionar visibles afecta solo a los resultados actuales; el contador incluye
+las marcas ocultas por la búsqueda. La confirmación de eliminación permite
+revisar la lista completa. Al desconectar o cambiar de iPhone se borran las marcas.
+El buscador admite formatos con o sin punto, códec y términos de metadatos juntos:
+`.m4a`, `mp3`, `wav`, `alac`, `.m4a artista`. Una cabecera de archivo comprobada
+prevalece sobre una extensión incorrecta. Eliminar los filtros visuales de acceso
+no convierte una descarga protegida en un original exportable.
+
+**Eliminar** admite de 1 a 100 canciones marcadas. Pide confirmación con Cancelar
+como opción predeterminada. La copia automática del catálogo no guarda sus audios:
+exporta previamente los originales que quieras conservar.
+
+Antes de escribir se comprueban el dispositivo mediante un token efímero en memoria,
+el DBPID y primary de la biblioteca, los item_pid y sync_id y los metadatos/rutas
+de la selección. Un cambio detiene la operación. Bajo el bloqueo de sincronización
+se guarda una copia del catálogo y preferencias y se entrega un delta firmado:
+update_db_info seguido exclusivamente de delete_track con IDs wire. Los IDs
+SQLite con signo se proyectan a su representación nativa de 64 bits sin signo.
+No se escribe SQL remoto ni se desvinculan archivos de audio desde el ordenador.
+Las solicitudes de assets de objetivos eliminados se rechazan antes de confirmar
+ningún asset. Solo se pueden declinar auxiliares conocidas de canciones supervivientes.
+
+Tras SyncFinished se exige el avance de ancla y que el conjunto de items sea
+exactamente el anterior menos los marcados. Los IDs wire, títulos, artistas,
+álbumes, duraciones, rutas y fechas conocidas de las demás canciones deben
+conservarse. iOS puede limpiar los archivos después; no se afirma espacio liberado.
+Si se pierde la confirmación, Revisar operación pendiente comprueba el catálogo
+sin volver a enviar eliminaciones ni audio. Una eliminación incierta no se repite
+automáticamente. Estas comprobaciones no equivalen a validar todas las tablas o
+listas de reproducción de todas las versiones de iOS; falta prueba física.
+
+## Para qué sirven las opciones avanzadas
+
+Se muestran solo al activar **Preferencias → Mostrar opciones avanzadas de recuperación**.
+La importación normal ya guarda registros y comprueba operaciones anteriores.
+
+- **Revisar operación pendiente:** consulta el estado actual, comprueba audio o
+  eliminaciones registradas y resuelve las que puede demostrar. No reenvía música.
+- **Completar importación pendiente:** intenta entregar el audio que falta de una
+  importación registrada, usando el original. No sirve para repetir eliminaciones.
+- **Actualizar portadas y fecha:** actualiza esos metadatos de canciones importadas
+  por TUPAQ en este ordenador, con originales y registros coincidentes.
+- **Ver respaldo del catálogo:** abre los registros y copias de base de datos
+  previas a los cambios. Son útiles para comprobar e investigar un problema,
+  pero no incluyen todos los audios ni ofrecen una restauración automática.
+
+## Referencias de portada existentes
+
+Una referencia source300 no tiene por qué ser una cadena decimal canónica mayor
+que 99. Los valores nulos u opacos se conservan sin interpretarlos como nuevos
+IDs ni impedir la importación. Los enteros y cadenas decimales representables
+reservan sus IDs, incluidos cero y alias con ceros iniciales. Se preserva una
+huella tipada de todos los tokens durante la comprobación previa a escribir.
+La asignación usa un ID libre y busca huecos si el máximo de 32 bits ya está
+ocupado. Las portadas nuevas siguen requiriendo registro y bytes SHA-256 correctos.

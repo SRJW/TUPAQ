@@ -3,11 +3,12 @@ from collections import OrderedDict
 import unicodedata
 import math
 
-from PySide6.QtCore import QAbstractTableModel,Qt
-from PySide6.QtWidgets import QTableWidgetItem
+from PySide6.QtCore import QAbstractTableModel,Qt,Signal
+from PySide6.QtWidgets import QTableWidgetItem,QStyledItemDelegate,QStyleOptionViewItem,QStyle,QApplication
+from PySide6.QtGui import QPainter,QPen,QPalette,QPainterPath
 
 SORT_ROLE = int(Qt.ItemDataRole.UserRole)+1
-HEADERS = ['Canción','Artista','Álbum','Formato','Duración','Tamaño','Archivo por USB']
+HEADERS = ['Canción','Artista','Álbum','Formato','Duración','Tamaño']
 
 
 def duration_label(value):
@@ -35,12 +36,34 @@ class SortableItem(QTableWidgetItem):
         return text_key(self.text()) < text_key(other.text())
 
 
+class SelectionDelegate(QStyledItemDelegate):
+    """Keep native checkbox interaction with a legible indicator in both themes."""
+    def paint(self,painter,option,index):
+        option=QStyleOptionViewItem(option);self.initStyleOption(option,index)
+        super().paint(painter,option,index)
+        if not option.features & QStyleOptionViewItem.ViewItemFeature.HasCheckIndicator:return
+        style=option.widget.style() if option.widget else QApplication.style()
+        rect=style.subElementRect(QStyle.SubElement.SE_ItemViewItemCheckIndicator,option,option.widget).adjusted(0,0,-1,-1)
+        if not rect.isValid():return
+        painter.save();painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(QPen(option.palette.color(QPalette.ColorRole.Mid),1))
+        painter.setBrush(option.palette.color(QPalette.ColorRole.Highlight if option.checkState!=Qt.CheckState.Unchecked else QPalette.ColorRole.Base))
+        painter.drawRoundedRect(rect,3,3)
+        painter.setPen(QPen(option.palette.color(QPalette.ColorRole.Text),1.7,Qt.PenStyle.SolidLine,Qt.PenCapStyle.RoundCap,Qt.PenJoinStyle.RoundJoin))
+        x,y,w,h=rect.x(),rect.y(),rect.width(),rect.height()
+        if option.checkState==Qt.CheckState.Checked:
+            path=QPainterPath();path.moveTo(x+w*.22,y+h*.52);path.lineTo(x+w*.43,y+h*.73);path.lineTo(x+w*.8,y+h*.28);painter.drawPath(path)
+        elif option.checkState==Qt.CheckState.PartiallyChecked:painter.drawLine(x+3,y+h//2,x+w-3,y+h//2)
+        painter.restore()
+
+
 class LibraryModel(QAbstractTableModel):
+    checkedChanged=Signal()
     def __init__(self,parent=None):
         super().__init__(parent)
         self.tracks=[];self.icons=OrderedDict();self.default_icon=None
         self.sort_column=0;self.sort_order=Qt.SortOrder.AscendingOrder
-        self.rows={}
+        self.rows={};self.checked=set()
 
     def replace(self,tracks):
         self.beginResetModel();self.tracks=tracks;self.icons.clear();self.endResetModel()
@@ -69,6 +92,24 @@ class LibraryModel(QAbstractTableModel):
         self.changePersistentIndexList(persistent,[self.index(positions[token],col) for token,col in old])
         self.layoutChanged.emit()
 
+    def flags(self,index):
+        flags=super().flags(index)
+        return flags|Qt.ItemFlag.ItemIsUserCheckable if index.isValid() and index.column()==0 else flags
+
+    def setData(self,index,value,role=Qt.ItemDataRole.EditRole):
+        if role!=Qt.ItemDataRole.CheckStateRole or not index.isValid() or index.column()!=0:return False
+        identifier=self.tracks[index.row()]['id']
+        if value in (Qt.CheckState.Checked,Qt.CheckState.Checked.value):self.checked.add(identifier)
+        else:self.checked.discard(identifier)
+        self.dataChanged.emit(index,index,[Qt.ItemDataRole.CheckStateRole]);self.checkedChanged.emit();return True
+
+    def check_visible(self,checked):
+        ids={track['id'] for track in self.tracks}
+        if checked:self.checked.update(ids)
+        else:self.checked.difference_update(ids)
+        if self.tracks:self.dataChanged.emit(self.index(0,0),self.index(len(self.tracks)-1,0),[Qt.ItemDataRole.CheckStateRole])
+        self.checkedChanged.emit()
+
     def set_icon(self,identifier,icon):
         self.icons[identifier]=icon;self.icons.move_to_end(identifier)
         while len(self.icons)>256:
@@ -79,7 +120,7 @@ class LibraryModel(QAbstractTableModel):
         row=self.rows.get(identifier)
         if row is None:return
         self.tracks[row].update(details)
-        self._changed(identifier,3,6)
+        self._changed(identifier,3,5)
         if self.sort_column in (3,4,5):self.sort(self.sort_column,self.sort_order)
 
     def _changed(self,identifier,first,last):
@@ -98,6 +139,7 @@ class LibraryModel(QAbstractTableModel):
     def data(self,index,role=Qt.ItemDataRole.DisplayRole):
         if not index.isValid() or not 0<=index.row()<len(self.tracks):return None
         track=self.tracks[index.row()];column=index.column()
+        if column==0 and role==Qt.ItemDataRole.CheckStateRole:return Qt.CheckState.Checked if track['id'] in self.checked else Qt.CheckState.Unchecked
         if column==0 and role==Qt.ItemDataRole.DecorationRole:return self.icons.get(track.get('id'),self.default_icon)
         if role==Qt.ItemDataRole.ToolTipRole and column in (3,5):
             origin=track.get('format_source' if column==3 else 'size_source')

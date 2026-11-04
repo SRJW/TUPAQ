@@ -118,6 +118,14 @@ def read_catalogue(path, diagnostics=None):
                 WHERE i.media_type = ? ORDER BY e.title, i.item_pid LIMIT ?''', (MUSIC_MEDIA_TYPE, MAX_TRACKS+1)).fetchall()
             if len(rows) > MAX_TRACKS:
                 raise LibraryError('La biblioteca supera el límite de 100.000 canciones de esta versión.')
+            binding={}
+            if {'db_pid','primary_container_pid'} <= {r[1] for r in db.execute('PRAGMA table_info(db_info)')}:
+                identities=db.execute('SELECT db_pid,primary_container_pid FROM db_info LIMIT 2').fetchall()
+                if len(identities)==1 and all(type(v) is int and v!=0 for v in identities[0]):
+                    binding=dict(library_database=identities[0][0],library_primary=identities[0][1])
+            wire_map={}
+            if {'item_pid','sync_id'} <= {r[1] for r in db.execute('PRAGMA table_info(item_store)')}:
+                wire_map={str(pid):wire for pid,wire in db.execute('SELECT item_pid,sync_id FROM item_store')}
             tracks = []
             from .remote_artwork import catalogue_artwork
             artwork = catalogue_artwork(db)
@@ -128,7 +136,8 @@ def read_catalogue(path, diagnostics=None):
                 if not math.isfinite(duration):
                     raise LibraryError('El catálogo contiene una duración no válida.')
                 tracks.append({'id': str(pid), 'title': title or 'Sin título', 'artist': artist or 'Sin artista',
-                               'album': album or 'Sin álbum', 'duration': max(0, duration)})
+                               'album': album or 'Sin álbum', 'duration': max(0, duration),**binding})
+                if str(pid) in wire_map:tracks[-1]['library_wire']=wire_map[str(pid)]
                 if duration<=0 and type(frames) in (int,float) and type(rate) in (int,float) and frames>0 and rate>0:
                     seconds=frames/rate
                     if math.isfinite(seconds) and 0<seconds<=7*86400:
@@ -237,6 +246,8 @@ async def _read_phone(diagnostics=None, device_info=None):
                 with tempfile.TemporaryDirectory(prefix='importios-library-') as directory:
                     tracks=await copy_catalogue(afc, directory, (FileNotFoundError, AfcFileNotFoundError), diagnostics=diagnostics)
                     from .presence import probe_files
+                    from .devices import device_token
+                    for track in tracks:track['_device_token']=device_token(devices[0].serial)
                     return await probe_files(afc,tracks,diagnostics)
     except LibraryError:
         raise

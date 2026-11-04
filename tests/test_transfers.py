@@ -138,8 +138,8 @@ class Phone:
             db.deserialize(self.files[PREF+'MediaLibrary.sqlitedb'])
             item=operation['item'];wire=operation['pid']
             # Deliberately make SQLite's item_pid different from the wire PID.
-            pid=db.execute('SELECT MAX(item_pid)+1 FROM item').fetchone()[0]
-            artist=db.execute('SELECT MAX(item_artist_pid)+1 FROM item_artist').fetchone()[0]
+            pid=db.execute('SELECT COALESCE(MAX(item_pid),0)+1 FROM item').fetchone()[0]
+            artist=db.execute('SELECT COALESCE(MAX(item_artist_pid),0)+1 FROM item_artist').fetchone()[0]
             album_artist=item['artist_pid'];album=item['album_pid']
             db.execute('INSERT INTO item_artist VALUES(?,?)',(artist,item['artist']))
             db.execute('INSERT OR IGNORE INTO album_artist VALUES(?,?,?)',(album_artist,item['album_artist'],album_artist))
@@ -208,7 +208,10 @@ class Peer:
             assert all(op['operation']=='insert_track' for op in p.operations)
             self.remaining={str(op['pid']) for op in p.operations}
             assets=[{'AssetType':'Music','IsDownload':True,'AssetID':i,'Variant':{'AssetParts':3 if next(op for op in p.operations if str(op['pid'])==i)['item'].get('artwork_cache_id') else 1}} for i in sorted(self.remaining)]
-            assets.append({'AssetType':'Music','IsDownload':True,'AssetID':'77','Variant':{'AssetParts':4}})
+            with closing(sqlite3.connect(':memory:')) as db:
+                db.deserialize(p.files[PREF+'MediaLibrary.sqlitedb'])
+                if db.execute('SELECT 1 FROM item_store WHERE sync_id=77').fetchone():
+                    assets.append({'AssetType':'Music','IsDownload':True,'AssetID':'77','Variant':{'AssetParts':4}})
             if p.fail=='manifest':assets[-1]['AssetID']='999999'
             self.queue.append({'Command':'AssetManifest','Session':2,'Params':{'AssetManifest':{'Media':assets}}})
             del p.files[MEDIA+'/Sync_00000000.plist'];del p.files[MEDIA+'/Sync_00000000.plist.cig']

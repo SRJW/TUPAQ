@@ -45,6 +45,8 @@ async def device():
     lockdown = await create_using_usbmux(serial=devices[0].serial, connection_type='USB',autopair=False,label='TUPAQ')
     async with lockdown:
         require(lockdown.paired and lockdown.session_id, 'trust-missing')
+        from .devices import device_token
+        lockdown._tupaq_device_token=device_token(devices[0].serial)
         async with AfcService(lockdown) as afc:
             yield lockdown, afc
 
@@ -261,9 +263,8 @@ async def plan_entries(afc, before, sources, directory):
             picture = prepare(source['path'],directory/'artwork',source['container'])
             require(local_hash(source['path'])==source['id'],'source-changed-before-upload')
             if picture:
-                cache_id = max(artwork_ids | {99})+1
-                require(cache_id<=0xffffffff,'artwork-cache-range')
-                artwork_ids.add(cache_id);picture['cache_id']=cache_id;entry['artwork']=picture
+                from .sync.artwork import allocate_cache_id
+                picture['cache_id']=allocate_cache_id(artwork_ids);entry['artwork']=picture
                 require(await missing(afc,f"/Airlock/Media/Artwork/{entry['track_id']}"),'artwork-staging-collision')
         for suffix in (source['extension'],''):
             require(await missing(afc,f"/Airlock/Media/{entry['track_id']}{suffix}"), 'airlock-collision')
@@ -307,7 +308,7 @@ async def upload_audio(afc, entry, progress):
 
 
 async def transact(afc, channel, before, identity, voice, entries, receipt, directory, progress,
-                   operation=None, artwork_only=False):
+                   operation=None, artwork_only=False, deleting=False):
     await check_empty_staging(afc)
     signer = await handshake(channel,identity,before['anchor'],voice)
     try:
@@ -322,7 +323,7 @@ async def transact(afc, channel, before, identity, voice, entries, receipt, dire
         require(current['anchor'] == before['anchor'] and current['database'] == before['database'] and
                 current['primary'] == before['primary'] and current['tracks'] == before['tracks'] and
                 current['originals'] == before['originals'] and current['wire_to_item'] == before['wire_to_item'] and
-                current['artwork_ids'] == before['artwork_ids'], 'catalogue-changed-before-stage')
+                current['artwork_ids'] == before['artwork_ids'] and current['artwork_tokens'] == before['artwork_tokens'], 'catalogue-changed-before-stage')
         if operation is None:operation = encode_operations(before['database'],before['primary'],before['anchor'],entries)
         signature = signer.sign(operation)
         receipt['phase'] = 'staging'
@@ -331,19 +332,21 @@ async def transact(afc, channel, before, identity, voice, entries, receipt, dire
         await write_bytes(afc,MEDIA+'/Sync_00000000.plist.cig',signature)
         receipt['phase'] = 'metadata-announced'
         save_receipt(directory,receipt)
+        announced_at=time.monotonic_ns()
         await channel.send({'Command':'FinishedSyncingMetadata','Session':2,'Params':{
             'DataclassAnchors':{'Media':str(before['anchor']+1),'VoiceMemo':str(voice)},
             'SyncTypes':{'Media':1,'Book':0,'Keybag':1}}})
         assets=[entry for entry in entries if entry.get('artwork')] if artwork_only else entries
-        await deliver_assets(afc,channel,before,assets,receipt,directory,progress,artwork_only=artwork_only)
+        await deliver_assets(afc,channel,before,assets,receipt,directory,progress,artwork_only=artwork_only,
+                             forbidden={str(value) for e in entries for value in (e['track_id'],e.get('wire_pid',e['track_id']))} if deleting else None,announced_at=announced_at)
     finally:
         signer.close()
 
 
-async def deliver_assets(afc,channel,before,entries,receipt,directory,progress,artwork_only=False):
-    own = {str(e['track_id']):e for e in entries}
+async def deliver_assets(afc,channel,before,entries,receipt,directory,progress,artwork_only=False,forbidden=None,announced_at=None):
+    own = {} if forbidden is not None else {str(e['track_id']):e for e in entries}
     manifest_seen, completed = False, set()
-    settled_at = time.monotonic_ns() if not own else None
+    settled_at = (announced_at or time.monotonic_ns()) if not own else None
     for _ in range(256):
         message = await channel.receive()
         require(message.get('Session') == 2, 'terminal-session')
@@ -351,7 +354,8 @@ async def deliver_assets(afc,channel,before,entries,receipt,directory,progress,a
         require(command not in ('SyncFailed','ConnectionInvalid','FileError'), 'device-sync-failed')
         if command == 'AssetManifest':
             require(not manifest_seen, 'manifest-repeated')
-            existing_music = {wire for wire,item in before['wire_to_item'].items() if item in before['tracks']}
+            existing_music = {wire for wire,item in before['wire_to_item'].items() if item in before['tracks'] and wire not in (forbidden or set())}
+            existing_music.update(str(int(wire)&((1<<64)-1)) for wire in list(existing_music))
             declared = {identifier:2 if artwork_only else 3 if entry.get('artwork') else 1 for identifier,entry in own.items()}
             audio, ancillary = validate_manifest(message,set(own),existing_music,declared)
             manifest_seen = True
@@ -426,6 +430,7 @@ async def import_selected(selected, backup_root, progress, expected_snapshot=Non
                 completed_receipts, retired_receipts = [], []
                 for journal in root.glob('*/journal.json'):
                     record = json.loads(journal.read_text(encoding='utf-8'))
+                    if record.get('operation')=='delete':continue
                     if record.get('phase') == 'resolved-items-removed':
                         retired_receipts.append(record)
                     if record.get('phase') in ('completed','observed-present'):
@@ -497,14 +502,19 @@ def transfer_error(error, mode):
         with suppress(TypeError,ValueError):
             if 0 <= int(status) <= 65535:
                 code += '-'+str(int(status))
-    if mode == 'export':
+    if mode == 'delete':
+        message='La eliminación se detuvo o no pudo verificarse. Actualiza la biblioteca y conserva el registro de la operación.'
+    elif mode == 'export':
         message = 'No se completó la exportación. Los archivos ya exportados se conservan; no se modificó el iPhone.'
     elif mode == 'repair':
         message = 'La actualización de portadas y fecha se detuvo o no pudo verificarse. Conserva el respaldo y copia el diagnóstico.'
     else:
         message = 'La importación se detuvo o no pudo verificarse. Revisa el diagnóstico y el respaldo del catálogo antes de repetirla.'
     messages = {
-        'previous-import-unverified':'Hay una importación anterior pendiente. Ve a Preferencias: Revisar importación comprueba el resultado; Completar importación pendiente intenta entregar el audio que falta.',
+        'delete-stale-selection':'La biblioteca o el dispositivo cambió. Actualiza la lista y vuelve a marcar las canciones.',
+        'delete-selection-limit':'Marca entre 1 y 100 canciones para eliminarlas.',
+        'delete-recovery-readonly':'Una eliminación pendiente se comprueba con Revisar operación; no se reenvía audio.',
+        'previous-import-unverified':'Hay una operación anterior sin confirmar. En Preferencias → Mostrar opciones avanzadas de recuperación → Revisar operación pendiente puedes comprobarla. Si falta audio, Completar importación pendiente utiliza el original.',
         'manifest-own-parts':'El iPhone solicitó componentes que esta versión no puede entregar. No repitas la importación. Copia el diagnóstico completo; los metadatos podrían estar ya en Música.',
         'recovery-source-missing':'No se encuentra el archivo original. Añádelo con Elegir canciones y vuelve a usar Preferencias → Completar importación pendiente.',
         'recovery-pending-state':'La canción no tiene el estado local pendiente admitido para completar su audio. No se ha reenviado la canción. Copia el diagnóstico.',
@@ -550,10 +560,12 @@ async def verify_pending(backup_root, progress):
 
 def run_transfer(mode, selected, destination, progress):
     try:
-        require(mode in ('import','export','verify','resume','repair'), 'transfer-mode')
+        require(mode in ('import','export','verify','resume','repair','delete'), 'transfer-mode')
+        from .deletion import delete_selected
         from .recovery import resume_pending
         from .metadata_update import repair_imported
-        work = (import_selected(selected,destination,progress) if mode == 'import' else
+        work = (delete_selected(selected,destination,progress) if mode=='delete' else
+                import_selected(selected,destination,progress) if mode == 'import' else
                 verify_pending(destination,progress) if mode == 'verify' else
                 repair_imported(destination,selected,progress) if mode == 'repair' else
                 resume_pending(destination,selected,progress) if mode == 'resume' else export_selected(selected,destination,progress))

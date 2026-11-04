@@ -73,7 +73,8 @@ class LibraryViewTests(unittest.TestCase):
                   {'id':'cloud','title':'Local','artist':'A','album':'B','duration':1,'is_local':False}]
             window.show_library(rows)
             self.assertEqual(window.library_model.rowCount(),1)
-            window.phone_filter.setCurrentIndex(1)
+            self.assertFalse(hasattr(window,'phone_filter'))
+            self.assertNotIn('Archivo por USB',[window.library_model.headerData(i,Qt.Orientation.Horizontal) for i in range(window.library_model.columnCount())])
             self.assertEqual(window.library_model.rowCount(),1)
             window.search.setText('absent')
             self.assertEqual(window.library_model.rowCount(),0)

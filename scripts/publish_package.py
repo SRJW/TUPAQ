@@ -16,19 +16,19 @@ def main():
     if subprocess.run(view, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         with tempfile.TemporaryDirectory() as directory:
             notes = Path(directory)/'notes.md'
-            notes.write_text('''TUPAQ 0.3.0-preview.7: interfaz compacta, archivos reales y recuperación.
+            notes.write_text('''TUPAQ 0.3.0-preview.8: casillas, búsqueda por formato y eliminación confirmada.
 
-- Diseño inspirado en Peel: barra lateral, búsqueda, biblioteca y cola central e inspector de canción plegable. Solo Biblioteca y Preferencias.
-- Oculta referencias a audios eliminados tras comprobar las carpetas USB. Conserva descargas protegidas sin ruta exportable. Nube y pendientes no aparecen como canciones descargadas.
-- Duración desde catálogo o cabeceras reales; un dato desconocido se muestra como —. Formato, tamaño y columnas ordenables.
-- Antes de importar revisa operaciones pendientes: un audio con ID, ruta y SHA-256 correctos permite continuar sin duplicarlo. Si falta o está dañado, conserva el bloqueo y explica la causa. Portadas/fechas pendientes se distinguen del audio.
-- Fuente nativa San Francisco en macOS; Preferencias muestra la fuente real. Windows admite fuentes locales autorizadas y declara la alternativa cuando SF no está disponible. No se redistribuyen archivos de Apple por las restricciones de su licencia estándar.
-- Prueba de resolución tipográfica independiente de las fuentes instaladas en cada sistema; diagnóstico de CI acotado para conservar el final del error.
-- 108 pruebas y comprobación de la aplicación empaquetada, incluidas pérdida de confirmación, archivos ausentes/corruptos, duración, interfaz y tipografía.
+- Corrección de import:artwork-cache-token: conserva referencias opacas/nulas de portadas y reserva los IDs numéricos, sin bloquear por formatos existentes ajenos ni reutilizar los identificadores ocupados.
+- Casillas para marcar canciones, selección de visibles y contador. Las marcas se conservan al ordenar o buscar y se limpian al cambiar de dispositivo.
+- Búsqueda por formato/códec: .m4a, .mp3, wav, aiff, alac… combinables con canción, artista y álbum.
+- Biblioteca simplificada: sin selector Descargadas/Exportables ni columna Archivo por USB.
+- Eliminar hasta 100 canciones marcadas, con confirmación y comprobación de dispositivo, biblioteca, IDs y metadatos. Usa delete_track nativo; no borra archivos de audio por AFC. Comprueba los objetivos y las canciones restantes. Función nueva pendiente de prueba física.
+- Opciones avanzadas de recuperación ocultas por defecto y explicadas. La copia del catálogo no incluye todos los audios ni permite una restauración automática.
+- 122 pruebas, incluidos tokens heterogéneos, casillas, formatos, cancelación, selección obsoleta, dispositivo distinto, eliminación, daño colateral y confirmación perdida.
 
-El usuario confirmó importación con metadatos y portada. Los cambios de esta versión se validan con simulación y necesitan prueba física en el iPhone. No se envían Reset ni eliminaciones ni se escribe SQLite remoto. Conserva los registros de operaciones pendientes; la copia del catálogo no es un respaldo completo.
+El usuario confirmó la importación con metadatos y portada en versiones anteriores. Esta revisión se valida con bibliotecas simuladas y la interfaz empaquetada; aún necesita prueba con el iPhone. No se envía Reset ni se escribe SQLite remoto. Conserva una copia de los audios que quieras guardar antes de eliminarlos.
 
-Windows y Mac: no necesitas Python ni abrir iTunes. Windows requiere el controlador/servicio USB de Apple. Paquetes sin firma de desarrollador ni notarización. Cada paquete aparece cuando pasa las comprobaciones de su plataforma. Instrucciones y límites: docs/TRANSFERENCIAS.md.
+Windows y Mac: no necesitas Python ni abrir iTunes. Windows requiere el controlador/servicio USB de Apple. Cada paquete se publica cuando pasa sus comprobaciones. Paquetes sin firma de desarrollador ni notarización. Fuente nativa San Francisco en macOS; no se redistribuyen archivos de fuentes Apple. Instrucciones: docs/TRANSFERENCIAS.md.
 ''', encoding='utf-8')
             created = subprocess.run(['gh','release','create',tag,'--repo',repo,'--title',
                 'TUPAQ '+tag,'--notes-file',str(notes),'--prerelease','--verify-tag'])

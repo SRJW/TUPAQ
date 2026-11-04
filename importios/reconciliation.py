@@ -24,7 +24,7 @@ def note_failure(receipt,error):
 async def reconcile(root,afc,current,identity,progress=lambda *args:None,exclude=None):
     from .transfers import read_remote,missing,save_receipt,check_empty_staging
     from .sync.artwork import verify as verify_artwork
-    result={'verified':0,'retired':0,'metadata_unverified':0,'reconciled':0,'source_ids':[],'unresolved':[],'foreign':0}
+    result={'verified':0,'retired':0,'removed':0,'metadata_unverified':0,'reconciled':0,'source_ids':[],'unresolved':[],'foreign':0}
     for journal in sorted(Path(root).glob('*/journal.json')):
         if exclude is not None and journal.parent==exclude:continue
         record=json.loads(journal.read_text(encoding='utf-8'));phase=record.get('phase')
@@ -42,6 +42,15 @@ async def reconcile(root,afc,current,identity,progress=lambda *args:None,exclude
             require((record.get('database'),record.get('primary'))==(current['database'],current['primary']),'pending-library-binding')
             require(saved_identity(journal.parent)==identity,'pending-library-identity')
             require(phase in ('metadata-announced','resuming-audio','verifying'),'pending-stage-uncertain')
+            if record.get('operation')=='delete':
+                from .deletion import verify_deleted
+                from .sync.catalogue import snapshot
+                before=snapshot(journal.parent/'before'/'1'/'MediaLibrary.sqlitedb')
+                verify_deleted(before,current,record['entries'],later=True)
+                result['removed']+=len(record['entries'])
+                record.update(phase='completed',reconciliation='native-removal-verified-now')
+                save_receipt(journal.parent,record);result['reconciled']+=1
+                continue
             entries=record.get('entries',[])
             require(1<=len(entries)<=49 and type(record.get('anchor')) is int and current['anchor']>=record['anchor']+1,'pending-receipt-state')
             wires=[str(e['track_id']) for e in entries]

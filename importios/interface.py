@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (QWidget,QFrame,QLabel,QVBoxLayout,QHBoxLayout,QPu
     QButtonGroup,QStackedWidget,QComboBox,QCheckBox,QGridLayout,QHeaderView,
     QTableView,QTableWidget,QSplitter,QAbstractItemView,QProgressBar,QListWidget,QApplication,
     QLineEdit,QScrollArea,QFormLayout)
-from .models import LibraryModel
+from .models import LibraryModel,SelectionDelegate
 from .visuals import music_icon,line_icon
 from .version import VERSION
 
@@ -51,24 +51,27 @@ def build(window):
     window.import_phone.setToolTip('Enviar la selección de la cola del ordenador; sin selección, enviar toda la cola.')
     window.export_phone=button('Exportar','download',window.export_songs)
     window.export_phone.setToolTip('Exportar al ordenador las canciones seleccionadas del iPhone.')
+    window.delete_phone=button('Eliminar','trash',window.delete_songs)
+    window.delete_phone.setToolTip('Eliminar de Música las canciones marcadas; pide confirmación.')
     window.library_button=button('','refresh',window.load_library);window.library_button.setToolTip('Volver a leer la biblioteca y comprobar sus archivos')
     window.copy_diagnostic=button('Diagnóstico','copy');window.last_diagnostic='';window.copy_diagnostic.setEnabled(False)
     window.copy_diagnostic.clicked.connect(lambda:QApplication.clipboard().setText(window.last_diagnostic))
     window.inspector_toggle=button('Detalles','library');window.inspector_toggle.setCheckable(True);window.inspector_toggle.setChecked(True)
-    for value in (window.choose,window.import_phone,window.export_phone,window.inspector_toggle,window.library_button,window.copy_diagnostic):toolbar.addWidget(value)
+    for value in (window.choose,window.import_phone,window.export_phone,window.delete_phone,window.inspector_toggle,window.library_button,window.copy_diagnostic):toolbar.addWidget(value)
     layout.addWidget(window.local_tools)
     window.device_status=QLabel('Conecta tu iPhone para mostrar su música.');window.device_status.setObjectName('muted')
     window.device_status.setWordWrap(True);window.device_status.setTextFormat(Qt.TextFormat.PlainText);window.device_status.setMaximumHeight(74);layout.addWidget(window.device_status)
     window.main_splitter=QSplitter(Qt.Orientation.Horizontal)
     center=QWidget();center_layout=QVBoxLayout(center);center_layout.setContentsMargins(0,0,0,0);center_layout.setSpacing(8)
-    window.search=QLineEdit();window.search.setPlaceholderText('Buscar canción, artista o álbum');window.search.setClearButtonEnabled(True);center_layout.addWidget(window.search)
+    window.search=QLineEdit();window.search.setPlaceholderText('Buscar canción, artista, álbum o formato (.m4a, .mp3…)');window.search.setClearButtonEnabled(True);center_layout.addWidget(window.search)
     collection_header=QHBoxLayout();window.library_heading=QLabel('En el iPhone');window.library_heading.setObjectName('section')
     collection_header.addWidget(window.library_heading,1)
-    window.phone_filter=QComboBox();window.phone_filter.addItems(['Descargadas en el iPhone','Exportables por USB']);collection_header.addWidget(window.phone_filter)
+    window.selection_count=QLabel('');window.selection_count.setObjectName('muted');collection_header.addWidget(window.selection_count)
+    window.select_visible=QCheckBox('Seleccionar visibles');window.select_visible.setTristate(True);collection_header.addWidget(window.select_visible)
     center_layout.addLayout(collection_header)
     splitter=QSplitter(Qt.Orientation.Vertical);splitter.splitterMoved.connect(window.schedule_artwork)
     window.library_panel=QFrame();phone_layout=QVBoxLayout(window.library_panel);phone_layout.setContentsMargins(0,0,0,0)
-    window.library_model=LibraryModel(window);window.library_table=QTableView();window.library_table.setModel(window.library_model)
+    window.library_model=LibraryModel(window);window.library_table=QTableView();window.library_table.setModel(window.library_model);window.library_table.setItemDelegateForColumn(0,SelectionDelegate(window.library_table))
     phone_layout.addWidget(window.library_table);splitter.addWidget(window.library_panel)
     window.queue_panel=QFrame();window.queue_panel.setObjectName('queuePanel');queue_layout=QVBoxLayout(window.queue_panel);queue_layout.setContentsMargins(0,8,0,0)
     queue_header=QHBoxLayout();queue_title=QLabel('PARA IMPORTAR');queue_title.setObjectName('section');queue_header.addWidget(queue_title,1)
@@ -87,7 +90,7 @@ def build(window):
     window.now_title=QLabel('Selecciona una canción');window.now_title.setObjectName('inspectorTitle');window.now_title.setWordWrap(True);window.now_title.setTextFormat(Qt.TextFormat.PlainText);inspector_layout.addWidget(window.now_title)
     window.info_artist=QLabel('');window.info_artist.setObjectName('muted');window.info_artist.setWordWrap(True);window.info_artist.setTextFormat(Qt.TextFormat.PlainText);inspector_layout.addWidget(window.info_artist)
     form=QFormLayout();form.setVerticalSpacing(14);window.info_fields={}
-    for key,label in [('album','Álbum'),('format','Formato'),('duration','Duración'),('size','Tamaño'),('availability','Archivo')]:
+    for key,label in [('album','Álbum'),('format','Formato'),('duration','Duración'),('size','Tamaño')]:
         name=QLabel(label);name.setObjectName('muted');value=QLabel('—');value.setWordWrap(True);value.setTextFormat(Qt.TextFormat.PlainText)
         form.addRow(name,value);window.info_fields[key]=value
     inspector_layout.addSpacing(8);inspector_layout.addLayout(form);inspector_layout.addStretch()
@@ -105,13 +108,15 @@ def build(window):
         table.setIconSize(QSize(30,30));table.verticalHeader().setDefaultSectionSize(44);table.setWordWrap(False)
         table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive);table.horizontalHeader().setSectionResizeMode(0,QHeaderView.ResizeMode.Stretch)
         table.horizontalHeader().setSectionsClickable(True);table.setSortingEnabled(True)
-    for section,width in [(1,116),(2,118),(3,100),(4,70),(5,78),(6,112)]:window.library_table.setColumnWidth(section,width)
+    for section,width in [(1,116),(2,118),(3,100),(4,70),(5,78)]:window.library_table.setColumnWidth(section,width)
     for section,width in [(1,110),(2,110),(3,100),(4,70),(5,78)]:window.table.setColumnWidth(section,width)
     window.library_table.sortByColumn(0,Qt.SortOrder.AscendingOrder);window.table.sortItems(0,Qt.SortOrder.AscendingOrder)
     window.library_table.selectionModel().selectionChanged.connect(window.library_selection_changed)
     window.table.itemSelectionChanged.connect(window.local_selection_changed)
     window.library_table.horizontalHeader().sortIndicatorChanged.connect(window.schedule_artwork)
-    window.phone_filter.currentIndexChanged.connect(window.filter_library);window.search.textChanged.connect(window.filter_library)
+    window.search.textChanged.connect(window.filter_library)
+    window.library_model.checkedChanged.connect(window.checks_changed)
+    window.select_visible.clicked.connect(window.library_model.check_visible)
     settings=QWidget();settings_layout=QVBoxLayout(settings);settings_layout.setContentsMargins(30,30,30,30);settings_layout.setSpacing(20)
     settings_title=QLabel('Preferencias');settings_title.setObjectName('title');settings_layout.addWidget(settings_title)
     settings_card=QFrame();settings_card.setObjectName('tableCard');grid=QGridLayout(settings_card);grid.setContentsMargins(20,20,20,20);grid.setSpacing(18)
@@ -124,22 +129,31 @@ def build(window):
     window.reset_font_button=button('Usar fuente nativa','refresh',window.reset_font);grid.addWidget(window.reset_font_button,4,1)
     settings_layout.addWidget(settings_card)
     maintenance=QFrame();maintenance.setObjectName('tableCard');maintenance_layout=QVBoxLayout(maintenance);maintenance_layout.setContentsMargins(20,20,20,20)
-    maintenance_layout.addWidget(QLabel('Transferencias y copia del catálogo'))
-    window.verify_import=QPushButton('Revisar importación pendiente');window.verify_import.setProperty('iconKind','refresh');window.verify_import.clicked.connect(lambda:window.start_transfer('verify',[],window.backup_root))
+    window.advanced=QCheckBox('Mostrar opciones avanzadas de recuperación');settings_layout.addWidget(window.advanced)
+    window.advanced.toggled.connect(maintenance.setVisible);maintenance.hide()
+    maintenance_layout.addWidget(QLabel('Recuperación y registros de transferencias'))
+    explanation=QLabel('No necesitas estas herramientas para importar normalmente. Sirven para comprobar o recuperar un envío interrumpido. La copia del catálogo guarda el estado de la biblioteca; no incluye todos los audios ni es una restauración automática.')
+    explanation.setWordWrap(True);explanation.setObjectName('muted');maintenance_layout.addWidget(explanation)
+    window.verify_import=QPushButton('Revisar operación pendiente');window.verify_import.setProperty('iconKind','refresh');window.verify_import.clicked.connect(lambda:window.start_transfer('verify',[],window.backup_root))
     window.open_backup=QPushButton('Ver respaldo del catálogo');window.open_backup.setProperty('iconKind','folder')
     window.open_backup.clicked.connect(window.open_backup_folder)
+    window.verify_import.setToolTip('Comprueba el resultado de un envío o una eliminación sin reenviar canciones.')
+    window.open_backup.setToolTip('Abre los registros y copias locales del catálogo. No incluye una copia completa de tus audios.')
     maintenance_layout.addWidget(window.verify_import);maintenance_layout.addWidget(window.open_backup);settings_layout.addWidget(maintenance);settings_layout.addStretch()
     window.resume_import=QPushButton('Completar importación pendiente');window.resume_import.setProperty('iconKind','upload')
     window.resume_import.clicked.connect(lambda:window.start_transfer('resume',list(window.tracks.values()),window.backup_root))
-    maintenance_layout.insertWidget(1,window.resume_import)
+    window.resume_import.setToolTip('Intenta terminar la entrega de audio que falta usando el archivo original y el registro guardado.')
+    maintenance_layout.addWidget(window.resume_import)
     window.repair_metadata=QPushButton('Actualizar portadas y fecha');window.repair_metadata.setProperty('iconKind','refresh')
     window.repair_metadata.clicked.connect(lambda:window.start_transfer('repair',list(window.tracks.values()),window.backup_root))
-    maintenance_layout.insertWidget(2,window.repair_metadata)
+    window.repair_metadata.setToolTip('Reenvía portada y fecha de canciones previamente importadas por TUPAQ en este ordenador.')
+    maintenance_layout.addWidget(window.repair_metadata)
     ownership_note=QLabel('Actualizar portadas y fecha se aplica solo a importaciones registradas por TUPAQ en este ordenador.')
     ownership_note.setWordWrap(True);ownership_note.setObjectName('muted');maintenance_layout.addWidget(ownership_note)
     recovery_note=QLabel('Completar usa el archivo original y el registro guardado de la operación. Función experimental: conserva los respaldos.')
     recovery_note.setWordWrap(True);recovery_note.setObjectName('muted');maintenance_layout.addWidget(recovery_note)
-    window.pages.addWidget(settings)
+    settings_scroll=QScrollArea();settings_scroll.setWidgetResizable(True);settings_scroll.setFrameShape(QFrame.Shape.NoFrame)
+    settings_scroll.setWidget(settings);window.pages.addWidget(settings_scroll)
     window.navigation.idClicked.connect(window.navigate)
     window.nav_buttons[0].setChecked(True)
     window.setWindowIcon(music_icon())
@@ -155,6 +169,8 @@ def apply_theme(window):
     palette=QPalette()
     for role,key in [(QPalette.ColorRole.Window,'bg'),(QPalette.ColorRole.WindowText,'text'),(QPalette.ColorRole.Base,'bg'),
                      (QPalette.ColorRole.Text,'text'),(QPalette.ColorRole.Button,'button'),(QPalette.ColorRole.ButtonText,'text'),
+                     (QPalette.ColorRole.Mid,'muted'),(QPalette.ColorRole.Dark,'muted'),
+                     (QPalette.ColorRole.Shadow,'border'),(QPalette.ColorRole.Light,'hover'),
                      (QPalette.ColorRole.Highlight,'selected'),(QPalette.ColorRole.HighlightedText,'text')]:palette.setColor(role,QColor(c[key]))
     window.setPalette(palette)
     window.setStyleSheet(f'''

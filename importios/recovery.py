@@ -97,6 +97,7 @@ async def resume_pending(root, selected, progress):
     from pymobiledevice3.services.afc import AFC_LOCK_EX, AFC_LOCK_UN
     root = Path(root)
     journal,receipt = pending_receipt(root)
+    require(receipt.get('operation')!='delete','delete-recovery-readonly')
     require(receipt.get('operation')!='metadata-update','recovery-metadata-only')
     directory,entries = journal.parent,receipt['entries']
     require(receipt.get('import_phase',receipt['phase']) in ('metadata-announced','verifying'), 'recovery-phase')

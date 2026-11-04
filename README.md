@@ -7,13 +7,14 @@ El objetivo es importar música local a la app Música del iPhone sin usar la
 aplicación iTunes ni 3uTools.
 
 El usuario confirmó la lectura y la importación con metadatos y portada en Música del iPhone.
-La **0.3.0-preview.7** adopta una interfaz compacta inspirada en Peel: barra lateral,
-búsqueda, biblioteca y cola central, con inspector de canción a la derecha.
-Mantiene solo Biblioteca y Preferencias, con importar y exportar en la misma página.
-Comprueba las carpetas USB para ocultar referencias a audios eliminados, recupera
-la duración desde las cabeceras y revisa automáticamente operaciones pendientes
-antes de un nuevo envío. Los cambios de esta versión se validan con simulación;
-la lectura y las transferencias todavía necesitan tu prueba en el iPhone real.
+La **0.3.0-preview.8** añade casillas para marcar canciones y seleccionar las visibles,
+búsqueda por formato (.m4a, .mp3, wav, alac…) y eliminación nativa con confirmación.
+Biblioteca muestra las canciones disponibles sin selector de acceso ni columna USB.
+Corrige import:artwork-cache-token: conserva las referencias existentes de portada,
+incluidas las opacas, y reserva los identificadores numéricos sin reutilizarlos.
+Las herramientas de recuperación quedan en Preferencias, ocultas hasta desplegar
+las opciones avanzadas. Los cambios pasan simulación y necesitan prueba física,
+especialmente la eliminación de canciones.
 Véase [cómo transferir y recuperar](docs/TRANSFERENCIAS.md).
 
 **Fuente de Apple:** macOS usa San Francisco mediante la fuente nativa del sistema.
@@ -48,9 +49,12 @@ notarización de Apple.
 
 - Interfaz nativa inspirada en Apple: barra lateral, tipografía del sistema y apariencia Sistema/Claro/Oscuro en Preferencias. Sin motor web ni animaciones.
 - Detección USB automática cada cinco segundos cuando la conexión está libre. Lee la biblioteca al conectar el teléfono y al reconectarlo; no vuelve a copiar el catálogo en cada sondeo. Se puede desactivar en Preferencias. Nunca importa automáticamente.
-- Tabla de biblioteca con celdas dibujadas bajo demanda. Cabeceras clicables para ordenar por canción, artista, álbum, formato, duración, tamaño y acceso USB. Duración y tamaño se ordenan numéricamente conservando la selección por canción.
+- Casillas persistentes por canción al ordenar o buscar, selección de visibles y contador de marcadas. Exportar y Eliminar usan las casillas; hacer clic en una fila abre sus detalles.
+- Tabla de biblioteca con celdas dibujadas bajo demanda. Cabeceras clicables para ordenar por canción, artista, álbum, formato, duración, tamaño. Duración y tamaño se ordenan numéricamente conservando la selección por canción.
 - Dos secciones en la misma página: canciones del iPhone y cola del ordenador. Importar y exportar están juntos.
 - Descargadas por defecto: usa estado local y el indicador de descarga protegida de suscripción; nube y pendientes no se presentan como canciones descargadas; las rutas ausentes se ocultan tras comprobar su carpeta USB. No fusiona por título: solo evita contar dos referencias al mismo archivo físico.
+- Buscar por canción, artista, álbum y formato/codec, con o sin punto en la extensión.
+- Eliminar: hasta 100 canciones marcadas por operación, con confirmación y vinculación al dispositivo, biblioteca e IDs leídos. Usa delete_track nativo; comprueba la desaparición de los objetivos y la conservación de IDs y metadatos de las demás canciones. No borra archivos por AFC; iOS gestiona la limpieza del audio. Función nueva pendiente de validación física.
 - Formato y tamaño: catálogo como lectura inicial, verificación de cabeceras y stat por USB para filas visibles. Se muestra — cuando no hay información; no se descarga cada audio completo para mostrarlo.
 - Errores de conexión por etapa y botón **Copiar diagnóstico**, también cuando la consulta devuelve cero resultados. Incluye versión, recuentos por tipo y presencia/tamaño del WAL, sin títulos ni credenciales ni identificadores del dispositivo.
 - Las canciones sin fila de metadatos complementarios se muestran como «Sin título» en lugar de descartarse.
@@ -132,7 +136,7 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m importios.native --smoke-fixtures 
 .venv/bin/python scripts/build_desktop.py
 ```
 
-La suite contiene 108 pruebas de formatos, HTTP local, descubrimiento USB simulado,
+La suite contiene 122 pruebas de formatos, HTTP local, descubrimiento USB simulado,
 paquetes de investigación, firmas candidatas, conexión automática y portadas remotas. La prueba nativa comprueba una
 ventana Qt real, lectura en un hilo de trabajo, los AAC/ALAC dentro de M4A, portadas, duplicados,
 archivos dañados, CSV, quitar/vaciar y las firmas. En Linux se ha probado también

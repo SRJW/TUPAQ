@@ -20,6 +20,7 @@ async def repair_imported(root, selected, progress):
     root=Path(root);records=[]
     for journal in sorted(root.glob('*/journal.json'),reverse=True):
         record=json.loads(journal.read_text(encoding='utf-8'))
+        if record.get('operation')=='delete':continue
         if record.get('phase') in ('completed','observed-present'):records.append((journal.parent,record))
     require(bool(records) or any(root.glob('*/journal.json')),'metadata-no-owned-tracks')
     requested={track['id'] for track in selected}
@@ -39,6 +40,7 @@ async def repair_imported(root, selected, progress):
                 records=[]
                 for journal in sorted(root.glob('*/journal.json'),reverse=True):
                     record=json.loads(journal.read_text(encoding='utf-8'))
+                    if record.get('operation')=='delete':continue
                     if record.get('phase') in ('completed','observed-present'):records.append((journal.parent,record))
                 entries=[];seen=set()
                 for saved,record in records:
@@ -62,8 +64,8 @@ async def repair_imported(root, selected, progress):
                     require(local_hash(entry['source']['path'])==entry['source']['id'],'source-changed-before-upload')
                     if picture:
                         require(before['artwork_known'],'artwork-catalogue-schema')
-                        cache=max(reserved|{99})+1;require(cache<=0xffffffff,'artwork-cache-range')
-                        reserved.add(cache);picture['cache_id']=cache;entry['artwork']=picture
+                        from .sync.artwork import allocate_cache_id
+                        picture['cache_id']=allocate_cache_id(reserved);entry['artwork']=picture
                 receipt.update(entries=entries,anchor=before['anchor'],database=before['database'],primary=before['primary'])
                 save_receipt(directory,receipt)
                 operations=[{'operation':'update_db_info','pid':before['database'],'db_info':{'primary_container_pid':before['primary']}}]

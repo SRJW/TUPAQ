@@ -232,9 +232,9 @@ class Window(QMainWindow):
         self.device_button.setEnabled(not phone_busy)
         self.library_button.setEnabled(not phone_busy)
         self.import_phone.setEnabled(not phone_busy and bool(self.tracks))
-        rows = self.library_table.selectionModel().selectedRows()
-        self.export_phone.setEnabled(not phone_busy and bool(rows)
-            and all(self.library_model.tracks[r.row()].get('afc_path') for r in rows))
+        selected=self.marked_tracks()
+        self.export_phone.setEnabled(not phone_busy and bool(selected) and all(t.get('afc_path') for t in selected))
+        self.delete_phone.setEnabled(not phone_busy and bool(selected))
         self.verify_import.setEnabled(not phone_busy and self.backup_root.exists())
         self.resume_import.setEnabled(not phone_busy and self.backup_root.exists())
         self.repair_metadata.setEnabled(not phone_busy and self.backup_root.exists())
@@ -260,16 +260,19 @@ class Window(QMainWindow):
             self.thumbnail_worker.stop()
         local = local_tracks(self.phone_tracks)
         known = any('is_local' in track for track in self.phone_tracks)
-        displayed = local if self.phone_filter.currentIndex()==0 else [track for track in local if track.get('usb_exists') is True]
+        displayed=local
         text=self.search.text().strip().casefold()
-        if text:displayed=[track for track in displayed if text in ' '.join(str(track.get(key,'')) for key in ('title','artist','album')).casefold()]
+        if text:
+            from .search import matches
+            displayed=[track for track in displayed if matches(track,text)]
         self.library_model.replace(displayed)
-        title = 'En el iPhone' if self.phone_filter.currentIndex() == 0 else 'Exportables por USB'
+        title = 'En el iPhone'
         self.library_heading.setText(f'{title} · {len(displayed)}')
         if self.worker is None and self.transfer_worker is None:
-            self.status.setText(f"{len(local)} {'descargadas' if known else 'con ruta USB'} · {len(self.tracks)} para importar")
+            self.status.setText(f"{len(local)} {'canciones' if known else 'canciones disponibles'} · {len(self.tracks)} para importar")
         if not self.library_table.selectionModel().selectedRows() and not self.table.selectionModel().selectedRows() and self.transfer_worker is None:self.clear_inspector()
         self.update_library_summary()
+        self.checks_changed()
         self.update_buttons()
         self.schedule_artwork()
 
@@ -277,8 +280,7 @@ class Window(QMainWindow):
         from .library_fields import local_tracks
         local=local_tracks(self.phone_tracks)
         missing=sum(track.get('usb_exists') is False for track in self.phone_tracks)
-        text=f'{len(local)} canciones descargadas'
-        if missing:text+=f' · {missing} referencias sin archivo ocultas'
+        text=f'{len(local)} canciones en el iPhone'
         self.device_status.setText(text if self.phone_tracks else 'Conecta tu iPhone para mostrar su música.')
 
     def change_theme(self, *ignored):
@@ -321,6 +323,7 @@ class Window(QMainWindow):
             self.library_ready = False
             self.library_epoch += 1
             self.phone_tracks = []
+            self.library_model.checked.clear()
             self.filter_library()
             self.artwork_attempted.clear()
             self.device_name.setText('iPhone')
@@ -335,6 +338,7 @@ class Window(QMainWindow):
             self.retry_library_at = 0
             self.library_epoch += 1
             self.phone_tracks = []
+            self.library_model.checked.clear()
             self.filter_library()
             self.artwork_attempted.clear()
         self.connection_badge.setText('● Conectado por USB')
@@ -346,6 +350,7 @@ class Window(QMainWindow):
         self.library_ready = False
         self.library_epoch += 1
         self.phone_tracks = []
+        self.library_model.checked.clear()
         self.filter_library()
         self.artwork_attempted.clear()
         self.connection_badge.setText('○ Servicio USB no disponible')
@@ -419,7 +424,8 @@ class Window(QMainWindow):
         values={'album':track.get('album') or 'Sin álbum','format':fmt or '—','duration':duration_label(track.get('duration')),
                 'size':byte_label(track.get('size')),'availability':'Original del ordenador' if track.get('path') else
                 'Disponible por USB' if track.get('afc_path') and track.get('usb_exists') is not False else 'Sin acceso USB'}
-        for key,value in values.items():self.info_fields[key].setText(value)
+        for key,value in values.items():
+            if key in self.info_fields:self.info_fields[key].setText(value)
         image=QPixmap()
         if track.get('thumbnail'):image.loadFromData(track['thumbnail'])
         icon=self.library_model.icons.get(track.get('id'),self.default_music_icon)
@@ -458,8 +464,34 @@ class Window(QMainWindow):
         identifiers = [self.table.item(r.row(),0).data(Qt.ItemDataRole.UserRole) for r in rows] if rows else list(self.tracks)
         self.start_transfer('import',[dict(self.tracks[i]) for i in identifiers],self.backup_root)
 
+    def marked_tracks(self):
+        from .library_fields import local_tracks
+        return [dict(track) for track in local_tracks(self.phone_tracks) if track['id'] in self.library_model.checked]
+
+    def checks_changed(self):
+        count=len(self.marked_tracks());self.selection_count.setText(f'{count} seleccionadas' if count else '')
+        visible={track['id'] for track in self.library_model.tracks};checked=visible & self.library_model.checked
+        self.select_visible.blockSignals(True)
+        self.select_visible.setCheckState(Qt.CheckState.Checked if visible and checked==visible else Qt.CheckState.PartiallyChecked if checked else Qt.CheckState.Unchecked)
+        self.select_visible.blockSignals(False);self.update_buttons()
+
+    def delete_songs(self):
+        selected=self.marked_tracks()
+        if not selected:return
+        if len(selected)>100:
+            QMessageBox.information(self,'Eliminar canciones','Puedes eliminar hasta 100 canciones por operación.');return
+        dialog=QMessageBox(self);dialog.setWindowTitle('Eliminar del iPhone')
+        dialog.setTextFormat(Qt.TextFormat.PlainText)
+        dialog.setText(f"¿Eliminar {len(selected)} canciones de la biblioteca de Música del iPhone?")
+        dialog.setInformativeText('Esta acción elimina las canciones del iPhone. Conserva los audios que quieras guardar en el ordenador. La copia del catálogo no permite recuperar por sí sola los audios.\n\n'+'\n'.join(t['title'] for t in selected[:5]))
+        dialog.setStandardButtons(QMessageBox.StandardButton.Cancel|QMessageBox.StandardButton.Yes)
+        dialog.setDetailedText('\n'.join(f"{t['title']} — {t.get('artist','Sin artista')}" for t in selected))
+        dialog.button(QMessageBox.StandardButton.Cancel).setText('Cancelar')
+        dialog.setDefaultButton(QMessageBox.StandardButton.Cancel);dialog.button(QMessageBox.StandardButton.Yes).setText('Eliminar canciones')
+        if dialog.exec()==QMessageBox.StandardButton.Yes:self.start_transfer('delete',selected,self.backup_root)
+
     def export_songs(self):
-        selected = [dict(self.library_model.tracks[r.row()]) for r in self.library_table.selectionModel().selectedRows()]
+        selected=self.marked_tracks()
         if not selected:
             return
         folder = QFileDialog.getExistingDirectory(self,'Guardar audio del iPhone en…')
@@ -510,10 +542,13 @@ class Window(QMainWindow):
 
     def transfer_result(self, result):
         self.transfer_outcome = result
-        if 'exported' in result:
+        if 'deleted' in result:
+            self.status.setText(f"{result['deleted']} canciones eliminadas de la biblioteca.")
+            self.library_model.checked.difference_update(result.get('item_ids',[]))
+        elif 'exported' in result:
             self.status.setText(f"{result['exported']} archivos exportados y comprobados.")
         elif 'reconciled' in result and 'imported' not in result:
-            self.status.setText(f"{result.get('verified',0)} audios comprobados · {result.get('metadata_unverified',0)} con metadatos por revisar · {result.get('retired',0)} retirados por el iPhone")
+            self.status.setText(f"{result.get('verified',0)} audios comprobados · {result.get('metadata_unverified',0)} con metadatos por revisar · {result.get('retired',0)} retirados por el iPhone · {result.get('removed',0)} eliminaciones comprobadas")
         elif 'updated' in result:
             self.status.setText(f"{result['updated']} canciones actualizadas · {result['covers']} portadas comprobadas.")
         else:
@@ -534,7 +569,7 @@ class Window(QMainWindow):
                     self.tracks.pop(identifier,None)
                     self.table.removeRow(row)
         self.update_buttons()
-        if self.transfer_outcome and any(key in self.transfer_outcome for key in ('imported','verified','updated')):
+        if self.transfer_outcome and any(key in self.transfer_outcome for key in ('imported','verified','updated','deleted')):
             self.load_library()
 
     def choose_files(self):
@@ -591,6 +626,8 @@ class Window(QMainWindow):
 
     def show_library(self, tracks, diagnostic=''):
         self.phone_tracks = tracks
+        from .library_fields import local_tracks
+        self.library_model.checked.intersection_update(t['id'] for t in local_tracks(tracks))
         self.filter_library()
         self.last_diagnostic = diagnostic or format_diagnostics({'tracks_returned': len(tracks)})
         self.copy_diagnostic.setEnabled(True)
@@ -822,7 +859,6 @@ def smoke(app, window, fixtures, output=None):
         assert not window.tracks and window.table.rowCount() == 0
         assert not window.export.isEnabled()
         assert all(path.exists() for path in files)
-        window.phone_filter.setCurrentIndex(0)
         window.show_library([{'is_local':True,'id': 'test', 'title': 'Canción sintética', 'artist': 'Prueba', 'album': 'Prueba', 'duration': 1}])
         assert window.library_model.rowCount() == 1
         assert window.library_model.data(window.library_model.index(0, 0)) == 'Canción sintética'
@@ -879,6 +915,7 @@ def smoke(app, window, fixtures, output=None):
                              'duration':1,'afc_path':'iTunes_Control/Music/F00/AAAA.m4a'}])
         window.navigate(0)
         window.library_table.selectRow(0)
+        window.library_model.setData(window.library_model.index(0,0),Qt.CheckState.Checked,Qt.ItemDataRole.CheckStateRole)
         assert window.export_phone.isEnabled()
         original_transfer = globals()['run_transfer']
         original_backup = window.backup_root

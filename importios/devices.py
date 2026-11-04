@@ -5,9 +5,17 @@ Windows needs Apple's device service/driver, macOS uses its built-in usbmuxd.
 """
 import plistlib
 import hashlib
+import secrets
 import socket
 import struct
 import sys
+
+SESSION_NONCE=secrets.token_bytes(32)
+
+def device_token(serial):
+    # In-memory binding only: changes every app launch, never written to journals.
+    return hashlib.sha256(SESSION_NONCE+str(serial).encode('utf-8')).hexdigest()
+
 
 HEADER = struct.Struct('<IIII')
 MAX_REPLY = 1024 * 1024

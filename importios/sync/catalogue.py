@@ -7,6 +7,13 @@ from ..library import read_catalogue
 from .protocol import require
 
 
+def cache_id(token):
+    if type(token) is int:value=token
+    elif isinstance(token,str) and token.isascii() and token.isdigit() and len(token)<=20:value=int(token)
+    else:return None
+    return value if 0<=value<=0xffffffff else None
+
+
 def snapshot(path):
     tracks = read_catalogue(path)
     with closing(sqlite3.connect(Path(path).resolve().as_uri()+'?mode=ro',uri=True)) as db:
@@ -45,6 +52,7 @@ def snapshot(path):
         item_columns = {row[1] for row in db.execute('PRAGMA table_info(item)')}
         states = {}
         artwork_ids = set()
+        artwork_tokens=set()
         artwork_tracks = {}
         artwork_known = True
         for table in ('artwork','artwork_token'):
@@ -53,14 +61,16 @@ def snapshot(path):
                 artwork_known = False
                 continue
             for token, in db.execute(f'SELECT artwork_token FROM {table} WHERE artwork_source_type=300'):
-                require(isinstance(token,str) and token.isascii() and token.isdigit() and
-                        100<=int(token)<=0xffffffff and str(int(token))==token, 'artwork-cache-token')
-                artwork_ids.add(int(token))
+                # Existing references can be opaque, NULL, INTEGER or decimal TEXT.
+                # Keep them unchanged; reserve every representable numeric alias.
+                artwork_tokens.add((type(token).__name__,token))
+                identifier=cache_id(token)
+                if identifier is not None:artwork_ids.add(identifier)
         if artwork_known:
             item_to_wire = {item:wire for wire,item in wire_to_item.items()}
             for pid,token in db.execute('SELECT entity_pid,artwork_token FROM artwork_token WHERE artwork_source_type=300 AND entity_type=0'):
                 wire = item_to_wire.get(str(pid))
-                if wire is not None:artwork_tracks[wire]=int(token)
+                if wire is not None and cache_id(token) is not None:artwork_tracks[wire]=cache_id(token)
         dates_known = 'date_added' in item_columns
         dates = {str(pid):value for pid,value in db.execute('SELECT item_pid,date_added FROM item')} if dates_known else {}
         if {'item_pid','is_placeholder','is_library_added','has_non_purgeable_asset','is_supported_type'} <= state_columns and 'remote_location_id' in item_columns:
@@ -70,7 +80,7 @@ def snapshot(path):
     return {'database':database,'primary':primary,'anchor':anchor,'ids':ids,'originals':originals,
             'wire_to_item':wire_to_item,'tracks':{t['id']:t for t in tracks},'artists':artist_groups,'albums':albums,
             'groups':groups,'states':states,'artwork_ids':artwork_ids,'artwork_known':artwork_known,
-            'artwork_tracks':artwork_tracks,'dates':dates,'dates_known':dates_known}
+            'artwork_tokens':artwork_tokens,'artwork_tracks':artwork_tracks,'dates':dates,'dates_known':dates_known}
 
 
 def verify_originals(before, after):

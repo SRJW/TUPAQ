@@ -52,3 +52,12 @@ async def verify(afc,after,entries):
             except Exception:
                 continue
         require(matched,'verify-artwork-original')
+
+
+def allocate_cache_id(reserved):
+    candidate=max(reserved|{99})+1
+    if candidate>0xffffffff:
+        candidate=next((value for value in range(100,100+len(reserved)+1) if value not in reserved),None)
+    require(candidate is not None and candidate<=0xffffffff,'artwork-cache-range')
+    reserved.add(candidate)
+    return candidate
