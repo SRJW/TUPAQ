@@ -1,6 +1,6 @@
 """Small painted native icons; no web view, animation or external icon font."""
 from PySide6.QtCore import Qt, QRectF, QPointF
-from PySide6.QtGui import QColor, QIcon, QPixmap, QPainter, QPen, QLinearGradient, QFont
+from PySide6.QtGui import QColor, QIcon, QPixmap, QPainter, QPen, QLinearGradient, QFont, QPainterPath
 
 
 def music_icon(size=64):
@@ -65,3 +65,12 @@ def line_icon(kind, color='#52576d', size=22):
         p.drawText(QRectF(0,0,24,24),Qt.AlignmentFlag.AlignCenter,'♪')
     p.end()
     return QIcon(image)
+
+
+def rounded_cover(source,size=120):
+    output=QPixmap(size*2,size*2);output.setDevicePixelRatio(2);output.fill(Qt.GlobalColor.transparent)
+    painter=QPainter(output);painter.setRenderHint(QPainter.RenderHint.Antialiasing);painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+    clip=QPainterPath();clip.addRoundedRect(QRectF(0,0,size,size),14,14);painter.setClipPath(clip)
+    edge=min(source.width(),source.height())
+    painter.drawPixmap(QRectF(0,0,size,size),source,QRectF((source.width()-edge)/2,(source.height()-edge)/2,edge,edge))
+    painter.end();return output

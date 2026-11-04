@@ -63,10 +63,20 @@ class LibraryModel(QAbstractTableModel):
         super().__init__(parent)
         self.tracks=[];self.icons=OrderedDict();self.default_icon=None
         self.sort_column=0;self.sort_order=Qt.SortOrder.AscendingOrder
-        self.rows={};self.checked=set()
+        self.rows={};self.checked=set();self.icon_keys={}
 
-    def replace(self,tracks):
-        self.beginResetModel();self.tracks=tracks;self.icons.clear();self.endResetModel()
+    @staticmethod
+    def cover_key(track):
+        return (track.get('afc_path'),tuple(track.get('artwork_paths') or []),track.get('album'),track.get('title'))
+
+    def replace(self,tracks,preserve_icons=False):
+        if not preserve_icons:self.icons.clear();self.icon_keys.clear()
+        else:
+            for track in tracks:
+                identifier=track.get('id')
+                if identifier in self.icons and self.icon_keys.get(identifier)!=self.cover_key(track):
+                    self.icons.pop(identifier,None);self.icon_keys.pop(identifier,None)
+        self.beginResetModel();self.tracks=tracks;self.endResetModel()
         self.sort(self.sort_column,self.sort_order)
 
     def sort(self,column,order=Qt.SortOrder.AscendingOrder):
@@ -111,9 +121,11 @@ class LibraryModel(QAbstractTableModel):
         self.checkedChanged.emit()
 
     def set_icon(self,identifier,icon):
+        row=self.rows.get(identifier)
+        if row is not None:self.icon_keys[identifier]=self.cover_key(self.tracks[row])
         self.icons[identifier]=icon;self.icons.move_to_end(identifier)
         while len(self.icons)>256:
-            old,_=self.icons.popitem(last=False);self._changed(old,0,0)
+            old,_=self.icons.popitem(last=False);self.icon_keys.pop(old,None);self._changed(old,0,0)
         self._changed(identifier,0,0)
 
     def set_details(self,identifier,details):
@@ -141,6 +153,7 @@ class LibraryModel(QAbstractTableModel):
         track=self.tracks[index.row()];column=index.column()
         if column==0 and role==Qt.ItemDataRole.CheckStateRole:return Qt.CheckState.Checked if track['id'] in self.checked else Qt.CheckState.Unchecked
         if column==0 and role==Qt.ItemDataRole.DecorationRole:return self.icons.get(track.get('id'),self.default_icon)
+        if role==Qt.ItemDataRole.ToolTipRole and column<3:return track[('title','artist','album')[column]]
         if role==Qt.ItemDataRole.ToolTipRole and column in (3,5):
             origin=track.get('format_source' if column==3 else 'size_source')
             return 'Comprobado por USB' if origin in ('header','usb') else 'Dato del catálogo; se comprobará al mostrar la fila' if origin else 'No hay información suficiente para determinarlo'

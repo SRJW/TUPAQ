@@ -107,7 +107,7 @@ catálogo puede dejar una operación pendiente. No se reintenta automáticamente
 
 ## Validación disponible
 
-Las 122 pruebas incluyen replay de importación de los cinco perfiles base,
+Las 130 pruebas incluyen replay de importación de los cinco perfiles base,
 originales conservados, exportación byte por byte, nombres existentes,
 rechazo por cambio de ancla, identidad sin configurar, manifest desconocido,
 audio permanente alterado, interrupción después de aplicar cambios, verificación
@@ -389,3 +389,27 @@ reservan sus IDs, incluidos cero y alias con ceros iniciales. Se preserva una
 huella tipada de todos los tokens durante la comprobación previa a escribir.
 La asignación usa un ID libre y busca huecos si el máximo de 32 bits ya está
 ocupado. Las portadas nuevas siguen requiriendo registro y bytes SHA-256 correctos.
+
+
+## Actualización visual y tipografía (preview.9)
+
+Al releer el catálogo, las filas anteriores siguen visibles con el aviso
+Actualizando biblioteca. Se muestra el resultado completo cuando termina la lectura,
+conservando las marcas, la canción seleccionada y la primera fila visible cuando
+siguen existiendo. Las carátulas se reutilizan dentro del límite de 256 iconos; se
+invalidan si cambian su referencia, ruta o metadatos relacionados. Una lectura fallida
+conserva la vista anterior y el diagnóstico. Desconectar el teléfono sigue limpiando
+la lista. El mensaje de una importación completada permanece en la barra inferior.
+
+El diseño usa paneles y gradientes estáticos inspirados en Apple Music. El resumen
+con portada se sitúa sobre la biblioteca; Detalles permite ocultarlo. La tabla
+continúa siendo virtual y las portadas se leen solo para las filas visibles.
+Mantiene Qt nativo y fondos estáticos para limitar el trabajo de repintado.
+
+En Windows se puede elegir una familia instalada o un archivo TTF/OTF/TTC/OTC de
+hasta 128 MiB. La muestra es una previsualización; **Aplicar** confirma el cambio
+en todos los widgets, incluidos botones y cabeceras. Cargar un archivo inválido
+conserva la fuente actual. La elección se guarda únicamente tras aplicar y el
+archivo elegido debe seguir disponible en aperturas posteriores. Las fuentes
+propias no se copian a los paquetes distribuidos. En macOS se ignoran elecciones
+personalizadas anteriores y se usa siempre la fuente nativa del sistema.

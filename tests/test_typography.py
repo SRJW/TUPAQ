@@ -8,7 +8,7 @@ from importios.typography import configure
 class TypographyTests(unittest.TestCase):
     def test_native_font_status_matches_actual_resolution(self):
         status=configure(APP);actual=QFontInfo(APP.font()).family()
-        if not APP.typography_is_apple:self.assertIn(actual,status);self.assertIn('no está disponible',status)
+        if not APP.typography_is_apple:self.assertIn(actual,status);self.assertIn('fuente del sistema',status)
         self.assertEqual(APP.font().pixelSize(),13)
 
     def test_reset_removes_previous_application_font(self):
@@ -25,5 +25,18 @@ class TypographyTests(unittest.TestCase):
             resolved.return_value.family.return_value='Helvetica'
             status=configure(APP)
             self.assertFalse(APP.typography_is_apple)
-            self.assertIn('no está disponible',status)
+            self.assertIn('Helvetica',status);self.assertFalse(status.startswith('San Francisco'))
         configure(APP)
+
+    def test_mac_ignores_saved_custom_file_and_family(self):
+        with patch('importios.typography.sys.platform','darwin'),patch('importios.typography.QFontDatabase.addApplicationFont') as load:
+            configure(APP,'missing-font.ttf','unavailable custom family')
+            load.assert_not_called();self.assertIsNone(APP.typography_font_path)
+        configure(APP)
+
+    def test_invalid_file_does_not_remove_existing_font_or_change_application(self):
+        original=APP.font();APP.typography_font_id=777
+        with patch('importios.typography.sys.platform','win32'),patch('importios.typography.QFontDatabase.removeApplicationFont') as remove:
+            with self.assertRaises(ValueError):configure(APP,'/missing/font.otf')
+            remove.assert_not_called();self.assertEqual(APP.font(),original)
+        APP.typography_font_id=None;configure(APP)

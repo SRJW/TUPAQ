@@ -7,24 +7,24 @@ El objetivo es importar música local a la app Música del iPhone sin usar la
 aplicación iTunes ni 3uTools.
 
 El usuario confirmó la lectura y la importación con metadatos y portada en Música del iPhone.
-La **0.3.0-preview.8** añade casillas para marcar canciones y seleccionar las visibles,
-búsqueda por formato (.m4a, .mp3, wav, alac…) y eliminación nativa con confirmación.
-Biblioteca muestra las canciones disponibles sin selector de acceso ni columna USB.
-Corrige import:artwork-cache-token: conserva las referencias existentes de portada,
-incluidas las opacas, y reserva los identificadores numéricos sin reutilizarlos.
-Las herramientas de recuperación quedan en Preferencias, ocultas hasta desplegar
-las opciones avanzadas. Los cambios pasan simulación y necesitan prueba física,
-especialmente la eliminación de canciones.
+La **0.3.0-preview.9** conserva la biblioteca visible mientras se actualiza después
+de una importación, incluidas selección, marcas, posición de lectura y carátulas.
+Si falla la lectura, mantiene la última vista válida e indica que no está actualizada.
+El diseño se acerca a Apple Music: portada y detalles sobre la tabla, paneles suaves,
+acento rosa y barra de estado de transferencias. Utiliza fondos estáticos sin desenfoque
+continuo ni animaciones. Las operaciones de música mantienen sus comprobaciones anteriores.
+Windows permite elegir cualquier familia instalada o cargar una fuente de archivo,
+ver una muestra y pulsar **Aplicar** para cambiar toda la interfaz. En Mac se usa
+siempre la fuente del sistema. Hay [propuestas concretas para continuar](docs/MEJORAS-PROPUESTAS.md).
 Véase [cómo transferir y recuperar](docs/TRANSFERENCIAS.md).
 
-**Fuente de Apple:** macOS usa San Francisco mediante la fuente nativa del sistema.
-Preferencias muestra la familia realmente resuelta. Windows usa San Francisco
-si está disponible; en caso contrario identifica explícitamente la fuente alternativa.
-Se puede cargar un archivo de fuente autorizado en Preferencias, pero TUPAQ
-no incluye archivos SF Pro: su licencia estándar prohíbe incrustarlos en programas
-y restringe su uso fuera de las plataformas de Apple. Descargar o instalar una fuente
-no concede por sí solo derechos adicionales. Las capturas siguientes se generan
-en Linux con la fuente alternativa, no con San Francisco.
+**Tipografía:** en Windows, Preferencias permite seleccionar familias instaladas y
+archivos TTF, OTF, TTC u OTC de hasta 128 MiB. Elegir una fuente no cambia la interfaz
+hasta pulsar Aplicar. Fuente del sistema también requiere Aplicar; la elección se
+conserva entre aperturas. El archivo de una fuente cargada debe seguir disponible.
+En macOS se utiliza la fuente nativa y no se ofrecen controles para sustituirla.
+No se redistribuyen archivos de fuentes de Apple. Las capturas se generan en Linux
+con su fuente disponible, no con San Francisco.
 [Información de Apple sobre sus fuentes](https://developer.apple.com/fonts/).
 
 ![TUPAQ en modo claro, con audio sintético de prueba](docs/interfaz-nativa.png)
@@ -136,7 +136,7 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m importios.native --smoke-fixtures 
 .venv/bin/python scripts/build_desktop.py
 ```
 
-La suite contiene 122 pruebas de formatos, HTTP local, descubrimiento USB simulado,
+La suite contiene 130 pruebas de formatos, HTTP local, descubrimiento USB simulado,
 paquetes de investigación, firmas candidatas, conexión automática y portadas remotas. La prueba nativa comprueba una
 ventana Qt real, lectura en un hilo de trabajo, los AAC/ALAC dentro de M4A, portadas, duplicados,
 archivos dañados, CSV, quitar/vaciar y las firmas. En Linux se ha probado también

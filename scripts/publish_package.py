@@ -16,19 +16,18 @@ def main():
     if subprocess.run(view, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         with tempfile.TemporaryDirectory() as directory:
             notes = Path(directory)/'notes.md'
-            notes.write_text('''TUPAQ 0.3.0-preview.8: casillas, búsqueda por formato y eliminación confirmada.
+            notes.write_text('''TUPAQ 0.3.0-preview.9: biblioteca estable, tipografía global y estilo Apple Music.
 
-- Corrección de import:artwork-cache-token: conserva referencias opacas/nulas de portadas y reserva los IDs numéricos, sin bloquear por formatos existentes ajenos ni reutilizar los identificadores ocupados.
-- Casillas para marcar canciones, selección de visibles y contador. Las marcas se conservan al ordenar o buscar y se limpian al cambiar de dispositivo.
-- Búsqueda por formato/códec: .m4a, .mp3, wav, aiff, alac… combinables con canción, artista y álbum.
-- Biblioteca simplificada: sin selector Descargadas/Exportables ni columna Archivo por USB.
-- Eliminar hasta 100 canciones marcadas, con confirmación y comprobación de dispositivo, biblioteca, IDs y metadatos. Usa delete_track nativo; no borra archivos de audio por AFC. Comprueba los objetivos y las canciones restantes. Función nueva pendiente de prueba física.
-- Opciones avanzadas de recuperación ocultas por defecto y explicadas. La copia del catálogo no incluye todos los audios ni permite una restauración automática.
-- 122 pruebas, incluidos tokens heterogéneos, casillas, formatos, cancelación, selección obsoleta, dispositivo distinto, eliminación, daño colateral y confirmación perdida.
+- Sin vaciar la biblioteca mientras se actualiza después de importar. Conserva selección, casillas, posición de lectura y carátulas válidas. Ante un error mantiene la vista anterior con aviso.
+- Diseño inspirado en Apple Music: portada y resumen sobre la lista, paneles suaves, acento rosa y barra inferior de transferencias. Fondos estáticos, sin motor web ni desenfoque continuo.
+- Windows: elegir una fuente instalada o archivo TTF/OTF/TTC/OTC, ver una muestra y pulsar Aplicar. El cambio alcanza toda la interfaz, incluidas cabeceras y botones. Guardado solo al aplicar; un archivo inválido conserva la fuente anterior.
+- Mac: siempre fuente del sistema, sin personalización de familia.
+- 130 pruebas y comprobación de la aplicación empaquetada. Pruebas de actualización lenta/fallida, posición de lectura, selección, caché y aplicación global de fuentes.
+- Propuestas futuras documentadas: cola persistente e historial, vistas Álbumes/Recientes y avisos de posibles duplicados.
 
-El usuario confirmó la importación con metadatos y portada en versiones anteriores. Esta revisión se valida con bibliotecas simuladas y la interfaz empaquetada; aún necesita prueba con el iPhone. No se envía Reset ni se escribe SQLite remoto. Conserva una copia de los audios que quieras guardar antes de eliminarlos.
+El usuario confirmó que la preview.8 funciona con su iPhone. Esta revisión modifica la presentación y tipografía; los cambios visuales se validan en simulación y necesitan su comprobación con el dispositivo. Conserva las comprobaciones de importación, exportación y eliminación; eliminar sigue requiriendo casillas y confirmación.
 
-Windows y Mac: no necesitas Python ni abrir iTunes. Windows requiere el controlador/servicio USB de Apple. Cada paquete se publica cuando pasa sus comprobaciones. Paquetes sin firma de desarrollador ni notarización. Fuente nativa San Francisco en macOS; no se redistribuyen archivos de fuentes Apple. Instrucciones: docs/TRANSFERENCIAS.md.
+Windows y Mac: no necesitas Python ni abrir iTunes. Cada paquete aparece después de pasar las comprobaciones de su plataforma. Paquetes sin firma ni notarización. No se redistribuyen archivos de fuentes de Apple. La copia del catálogo no incluye todos los audios ni permite restaurarlos automáticamente. Instrucciones: docs/TRANSFERENCIAS.md.
 ''', encoding='utf-8')
             created = subprocess.run(['gh','release','create',tag,'--repo',repo,'--title',
                 'TUPAQ '+tag,'--notes-file',str(notes),'--prerelease','--verify-tag'])

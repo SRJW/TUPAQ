@@ -11,9 +11,9 @@ import tempfile
 import time
 import asyncio
 
-from PySide6.QtCore import Qt, QThread, Signal, QSize, QStandardPaths, QLockFile, QUrl, QTimer, QSettings, QPoint
-from PySide6.QtGui import QIcon, QPixmap, QDesktopServices
-from PySide6.QtWidgets import QApplication,QFileDialog,QMainWindow,QMessageBox
+from PySide6.QtCore import Qt, QThread, Signal, QSize, QStandardPaths, QLockFile, QUrl, QTimer, QSettings, QPoint, QItemSelectionModel
+from PySide6.QtGui import QIcon, QPixmap, QDesktopServices, QFont, QFontInfo, QFontDatabase
+from PySide6.QtWidgets import QApplication,QFileDialog,QMainWindow,QMessageBox,QAbstractItemView
 
 from .audio import inspect_audio, read_artwork
 from .artwork import thumbnail
@@ -186,12 +186,17 @@ class Window(QMainWindow):
         self.library_epoch = 0
         self.artwork_attempted = set()
         self.duplicates = 0
+        self.activity_message=''
         from .typography import configure
         app=QApplication.instance()
         font_path=QSettings().value('font_path','') if auto_connect else ''
-        try:configure(app,font_path or None)
+        font_family=QSettings().value('font_family','') if auto_connect else ''
+        try:configure(app,font_path or None,font_family or None)
         except (OSError,ValueError):configure(app)
         self.setFont(app.font())
+        self.pending_font_path=getattr(app,'typography_font_path',None)
+        self.pending_font_family=font_family or None
+        self.font_applying=False
         from .interface import build, apply_theme
         build(self)
         self.persist_settings = auto_connect
@@ -265,12 +270,30 @@ class Window(QMainWindow):
         if text:
             from .search import matches
             displayed=[track for track in displayed if matches(track,text)]
-        self.library_model.replace(displayed)
+        view=self.library_table
+        selected={self.library_model.tracks[i.row()]['id'] for i in view.selectionModel().selectedRows()}
+        current=view.currentIndex();current_id=self.library_model.tracks[current.row()]['id'] if current.isValid() else None
+        scroll=view.verticalScrollBar().value()
+        first=view.indexAt(QPoint(4,4))
+        top_id=self.library_model.tracks[first.row()]['id'] if first.isValid() else None
+        view.setUpdatesEnabled(False)
+        self.library_model.replace(displayed,preserve_icons=bool(self.phone_tracks))
+        selection=view.selectionModel()
+        for identifier in selected:
+            row=self.library_model.rows.get(identifier)
+            if row is not None:selection.select(self.library_model.index(row,0),QItemSelectionModel.SelectionFlag.Select|QItemSelectionModel.SelectionFlag.Rows)
+        if current_id in self.library_model.rows:
+            selection.setCurrentIndex(self.library_model.index(self.library_model.rows[current_id],0),QItemSelectionModel.SelectionFlag.NoUpdate)
+        if top_id in self.library_model.rows:
+            view.scrollTo(self.library_model.index(self.library_model.rows[top_id],0),QAbstractItemView.ScrollHint.PositionAtTop)
+        else:view.verticalScrollBar().setValue(scroll)
+        view.setUpdatesEnabled(True);view.viewport().update()
         title = 'En el iPhone'
         self.library_heading.setText(f'{title} · {len(displayed)}')
-        if self.worker is None and self.transfer_worker is None:
+        if self.worker is None and self.transfer_worker is None and not self.activity_message:
             self.status.setText(f"{len(local)} {'canciones' if known else 'canciones disponibles'} · {len(self.tracks)} para importar")
         if not self.library_table.selectionModel().selectedRows() and not self.table.selectionModel().selectedRows() and self.transfer_worker is None:self.clear_inspector()
+        self.library_selection_changed()
         self.update_library_summary()
         self.checks_changed()
         self.update_buttons()
@@ -414,7 +437,7 @@ class Window(QMainWindow):
 
     def clear_inspector(self):
         self.now_cover.setPixmap(QPixmap());self.now_cover.setText('♪')
-        self.now_title.setText('Selecciona una canción');self.info_artist.setText('');self.info_origin.setText('DETALLES')
+        self.now_title.setText('Tu música, siempre contigo.');self.info_artist.setText('Selecciona una canción para ver sus detalles.');self.info_origin.setText('TU COLECCIÓN')
         for value in self.info_fields.values():value.setText('—')
 
     def show_track_details(self,track,origin):
@@ -429,21 +452,58 @@ class Window(QMainWindow):
         image=QPixmap()
         if track.get('thumbnail'):image.loadFromData(track['thumbnail'])
         icon=self.library_model.icons.get(track.get('id'),self.default_music_icon)
-        self.now_cover.setPixmap(image.scaled(96,96,Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation) if not image.isNull() else icon.pixmap(96,96))
+        from .visuals import rounded_cover
+        self.now_cover.setPixmap(rounded_cover(image if not image.isNull() else icon.pixmap(120,120),120))
+
+    def stage_font(self,*ignored):
+        if sys.platform=='darwin' or self.font_applying:return
+        family=self.font_choice.currentFont().family()
+        identifier=getattr(QApplication.instance(),'typography_font_id',None)
+        loaded=QFontDatabase.applicationFontFamilies(identifier) if identifier is not None else []
+        self.pending_font_path=getattr(QApplication.instance(),'typography_font_path',None) if family in loaded else None
+        self.pending_font_family=family
+        self.update_font_preview()
+
+    def update_font_preview(self):
+        from .typography import css_family
+        family=self.pending_font_family or QFontInfo(QFontDatabase.systemFont(QFontDatabase.SystemFont.GeneralFont)).family()
+        self.font_preview.setStyleSheet(f'font-family:"{css_family(family)}";font-size:18px;')
+        self.font_pending.setText('Archivo: '+Path(self.pending_font_path).name if self.pending_font_path else f'Por aplicar: {family}')
+        self.apply_font_button.setEnabled(True)
 
     def choose_font(self):
-        path,_=QFileDialog.getOpenFileName(self,'Selecciona una fuente que tengas autorización de usar','', 'Fuentes (*.ttf *.otf *.ttc)')
-        if not path:return
-        from .typography import configure
-        try:
-            status=configure(QApplication.instance(),path);self.setFont(QApplication.instance().font());self.font_status.setText(status)
-            if self.persist_settings:QSettings().setValue('font_path',path)
-        except (OSError,ValueError):QMessageBox.warning(self,'No se pudo cargar','El archivo no es una fuente admitida o supera 32 MiB.')
+        if sys.platform=='darwin':return
+        path,_=QFileDialog.getOpenFileName(self,'Elegir archivo de fuente','', 'Fuentes (*.ttf *.otf *.ttc *.otc)')
+        if path:
+            self.pending_font_path=path;self.pending_font_family=None;self.update_font_preview()
 
     def reset_font(self):
+        if sys.platform=='darwin':return
+        self.pending_font_path=None;self.pending_font_family=None
+        self.font_choice.blockSignals(True);self.font_choice.setCurrentFont(QFontDatabase.systemFont(QFontDatabase.SystemFont.GeneralFont));self.font_choice.blockSignals(False)
+        self.update_font_preview()
+
+    def apply_font(self):
+        if sys.platform=='darwin':return
         from .typography import configure
-        status=configure(QApplication.instance());self.setFont(QApplication.instance().font());self.font_status.setText(status)
-        if self.persist_settings:QSettings().remove('font_path')
+        self.font_applying=True
+        try:
+            status=configure(QApplication.instance(),self.pending_font_path,self.pending_font_family)
+            app=QApplication.instance();self.setFont(app.font())
+            from .interface import apply_theme
+            apply_theme(self)
+            self.font_status.setText(status)
+            self.font_choice.blockSignals(True);self.font_choice.setCurrentFont(app.font());self.font_choice.blockSignals(False)
+            self.pending_font_family=app.font().family();self.pending_font_path=app.typography_font_path
+            self.font_preview.setStyleSheet('font-size:18px;');self.font_pending.setText('Aplicada a toda la interfaz')
+            self.apply_font_button.setEnabled(False)
+            if self.persist_settings:
+                settings=QSettings();settings.setValue('font_family',self.pending_font_family)
+                if self.pending_font_path:settings.setValue('font_path',self.pending_font_path)
+                else:settings.remove('font_path')
+        except (OSError,ValueError):
+            QMessageBox.warning(self,'No se pudo aplicar','Elige una fuente instalada o un archivo TTF, OTF o colección admitida de hasta 128 MiB.')
+        finally:self.font_applying=False
 
     def artwork_finished(self):
         worker = self.thumbnail_worker
@@ -514,6 +574,7 @@ class Window(QMainWindow):
             self.show_library_error('No se pudo preparar la carpeta local de datos de TUPAQ.\nDiagnóstico: transfer:local-folder')
             return
         self.transfer_outcome = None
+        self.activity_message=''
         self.progress_track_id = None
         self.transfer_worker = TransferWorker(mode,selected,destination,self.backup_root.parent/'transfer.lock',self)
         self.transfer_worker.progress.connect(self.transfer_progress)
@@ -539,6 +600,7 @@ class Window(QMainWindow):
     def transfer_problem(self, message):
         self.show_library_error(message)
         self.status.setText('Transferencia detenida. Consulta el diagnóstico antes de repetirla.')
+        self.activity_message=self.status.text()
 
     def transfer_result(self, result):
         self.transfer_outcome = result
@@ -555,6 +617,8 @@ class Window(QMainWindow):
             count = result.get('imported',result.get('verified',0))
             skipped = result.get('already_imported',0)
             self.status.setText(f'{count} canciones importadas y comprobadas. Ya importadas: {skipped}. Copia del catálogo en Ver respaldo.')
+
+        self.activity_message=self.status.text()
 
     def transfer_finished(self):
         worker = self.transfer_worker
@@ -609,13 +673,12 @@ class Window(QMainWindow):
         self.library_epoch += 1
         self.artwork_attempted.clear()
         self.library_ready = False
-        self.library_model.replace([])
-        self.library_heading.setText('En el iPhone · leyendo…')
+        if not self.phone_tracks:self.library_heading.setText('En el iPhone · leyendo…')
         self.library_button.setEnabled(False)
         self.copy_diagnostic.setEnabled(False)
-        if not automatic or (not self.tracks and self.pages.currentIndex() == 0):
+        if not self.phone_tracks and (not automatic or (not self.tracks and self.pages.currentIndex() == 0)):
             self.navigate(0)
-        self.device_status.setText('Leyendo una copia de la biblioteca. Puede tardar hasta dos minutos…')
+        self.device_status.setText('Actualizando biblioteca… Puedes seguir viendo tus canciones.' if self.phone_tracks else 'Leyendo la biblioteca del iPhone…')
         self.library_worker = LibraryReader(self)
         self.library_worker.result.connect(self.show_library)
         self.library_worker.problem.connect(self.library_problem)
@@ -625,6 +688,11 @@ class Window(QMainWindow):
         self.library_worker.start()
 
     def show_library(self, tracks, diagnostic=''):
+        previous={track['id']:track for track in self.phone_tracks}
+        for track in tracks:
+            old=previous.get(track['id'])
+            if old and self.library_model.cover_key(old)==self.library_model.cover_key(track):
+                if not track.get('duration') and old.get('duration',0)>0:track['duration']=old['duration']
         self.phone_tracks = tracks
         from .library_fields import local_tracks
         self.library_model.checked.intersection_update(t['id'] for t in local_tracks(tracks))
@@ -643,6 +711,7 @@ class Window(QMainWindow):
         self.library_ready = False
         self.retry_library_at = time.monotonic()+20
         self.show_library_error(message)
+        if self.phone_tracks:self.device_status.setText('No se pudo actualizar. Se mantiene la vista anterior.\n'+message)
 
     def show_library_error(self, message):
         self.last_diagnostic = message
@@ -721,6 +790,7 @@ class Window(QMainWindow):
         self.update_buttons()
 
     def remove_selection(self):
+        self.activity_message=''
         for row in sorted({index.row() for index in self.table.selectionModel().selectedRows()}, reverse=True):
             self.tracks.pop(self.table.item(row, 0).data(Qt.ItemDataRole.UserRole))
             self.table.removeRow(row)
@@ -728,6 +798,7 @@ class Window(QMainWindow):
         self.update_buttons()
 
     def clear_tracks(self):
+        self.activity_message=''
         self.clear_inspector()
         self.table.setRowCount(0)
         self.tracks.clear()
