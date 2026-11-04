@@ -124,7 +124,7 @@ class LibraryModel(QAbstractTableModel):
         row=self.rows.get(identifier)
         if row is not None:self.icon_keys[identifier]=self.cover_key(self.tracks[row])
         self.icons[identifier]=icon;self.icons.move_to_end(identifier)
-        while len(self.icons)>256:
+        while len(self.icons)>96:
             old,_=self.icons.popitem(last=False);self.icon_keys.pop(old,None);self._changed(old,0,0)
         self._changed(identifier,0,0)
 

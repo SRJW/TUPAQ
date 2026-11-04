@@ -7,12 +7,15 @@ El objetivo es importar música local a la app Música del iPhone sin usar la
 aplicación iTunes ni 3uTools.
 
 El usuario confirmó la lectura y la importación con metadatos y portada en Música del iPhone.
-La **0.3.0-preview.11** conserva la biblioteca visible mientras se actualiza después
+La **0.3.0-preview.12** conserva la biblioteca visible mientras se actualiza después
 de una importación, incluidas selección, marcas, posición de lectura y carátulas.
 Si falla la lectura, mantiene la última vista válida e indica que no está actualizada.
-El diseño se acerca a Apple Music: portada y detalles sobre la tabla, paneles suaves,
-acento rosa y barra de estado de transferencias. Utiliza fondos estáticos sin desenfoque
-continuo ni animaciones. Las operaciones de música mantienen sus comprobaciones anteriores.
+El diseño toma la composición de las referencias de Apple Music: portada grande,
+información y acciones a su derecha, paneles translúcidos, sombras y barra inferior
+integrada. Preferencias ofrece Nocturno, Aurora y Atardecer. El fondo atmosférico
+se calcula al cambiar tamaño o estilo; no utiliza desenfoque continuo ni motor web.
+Incluye Cancelar y correcciones para confirmaciones rápidas e importaciones sucesivas,
+sin eliminar registros ni omitir comprobaciones. Estas correcciones requieren prueba física.
 Windows permite elegir cualquier familia instalada o cargar una fuente de archivo,
 ver una muestra y pulsar **Aplicar** para cambiar toda la interfaz. En Mac se usa
 siempre la fuente del sistema. Hay [propuestas concretas para continuar](docs/MEJORAS-PROPUESTAS.md).
@@ -29,7 +32,11 @@ con su fuente disponible, no con San Francisco.
 
 ![TUPAQ en modo claro, con audio sintético de prueba](docs/interfaz-nativa.png)
 
-![TUPAQ en modo oscuro, con audio sintético de prueba](docs/interfaz-oscura.png)
+![TUPAQ Aurora, con datos y portada sintéticos de prueba](docs/interfaz-oscura.png)
+
+![TUPAQ Atardecer, con datos y portada sintéticos de prueba](docs/interfaz-atardecer.png)
+
+![TUPAQ Nocturno, con datos y portada sintéticos de prueba](docs/interfaz-nocturna.png)
 
 ## Descargar y abrir
 
@@ -67,11 +74,12 @@ notarización de Apple.
 - Consultar dispositivos USB mediante **ListDevices** del servicio local de Apple.
   No inicia sesiones de sincronización, emparejamientos ni escrituras al iPhone.
 - **Biblioteca** se abre al detectar el iPhone; **Actualizar** permite releerla. Usa la autorización de confianza existente y AFC
-  para obtener dos copias consecutivas del catálogo y su WAL. Si no coinciden,
-  rechaza la lectura. Consulta una copia local con SQLite en modo de solo lectura
+  para obtener dos lecturas consecutivas coincidentes del catálogo y su WAL.
+  Si están cambiando, repite hasta tres intentos; otros errores no se reintentan.
+  Conserva una sola copia del par coincidente. Consulta una copia local con SQLite en modo de solo lectura
   y muestra título, artista, álbum y duración. No escribe en la biblioteca remota.
   El usuario confirmó la lectura de título, artista, álbum y duración en su iPhone.
-- Miniaturas de la biblioteca: consulta los originales de Artwork y, si faltan, los tags incrustados mediante lecturas parciales por USB. Solo las filas visibles y con caché de hasta 256 iconos; no descarga todo el audio ni consulta URLs. Si no hay portada accesible, muestra una nota musical.
+- Miniaturas de la biblioteca: consulta los originales de Artwork y, si faltan, los tags incrustados mediante lecturas parciales por USB. Solo las filas visibles y con caché de hasta 96 iconos de 224 px; no descarga todo el audio ni consulta URLs. Si no hay portada accesible, muestra una nota musical.
 - **Importar al iPhone**: toma archivos del ordenador, guarda el catálogo y las
   preferencias de biblioteca localmente, conserva la identidad existente y envía
   un delta ATC firmado. Comprueba después las canciones nuevas, la conservación
@@ -79,6 +87,7 @@ notarización de Apple.
 - **Exportar selección**: copia los originales accesibles por USB a la carpeta
   elegida, comprueba SHA-256 y evita sobrescribir archivos existentes. Los archivos
   protegidos se copian conservando su protección; no hay descifrado ni conversión.
+- **Cancelar**: detiene la preparación antes del envío de cambios y la exportación entre lecturas, conservando archivos completos y retirando temporales. Una vez iniciado el envío de metadatos a Música, finaliza y verifica el lote actual antes de detenerse; no ofrece interrupción inmediata ni reversión.
 - **Actualizar portadas y fecha**: usa originales y registros de TUPAQ, verifica los audios y envía solo metadatos/portadas de esas canciones. No duplica filas ni vuelve a subir audio; hasta 49 canciones por lote.
 - **Completar importación pendiente**: recuperación experimental con el original y el registro local. Para una canción pendiente representada, solicita el audio sin volver a insertar metadatos; no garantiza aceptación de esa sesión por un iPhone físico. Si el estado no coincide, se detiene.
 - **Revisar importación**: vuelve a comprobar una operación cuya confirmación se
@@ -136,7 +145,7 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m importios.native --smoke-fixtures 
 .venv/bin/python scripts/build_desktop.py
 ```
 
-La suite contiene 130 pruebas de formatos, HTTP local, descubrimiento USB simulado,
+La suite contiene 142 pruebas de formatos, HTTP local, descubrimiento USB simulado,
 paquetes de investigación, firmas candidatas, conexión automática y portadas remotas. La prueba nativa comprueba una
 ventana Qt real, lectura en un hilo de trabajo, los AAC/ALAC dentro de M4A, portadas, duplicados,
 archivos dañados, CSV, quitar/vaciar y las firmas. En Linux se ha probado también

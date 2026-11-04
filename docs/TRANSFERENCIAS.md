@@ -57,9 +57,11 @@ autorizados. La exportación no envía operaciones ATC ni modifica el iPhone.
 
 ## Copia del catálogo y operaciones pendientes
 
-Antes de importar se guardan dos copias coincidentes del catálogo y su WAL,
-las preferencias y el catálogo de host usados para obtener la identidad y las
-anclas existentes. En **Preferencias**, **Ver respaldo del catálogo** abre su carpeta local de datos de TUPAQ.
+Antes de importar se realizan dos lecturas coincidentes del catálogo y su WAL.
+Se conserva una sola copia del par coincidente, además de las preferencias y el
+catálogo de host usados para obtener la identidad y las anclas existentes.
+Si el catálogo cambia durante la lectura, se repite hasta tres intentos; se eliminan
+solo los temporales de ese intento. No se reintentan otros errores ni se borra historial. En **Preferencias**, **Ver respaldo del catálogo** abre su carpeta local de datos de TUPAQ.
 Es información privada de la biblioteca; no es un respaldo de todos los audios
 ni del teléfono completo. No existe una restauración automática de esa copia.
 
@@ -107,7 +109,7 @@ catálogo puede dejar una operación pendiente. No se reintenta automáticamente
 
 ## Validación disponible
 
-Las 130 pruebas incluyen replay de importación de los cinco perfiles base,
+Las 142 pruebas incluyen replay de importación de los cinco perfiles base,
 originales conservados, exportación byte por byte, nombres existentes,
 rechazo por cambio de ancla, identidad sin configurar, manifest desconocido,
 audio permanente alterado, interrupción después de aplicar cambios, verificación
@@ -144,7 +146,7 @@ serializan con las transferencias. Las portadas se cargan para las filas visible
 primero desde Artwork/Originals con rutas validadas y después desde tags
 MP3/M4A/WAV/AIFF acotados a 8 MiB. Los datos de audio se saltan por posición;
 no se envía música a Internet. Una portada ausente, protegida o inaccesible usa
-un icono musical. La caché mantiene hasta 256 miniaturas de 96 px.
+un icono musical. La caché mantiene hasta 96 miniaturas de 224 px.
 
 ## Error `import:host-anchor-ahead`
 
@@ -396,13 +398,13 @@ ocupado. Las portadas nuevas siguen requiriendo registro y bytes SHA-256 correct
 Al releer el catálogo, las filas anteriores siguen visibles con el aviso
 Actualizando biblioteca. Se muestra el resultado completo cuando termina la lectura,
 conservando las marcas, la canción seleccionada y la primera fila visible cuando
-siguen existiendo. Las carátulas se reutilizan dentro del límite de 256 iconos; se
+siguen existiendo. Las carátulas se reutilizan dentro del límite de 96 iconos; se
 invalidan si cambian su referencia, ruta o metadatos relacionados. Una lectura fallida
 conserva la vista anterior y el diagnóstico. Desconectar el teléfono sigue limpiando
 la lista. El mensaje de una importación completada permanece en la barra inferior.
 
 El diseño usa paneles y gradientes estáticos inspirados en Apple Music. El resumen
-con portada se sitúa sobre la biblioteca; Detalles permite ocultarlo. La tabla
+con portada se sitúa sobre la biblioteca; la cola se puede mostrar u ocultar. La tabla
 continúa siendo virtual y las portadas se leen solo para las filas visibles.
 Mantiene Qt nativo y fondos estáticos para limitar el trabajo de repintado.
 
@@ -413,3 +415,49 @@ conserva la fuente actual. La elección se guarda únicamente tras aplicar y el
 archivo elegido debe seguir disponible en aperturas posteriores. Las fuentes
 propias no se copian a los paquetes distribuidos. En macOS se ignoran elecciones
 personalizadas anteriores y se usa siempre la fuente nativa del sistema.
+
+
+## Cristal, cancelación e importaciones sucesivas (preview.12)
+
+La interfaz sigue la composición de las referencias: portada grande a la izquierda
+del resumen, acciones a su derecha, tabla debajo y barra de actividad inferior de
+ancho completo. La barra lateral muestra hasta seis álbumes reales; al pulsarlos
+se busca ese álbum. Preferencias permite elegir Nocturno, Aurora o Atardecer.
+Las superficies son translúcidas sobre un fondo atmosférico propio almacenado en
+caché, con tres sombras estáticas. No es desenfoque del escritorio ni incluye
+controles ficticios de reproducción. Las capturas usan datos y portada sintéticos.
+La caché de 96 portadas permite una portada mayor en el resumen sin acumular
+imágenes de toda la biblioteca. Sigue vigente Aplicar fuente global en Windows
+y la fuente nativa del sistema en Mac.
+
+**Cancelar** aparece durante importación y exportación. Antes del primer envío
+de metadatos detiene la preparación sin cambiar Música. La exportación comprueba
+la solicitud entre lecturas y archivos: conserva los archivos completos ya
+comprobados y elimina el temporal parcial. Las esperas de respuestas iniciales
+también comprueban la cancelación, sin terminar el hilo a la fuerza.
+
+Una vez iniciado el envío nativo de metadatos, se indica **Finalizando** y se
+termina y verifica el lote actual completo. No se promete interrupción inmediata
+ni restauración de cambios ya enviados: una interrupción en ese punto dejaría
+filas sin audio. Si falla la verificación, se conserva el registro pendiente.
+
+La copia local no escribe en Música y sirve para identificar la biblioteca,
+comparar antes/después y revisar una transferencia cuya confirmación se perdió.
+Los mensajes ahora distinguen lectura, comprobación de operaciones anteriores y
+preparación del envío. No se debe borrar catalogue-backups para desbloquear la app.
+El usuario observó que borrarlo permitió volver a importar, pero sin el diagnóstico
+y el registro anteriores no puede atribuirse con certeza la causa histórica.
+
+Se corrigió una carrera comprobada en simulación: SyncFinished podía llegar
+durante el envío del último FileComplete o la escritura local del registro.
+La medición anterior lo interpretaba como anticipado. Ahora la frontera se fija
+inmediatamente antes de enviar la última confirmación al teléfono; se conservan
+el rechazo de mensajes realmente anticipados y la verificación posterior completa.
+
+Un registro detenido antes de anunciar metadatos solo se resuelve automáticamente
+si el catálogo conserva exactamente su estado previo, la zona de preparación está
+vacía y no existe ninguno de sus destinos de audio o portada. Se conserva el
+registro como fallo anterior a cambios. Un estado diferente o ambiguo sigue
+bloqueando otro envío. Cinco importaciones consecutivas simuladas, confirmación
+inmediata, catálogo cambiante, cancelación y conservación de archivos exportados
+tienen pruebas; esto no sustituye la comprobación con el iPhone físico.

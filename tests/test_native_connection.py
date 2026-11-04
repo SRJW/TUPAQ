@@ -5,7 +5,8 @@ from pathlib import Path
 os.environ.setdefault('QT_QPA_PLATFORM','offscreen')
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, Mock
+from importios.cancellation import TransferControl
 
 from PySide6.QtCore import Qt, QEvent
 from PySide6.QtGui import QCloseEvent,QFontDatabase
@@ -46,6 +47,31 @@ class NativeConnectionTests(unittest.TestCase):
             APP.processEvents();time.sleep(.005)
         self.assertIsNone(self.window.library_worker)
 
+    def test_cancel_button_explains_committed_batch_and_keeps_progress_message(self):
+        control=TransferControl();control.begin_commit()
+        worker=Mock(mode='import',control=control)
+        worker.cancel.side_effect=control.request
+        self.window.transfer_worker=worker
+        try:
+            self.window.cancel_transfer_button.show()
+            self.window.cancel_transfer_button.click()
+            self.assertTrue(control.event.is_set())
+            self.assertFalse(self.window.cancel_transfer_button.isEnabled())
+            self.assertIn('Se finalizará este lote',self.window.status.text())
+            self.window.transfer_progress(1,2,'Enviando…')
+            self.assertIn('Se finalizará este lote',self.window.status.text())
+        finally:self.window.transfer_worker=None
+
+    def test_cancel_queued_intent_before_artwork_finishes_never_starts_transfer(self):
+        self.window.after_artwork=('transfer','import',[dict(TRACK)],Path('/tmp'))
+        self.window.cancel_transfer_button.show()
+        with patch.object(self.window,'start_transfer') as start:
+            self.window.cancel_transfer_button.click()
+            self.assertIsNone(self.window.after_artwork)
+            self.assertFalse(self.window.cancel_transfer_button.isVisible())
+            self.assertIn('cancelada antes',self.window.status.text())
+            start.assert_not_called()
+
     def test_attach_loads_once_replug_reloads_and_never_imports(self):
         with patch('importios.native.read_phone_library',return_value=[dict(TRACK)]) as read,patch('importios.native.run_transfer') as transfer:
             self.window.devices_found([{'token':'first'}]);self.drain_library()
@@ -81,7 +107,7 @@ class NativeConnectionTests(unittest.TestCase):
         model.replace([dict(TRACK,id=str(n)) for n in range(260)])
         icon=music_icon(40)
         for n in range(260):model.set_icon(str(n),icon)
-        self.assertEqual(len(model.icons),256)
+        self.assertEqual(len(model.icons),96)
         self.assertNotIn('0',model.icons)
         self.assertEqual(model.data(model.index(259,0),Qt.ItemDataRole.DecorationRole).cacheKey(),icon.cacheKey())
         model.replace([])

@@ -20,6 +20,7 @@ import time
 import uuid
 
 from .library import LibraryError, copy_catalogue
+from .cancellation import CURRENT,TransferControl,TransferCancelled,checkpoint,begin_commit
 from .phone_paths import media_path
 from .sync.catalogue import snapshot, verify_before_after
 from .sync.protocol import Atc, ProtocolError, require, library_identity, saved_anchors, handshake, encode_operations, validate_manifest
@@ -61,6 +62,7 @@ async def missing(afc, path):
 
 
 async def read_remote(afc, path, output=None, limit=MAX_AUDIO, progress=None):
+    checkpoint()
     before = await afc.stat(path)
     size = before.get('st_size')
     require(before.get('st_ifmt') == 'S_IFREG' and type(size) is int and 0 <= size <= limit, 'remote-file-size')
@@ -68,6 +70,7 @@ async def read_remote(afc, path, output=None, limit=MAX_AUDIO, progress=None):
     digest, blocks, done = hashlib.sha256(), [], 0
     try:
         while done < size:
+            checkpoint()
             block = await afc.fread(handle,min(CHUNK,size-done))
             require(bool(block) and len(block) <= size-done, 'remote-file-truncated')
             digest.update(block)
@@ -138,6 +141,7 @@ async def export_selected(selected, folder, progress):
                         'export-stale-selection')
                 require(bool(current.get('afc_path')), 'export-no-usb-file')
             for index, chosen in enumerate(selected):
+                checkpoint()
                 track = fresh[chosen['id']]
                 destination_name = export_name(track)
                 temporary_audio = Path(temporary)/'audio.part'
@@ -148,7 +152,10 @@ async def export_selected(selected, folder, progress):
                 require(size > 0, 'export-empty-audio')
                 _, check, check_size = await read_remote(afc,track['afc_path'])
                 require(size == check_size and digest == check == local_hash(temporary_audio), 'export-hash')
+                checkpoint()
                 result.append(str(retain_export(temporary_audio,folder,destination_name)))
+                control=CURRENT.get()
+                if control is not None:control.files=list(result)
                 temporary_audio.unlink()
                 progress((index+1)*100,len(selected)*100,'Exportada: '+track['title'])
     return {'exported':len(result),'files':result}
@@ -326,6 +333,7 @@ async def transact(afc, channel, before, identity, voice, entries, receipt, dire
                 current['artwork_ids'] == before['artwork_ids'] and current['artwork_tokens'] == before['artwork_tokens'], 'catalogue-changed-before-stage')
         if operation is None:operation = encode_operations(before['database'],before['primary'],before['anchor'],entries)
         signature = signer.sign(operation)
+        begin_commit()
         receipt['phase'] = 'staging'
         save_receipt(directory,receipt)
         await write_bytes(afc,MEDIA+'/Sync_00000000.plist',operation)
@@ -375,15 +383,16 @@ async def deliver_assets(afc,channel,before,entries,receipt,directory,progress,a
                 def bytes_progress(done,total):
                     progress(index*100+int(done*80/max(1,total)),len(entries)*100,'Importando: '+entry['source']['title'],entry['source']['id'])
                 if not artwork_only:await upload_audio(afc,entry,bytes_progress)
+                if index==len(audio)-1 and not ancillary:settled_at=time.monotonic_ns()
                 await channel.send({'Command':'FileComplete','Session':2,'Params':{
                     'AssetID':identifier,'Dataclass':'Media','AssetPath':'' if artwork_only else entry['destination']}})
                 completed.add(identifier)
                 receipt['completed_assets'] = sorted(completed)
                 save_receipt(directory,receipt)
-            for identifier in ancillary:
+            for index,identifier in enumerate(ancillary):
+                if index==len(ancillary)-1:settled_at=time.monotonic_ns()
                 await channel.send({'Command':'FileError','Session':2,'Params':{
                     'AssetID':identifier,'Dataclass':'Media','ErrorCode':16,'ErrorIsVisible':False}})
-            settled_at = time.monotonic_ns()
         elif command == 'SyncFinished':
             observed = getattr(channel,'last_received_at',None)
             require(settled_at is not None and (observed is None or observed >= settled_at), 'terminal-before-settlement')
@@ -400,6 +409,7 @@ async def import_selected(selected, backup_root, progress, expected_snapshot=Non
     require(sum(Path(chosen['path']).stat().st_size for chosen in selected) <= 2*1024*1024*1024, 'import-batch-size')
     sources, hashes = [], set()
     for chosen in selected:
+        checkpoint()
         source = inspect_source(chosen['path'],chosen.get('id'))
         require(source['id'] not in hashes, 'duplicate-source')
         hashes.add(source['id'])
@@ -420,13 +430,16 @@ async def import_selected(selected, backup_root, progress, expected_snapshot=Non
             try:
                 await afc.lock(lock,AFC_LOCK_EX)
                 locked = True
-                progress(0,100,'Guardando una copia del catálogo…')
+                progress(0,100,'Leyendo el estado actual de Música…')
                 before = await capture(afc,directory/'before')
                 require(expected_snapshot is None or before == expected_snapshot, 'recovery-catalogue-changed')
                 identity, voice = await preferences(afc,directory,before)
                 from .reconciliation import reconcile,ensure_resolved
+                progress(0,100,'Comprobando operaciones anteriores…')
+                checkpoint()
                 reconciliation = await reconcile(root,afc,before,identity,progress,exclude=directory)
                 ensure_resolved(reconciliation)
+                progress(0,100,'Buscando canciones ya importadas…')
                 completed_receipts, retired_receipts = [], []
                 for journal in root.glob('*/journal.json'):
                     record = json.loads(journal.read_text(encoding='utf-8'))
@@ -463,6 +476,8 @@ async def import_selected(selected, backup_root, progress, expected_snapshot=Non
                     save_receipt(directory,receipt)
                     return {'imported':0,'already_imported':len(already),'source_ids':list(hashes),'backup':str(directory),'reconciled':reconciliation['reconciled'],'metadata_unverified':reconciliation['metadata_unverified']}
                 await check_empty_staging(afc)
+                checkpoint()
+                progress(0,100,'Preparando el envío de canciones…')
                 entries = await plan_entries(afc,before,sources,directory)
                 receipt.update(entries=entries,anchor=before['anchor'],database=before['database'],primary=before['primary'])
                 save_receipt(directory,receipt)
@@ -496,7 +511,7 @@ async def import_selected(selected, backup_root, progress, expected_snapshot=Non
 
 
 def transfer_error(error, mode):
-    code = str(error) if isinstance(error,ProtocolError) else type(error).__name__
+    code = str(error) if isinstance(error,ProtocolError) else error.diagnostic if isinstance(error,LibraryError) else type(error).__name__
     status = getattr(error,'status',None)
     if status is not None and not isinstance(error,ProtocolError):
         with suppress(TypeError,ValueError):
@@ -511,6 +526,7 @@ def transfer_error(error, mode):
     else:
         message = 'La importación se detuvo o no pudo verificarse. Revisa el diagnóstico y el respaldo del catálogo antes de repetirla.'
     messages = {
+        'catalogue:changing':'Música sigue actualizando su catálogo y no se pudo obtener una lectura estable. Conserva los registros y vuelve a actualizar la biblioteca.',
         'delete-stale-selection':'La biblioteca o el dispositivo cambió. Actualiza la lista y vuelve a marcar las canciones.',
         'delete-selection-limit':'Marca entre 1 y 100 canciones para eliminarlas.',
         'delete-recovery-readonly':'Una eliminación pendiente se comprueba con Revisar operación; no se reenvía audio.',
@@ -559,7 +575,10 @@ async def verify_pending(backup_root, progress):
 
 
 def run_transfer(mode, selected, destination, progress):
+    control=getattr(progress,'control',None) or TransferControl()
+    token=CURRENT.set(control)
     try:
+        checkpoint()
         require(mode in ('import','export','verify','resume','repair','delete'), 'transfer-mode')
         from .deletion import delete_selected
         from .recovery import resume_pending
@@ -569,6 +588,13 @@ def run_transfer(mode, selected, destination, progress):
                 verify_pending(destination,progress) if mode == 'verify' else
                 repair_imported(destination,selected,progress) if mode == 'repair' else
                 resume_pending(destination,selected,progress) if mode == 'resume' else export_selected(selected,destination,progress))
-        return asyncio.run(asyncio.wait_for(work,timeout=1800))
+        result=asyncio.run(asyncio.wait_for(work,timeout=1800))
+        if control.event.is_set() and control.committed:result['cancel_deferred']=True
+        return result
+    except TransferCancelled:
+        result={'cancelled':True,'before_changes':not control.committed}
+        if mode=='export':result.update(exported=len(control.files),files=control.files)
+        return result
     except Exception as error:
         raise transfer_error(error,mode) from None
+    finally:CURRENT.reset(token)

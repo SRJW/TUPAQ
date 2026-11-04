@@ -16,18 +16,19 @@ def main():
     if subprocess.run(view, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         with tempfile.TemporaryDirectory() as directory:
             notes = Path(directory)/'notes.md'
-            notes.write_text('''TUPAQ 0.3.0-preview.11: biblioteca estable, tipografía global y estilo Apple Music.
+            notes.write_text('''TUPAQ 0.3.0-preview.12: cristal, cancelación y confirmación de importaciones sucesivas.
 
-- Sin vaciar la biblioteca mientras se actualiza después de importar. Conserva selección, casillas, posición de lectura y carátulas válidas. Ante un error mantiene la vista anterior con aviso.
-- Diseño inspirado en Apple Music: portada y resumen sobre la lista, paneles suaves, acento rosa y barra inferior de transferencias. Fondos estáticos, sin motor web ni desenfoque continuo.
-- Windows: elegir una fuente instalada o archivo TTF/OTF/TTC/OTC, ver una muestra y pulsar Aplicar. El cambio alcanza toda la interfaz, incluidas cabeceras y botones. Guardado solo al aplicar; un archivo inválido conserva la fuente anterior.
-- Mac: siempre fuente del sistema, sin personalización de familia.
-- 130 pruebas y comprobación de la aplicación empaquetada. Pruebas de actualización lenta/fallida, posición de lectura, selección, caché y aplicación global de fuentes.
-- Propuestas futuras documentadas: cola persistente e historial, vistas Álbumes/Recientes y avisos de posibles duplicados.
+- Composición inspirada en las referencias de Apple Music: portada grande, acciones a su derecha, paneles translúcidos, álbumes en la barra lateral y barra inferior integrada. Nocturno, Aurora y Atardecer en Preferencias. Fondo atmosférico en caché, sin motor web ni desenfoque continuo.
+- Cancelar importación antes de enviar cambios; cancelar exportación conservando archivos completos y eliminando el temporal parcial. Si Música ya recibe metadatos, se finaliza y verifica el lote actual completo: no es una interrupción inmediata ni una reversión.
+- Corregida una carrera que rechazaba confirmaciones rápidas durante el último FileComplete o guardado local. Se conservan el rechazo de confirmaciones prematuras y la verificación del catálogo y audio.
+- Lectura del catálogo cambiante: hasta tres intentos, dos lecturas coincidentes y una copia conservada. Mensajes separados para lectura, operaciones pendientes y envío. No se borra el historial para desbloquear.
+- Solo se resuelve un registro anterior a cambios cuando catálogo y ausencia de todos sus destinos lo demuestran. Los estados ambiguos siguen bloqueados.
+- Biblioteca visible durante actualización. Casillas, orden, búsqueda por formato y eliminación con confirmación. Windows: fuente global mediante Aplicar; Mac: fuente nativa del sistema.
+- 142 pruebas, incluidas cinco importaciones consecutivas simuladas, cancelación y confirmación rápida, más comprobación de cada aplicación empaquetada.
 
-El usuario confirmó que la preview.8 funciona con su iPhone. Esta revisión modifica la presentación y tipografía; los cambios visuales se validan en simulación y necesitan su comprobación con el dispositivo. Conserva las comprobaciones de importación, exportación y eliminación; eliminar sigue requiriendo casillas y confirmación.
+El usuario confirmó importaciones con metadatos y portada en revisiones anteriores. Estas correcciones se validan en simulación y necesitan comprobación con el dispositivo; no puede atribuirse con certeza el fallo histórico sin su diagnóstico. No borres catalogue-backups: sus registros permiten comprobar operaciones pendientes.
 
-Windows y Mac: no necesitas Python ni abrir iTunes. Cada paquete aparece después de pasar las comprobaciones de su plataforma. Paquetes sin firma ni notarización. No se redistribuyen archivos de fuentes de Apple. La copia del catálogo no incluye todos los audios ni permite restaurarlos automáticamente. Instrucciones: docs/TRANSFERENCIAS.md.
+Windows y Mac: no necesitas Python ni abrir iTunes. Cada paquete aparece después de pasar las comprobaciones de su plataforma. Paquetes sin firma ni notarización. No se redistribuyen fuentes de Apple. La copia del catálogo no incluye todos los audios ni permite restaurarlos automáticamente. Instrucciones: docs/TRANSFERENCIAS.md.
 ''', encoding='utf-8')
             created = subprocess.run(['gh','release','create',tag,'--repo',repo,'--title',
                 'TUPAQ '+tag,'--notes-file',str(notes),'--prerelease','--verify-tag'])

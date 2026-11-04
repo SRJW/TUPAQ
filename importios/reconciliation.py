@@ -13,7 +13,8 @@ from .recovery import TERMINAL,saved_identity
 
 
 def safe_code(error):
-    value=str(error) if isinstance(error,ProtocolError) else type(error).__name__
+    from .library import LibraryError
+    value=str(error) if isinstance(error,ProtocolError) else error.diagnostic if isinstance(error,LibraryError) else type(error).__name__
     return value if re.fullmatch(r'[A-Za-z0-9_:-]{1,100}',value) else type(error).__name__
 
 
@@ -41,7 +42,18 @@ async def reconcile(root,afc,current,identity,progress=lambda *args:None,exclude
         try:
             require((record.get('database'),record.get('primary'))==(current['database'],current['primary']),'pending-library-binding')
             require(saved_identity(journal.parent)==identity,'pending-library-identity')
-            require(phase in ('metadata-announced','resuming-audio','verifying'),'pending-stage-uncertain')
+            if phase=='staging' and not record.get('operation'):
+                from .sync.catalogue import snapshot
+                baseline=snapshot(journal.parent/'before'/'1'/'MediaLibrary.sqlitedb')
+                if current==baseline:
+                    await check_empty_staging(afc)
+                    require(bool(record.get('entries')),'pending-no-entries')
+                    for entry in record['entries']:
+                        for path in (entry['destination'],f"/Airlock/Media/{entry['track_id']}",f"/Airlock/Media/{entry['track_id']}{entry['source']['extension']}",f"/Airlock/Media/Artwork/{entry['track_id']}"):
+                            require(await missing(afc,path),'pending-staging-files-remain')
+                    record.update(phase='before-write-failed',reconciliation='unannounced-empty-staging-and-unchanged-catalogue')
+                    save_receipt(journal.parent,record);result['reconciled']+=1;continue
+            require(phase in ('staging','metadata-announced','resuming-audio','verifying'),'pending-stage-uncertain')
             if record.get('operation')=='delete':
                 from .deletion import verify_deleted
                 from .sync.catalogue import snapshot

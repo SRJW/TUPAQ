@@ -296,13 +296,15 @@ class LibraryTests(unittest.TestCase):
             self.assertEqual([mode for _, mode in afc.opens], ['r','r'])
             self.assertEqual(afc.closed, [1,2])
 
-    def test_changing_remote_copy_is_rejected(self):
+    def test_transiently_changing_remote_copy_is_retried_and_stable_pair_kept(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary)/'library.db'
             database(path)
             target = Path(temporary)/'snapshot';target.mkdir()
-            with self.assertRaisesRegex(LibraryError, 'cambió'):
-                asyncio.run(copy_catalogue(FakeAfc(path.read_bytes(), change=True), target))
+            diagnostics={}
+            tracks=asyncio.run(copy_catalogue(FakeAfc(path.read_bytes(), change=True),target,diagnostics=diagnostics))
+            self.assertEqual(len(tracks),1);self.assertEqual(diagnostics['catalogue_attempts'],2)
+            self.assertTrue((target/'1'/'MediaLibrary.sqlitedb').is_file())
 
     def test_unknown_schema_and_invalid_database_fail_explicitly(self):
         with tempfile.TemporaryDirectory() as temporary:

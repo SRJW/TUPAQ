@@ -26,6 +26,11 @@ class LibraryError(Exception):
         self.diagnostic = diagnostic or 'catalogue:LibraryError'
 
 
+class CatalogueChanging(LibraryError):
+    def __init__(self):
+        super().__init__('Música está actualizando el catálogo. La lectura se detuvo porque aún no hay una copia estable.','catalogue:changing')
+
+
 def connection_failure(error, stage):
     messages = {
         'modules': 'No se pudo cargar el componente de comunicación de esta versión.',
@@ -171,11 +176,13 @@ def read_catalogue(path, diagnostics=None):
         raise LibraryError('No se pudo leer una copia válida de la biblioteca de Música.') from error
 
 
-async def copy_catalogue(afc, directory, missing_errors=(FileNotFoundError,), diagnostics=None):
+async def _copy_catalogue_once(afc, directory, missing_errors=(FileNotFoundError,), diagnostics=None):
     """Two consecutive identical db+WAL reads, always opening AFC in mode 'r'."""
     directory = Path(directory)
     fingerprints = []
     for pass_number in range(2):
+        from .cancellation import checkpoint
+        checkpoint()
         folder = directory/str(pass_number)
         folder.mkdir()
         current = {}
@@ -197,6 +204,7 @@ async def copy_catalogue(afc, directory, missing_errors=(FileNotFoundError,), di
                 with target.open('xb') as output:
                     remaining = size
                     while remaining:
+                        checkpoint()
                         block = await afc.fread(handle, min(1024*1024, remaining))
                         if not block or len(block) > remaining:
                             raise LibraryError('La copia de la biblioteca quedó incompleta.')
@@ -206,13 +214,36 @@ async def copy_catalogue(afc, directory, missing_errors=(FileNotFoundError,), di
                 await afc.fclose(handle)
             after = await afc.stat(remote)
             if any(before.get(key) != after.get(key) for key in ['st_size', 'st_mtime', 'st_ifmt']):
-                raise LibraryError('La biblioteca está cambiando. Espera a que termine la actividad de Música e inténtalo de nuevo.')
+                raise CatalogueChanging()
             with target.open('rb') as stream:
                 current[suffix] = hashlib.file_digest(stream, 'sha256').hexdigest()
         fingerprints.append(current)
     if fingerprints[0] != fingerprints[1]:
-        raise LibraryError('La biblioteca cambió durante la lectura. Vuelve a intentarlo cuando esté estable.')
+        raise CatalogueChanging()
     return read_catalogue(directory/'1'/'MediaLibrary.sqlitedb', diagnostics)
+
+
+async def copy_catalogue(afc,directory,missing_errors=(FileNotFoundError,),diagnostics=None):
+    import shutil
+    import uuid
+    from .cancellation import checkpoint
+    directory=Path(directory)
+    if any((directory/str(n)).exists() for n in (0,1)):
+        raise LibraryError('La carpeta de lectura ya está ocupada.','catalogue:destination')
+    for attempt in range(3):
+        checkpoint()
+        work=directory/('.reading-'+uuid.uuid4().hex);work.mkdir(mode=0o700)
+        try:
+            tracks=await _copy_catalogue_once(afc,work,missing_errors,diagnostics)
+            # Both reads matched. Retain one coherent copy, not two identical archives.
+            (work/'1').rename(directory/'1')
+            if diagnostics is not None:diagnostics['catalogue_attempts']=attempt+1
+            return tracks
+        except CatalogueChanging:
+            if attempt==2:raise
+            await asyncio.sleep(.2*(attempt+1))
+        finally:
+            shutil.rmtree(work,ignore_errors=True)
 
 
 async def _read_phone(diagnostics=None, device_info=None):

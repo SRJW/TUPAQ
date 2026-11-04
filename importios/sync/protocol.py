@@ -211,7 +211,16 @@ class Atc:
             self.queue.put_nowait(error)
 
     async def receive(self):
-        result = await asyncio.wait_for(self.queue.get(), timeout=90)
+        from ..cancellation import checkpoint
+        deadline=asyncio.get_running_loop().time()+90
+        while True:
+            checkpoint()
+            remaining=deadline-asyncio.get_running_loop().time()
+            if remaining<=0:raise asyncio.TimeoutError()
+            try:
+                result=await asyncio.wait_for(self.queue.get(),timeout=min(.25,remaining));break
+            except asyncio.TimeoutError:
+                if asyncio.get_running_loop().time()>=deadline:raise
         if isinstance(result, Exception):
             raise result
         result,self.last_received_at = result

@@ -51,7 +51,7 @@ def catalogue_artwork(db):
     return result
 
 
-async def cover_for_track(afc, track, stopped=lambda:False):
+async def cover_for_track(afc, track, stopped=lambda:False,thumbnail_size=96):
     """At most 8 MiB of tags plus tiny headers, with all handles in mode r."""
     async def fetch(path, embedded=False):
         stat = await afc.stat(path)
@@ -77,7 +77,7 @@ async def cover_for_track(afc, track, stopped=lambda:False):
             return bytes(data)
         try:
             if not embedded:
-                return thumbnail(await read(0,size)) if size <= IMAGE_LIMIT else None
+                return thumbnail(await read(0,size),thumbnail_size) if size <= IMAGE_LIMIT else None
             first = await read(0,min(12,size))
             if first.startswith(b'ID3'):
                 if len(first)<10 or any(v&128 for v in first[6:10]):
@@ -85,7 +85,7 @@ async def cover_for_track(afc, track, stopped=lambda:False):
                 tag_size = 10+sum(v << shift for v,shift in zip(first[6:10],(21,14,7,0)))
                 if not 10 <= tag_size <= min(TAG_LIMIT,size):
                     return None
-                return _id3_cover(await read(0,tag_size))
+                return _id3_cover(await read(0,tag_size),thumbnail_size)
             if len(first)>=8 and first[4:8] == b'ftyp':
                 offset, ftyp = 0, b''
                 for _ in range(1024):
@@ -108,7 +108,7 @@ async def cover_for_track(afc, track, stopped=lambda:False):
                             return None
                         audio = MP4(io.BytesIO(ftyp+await read(offset,length)))
                         covers = (audio.tags or {}).get('covr')
-                        return thumbnail(bytes(covers[0])) if covers else None
+                        return thumbnail(bytes(covers[0]),thumbnail_size) if covers else None
                     offset += length
             if first[:4] in (b'RIFF',b'FORM'):
                 endian = '<I' if first[:4] == b'RIFF' else '>I'
@@ -151,10 +151,10 @@ async def cover_for_track(afc, track, stopped=lambda:False):
     return None
 
 
-def _id3_cover(data):
+def _id3_cover(data,size=96):
     tags = ID3(io.BytesIO(data))
     pictures = tags.getall('APIC')
     if not pictures:
         return None
     picture = next((p for p in pictures if p.type == 3),pictures[0])
-    return thumbnail(picture.data)
+    return thumbnail(picture.data,size)

@@ -3,7 +3,7 @@ from PySide6.QtCore import QByteArray, QBuffer, QIODevice, QSize, Qt
 from PySide6.QtGui import QImageReader
 
 
-def thumbnail(data):
+def thumbnail(data,limit=96):
     if not data or len(data) > 5*1024*1024:
         return None
     source = QBuffer()
@@ -13,7 +13,7 @@ def thumbnail(data):
     size = reader.size()
     if not size.isValid() or size.width()*size.height() > 16_000_000:
         return None
-    reader.setScaledSize(size.scaled(QSize(96, 96), Qt.AspectRatioMode.KeepAspectRatio))
+    reader.setScaledSize(size.scaled(QSize(limit, limit), Qt.AspectRatioMode.KeepAspectRatio))
     image = reader.read()
     if image.isNull():
         return None
