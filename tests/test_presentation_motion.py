@@ -48,6 +48,22 @@ class PresentationTests(unittest.TestCase):
         self.assertEqual(w.library_empty.button.text(),'Limpiar búsqueda');w.library_empty.button.click()
         self.assertEqual(w.search.text(),'');self.assertEqual(w.library_model.rowCount(),1);self.assertFalse(w.library_empty.isVisible())
 
+    def test_primary_hover_keeps_readable_text_in_light_and_dark_modes(self):
+        from PySide6.QtCore import QPoint
+        from PySide6.QtGui import QPalette
+        def luminance(color):
+            values=[v/255 for v in (color.red(),color.green(),color.blue())]
+            values=[v/12.92 if v<=.04045 else ((v+.055)/1.055)**2.4 for v in values]
+            return sum(v*k for v,k in zip(values,(.2126,.7152,.0722)))
+        w=self.w
+        for theme in (1,2):
+            w.theme_choice.setCurrentIndex(theme);w.import_phone.setEnabled(True);APP.processEvents()
+            QTest.mouseMove(w,QPoint(5,5));QTest.mouseMove(w.import_phone,QPoint(30,40));QTest.qWait(220)
+            image=w.import_phone.grab().toImage();background=image.pixelColor(round(30*w.devicePixelRatioF()),round(40*w.devicePixelRatioF()))
+            foreground=w.import_phone.palette().color(QPalette.ColorRole.ButtonText)
+            a,b=sorted((luminance(foreground),luminance(background)))
+            self.assertGreaterEqual((b+.05)/(a+.05),4.5)
+
     def test_drag_feedback_only_accepts_local_files_and_never_imports(self):
         from unittest.mock import patch
         from PySide6.QtCore import QMimeData,QUrl,QPoint,QPointF

@@ -16,9 +16,10 @@ def main():
     if subprocess.run(view, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         with tempfile.TemporaryDirectory() as directory:
             notes = Path(directory)/'notes.md'
-            notes.write_text('''TUPAQ 0.3.0-preview.20: interfaz tonal, interacciones cuidadas y tipografía fija.
+            notes.write_text('''TUPAQ 0.3.0-preview.21: interfaz tonal, interacciones cuidadas y tipografía fija.
 
 - Composición completamente renovada: navegación compacta, tarjeta protagonista del iPhone, tres acciones grandes y biblioteca a todo el ancho. Detalles abre una ventana secundaria; se elimina la tercera columna permanente.
+- Contraste del botón principal comprobado sobre su imagen renderizada al pasar el cursor, en claro y oscuro.
 - Modo Tonal verde azulado, espaciado y radios amplios, estados vacíos con acciones y preferencias organizadas en tarjetas.
 - Transiciones breves al navegar, respuesta de controles y mezcla de carátulas sin cuadros vacíos. Reducir movimiento detiene todo inmediatamente y se conserva entre aperturas. Sin animaciones decorativas continuas; la biblioteca no se desvanece al actualizar.
 - Zona de arrastre visible: los archivos van a la cola y no se importan automáticamente. Atajos habituales para buscar y abrir canciones.

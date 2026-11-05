@@ -278,6 +278,7 @@ def apply_theme(window):
     window.shell_layout.setContentsMargins(14,14,14,14)
     window.shell_layout.setSpacing(12);window.top_layout.setSpacing(14)
     radius=20
+    primary_hover=('#0c797c' if dark else '#00585b') if studio else '#a93a08'
     for widget in (window.inspector,window.status.parentWidget(),window.nav_buttons[0].parentWidget()):
         if widget.graphicsEffect():widget.graphicsEffect().setEnabled(not studio)
     from .typography import css_family
@@ -321,7 +322,7 @@ def apply_theme(window):
         QPushButton:pressed {{background:{c['hover']};border-color:{c['blue']};}}
         QPushButton:focus {{border:1px solid {c['muted']};}}
         QPushButton#primary {{background:{c['accent']};color:white;font-weight:600;border:1px solid rgba(255,255,255,35);padding:10px 22px;}}
-        QPushButton#primary:hover {{background:{c['hover']};}}
+        QPushButton#primary:hover {{background:{primary_hover};}}
         QPushButton:disabled,QPushButton#primary:disabled {{background:{c['bg']};color:{c['muted']};border:1px solid {c['border']};}}
         QPushButton#nav {{background:transparent;border:0;text-align:left;border-radius:8px;padding:8px 10px;}}
         QPushButton#nav:focus {{border:2px solid {c['blue']};border-radius:20px;}}
