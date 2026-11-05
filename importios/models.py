@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QTableWidgetItem,QStyledItemDelegate,QStyleOptionV
 from PySide6.QtGui import QPainter,QPen,QPalette,QPainterPath
 
 SORT_ROLE = int(Qt.ItemDataRole.UserRole)+1
+LYRICS_ROLE = SORT_ROLE+1
 HEADERS = ['Canción','Artista','Álbum','Formato','Duración','Tamaño']
 
 
@@ -49,6 +50,16 @@ class SelectionDelegate(QStyledItemDelegate):
     def paint(self,painter,option,index):
         option=QStyleOptionViewItem(option);self.initStyleOption(option,index)
         super().paint(painter,option,index)
+        if index.column()==0 and index.data(LYRICS_ROLE):
+            style=option.widget.style() if option.widget else QApplication.style()
+            icon=style.subElementRect(QStyle.SubElement.SE_ItemViewItemDecoration,option,option.widget)
+            from PySide6.QtCore import QRectF
+            rect=QRectF(icon.right()-14,icon.bottom()-13,16,14)
+            painter.save();painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            painter.setPen(QPen(option.palette.color(QPalette.ColorRole.Base),1));painter.setBrush(option.palette.color(QPalette.ColorRole.Text));painter.drawRoundedRect(rect,3,3)
+            painter.setPen(QPen(option.palette.color(QPalette.ColorRole.Base),1))
+            for y in (4,7,10):painter.drawLine(int(rect.x()+4),int(rect.y()+y),int(rect.x()+12),int(rect.y()+y))
+            painter.restore()
         if not option.features & QStyleOptionViewItem.ViewItemFeature.HasCheckIndicator:return
         style=option.widget.style() if option.widget else QApplication.style()
         rect=style.subElementRect(QStyle.SubElement.SE_ItemViewItemCheckIndicator,option,option.widget).adjusted(0,0,-1,-1)
@@ -140,7 +151,7 @@ class LibraryModel(QAbstractTableModel):
         row=self.rows.get(identifier)
         if row is None:return
         self.tracks[row].update(details)
-        self._changed(identifier,3,5)
+        self._changed(identifier,0,5)
         if self.sort_column in (3,4,5):self.sort(self.sort_column,self.sort_order)
 
     def _changed(self,identifier,first,last):
@@ -159,9 +170,14 @@ class LibraryModel(QAbstractTableModel):
     def data(self,index,role=Qt.ItemDataRole.DisplayRole):
         if not index.isValid() or not 0<=index.row()<len(self.tracks):return None
         track=self.tracks[index.row()];column=index.column()
+        if column==0 and role==LYRICS_ROLE:
+            from .lyrics import state
+            return state(track)
         if column==0 and role==Qt.ItemDataRole.CheckStateRole:return Qt.CheckState.Checked if track['id'] in self.checked else Qt.CheckState.Unchecked
         if column==0 and role==Qt.ItemDataRole.DecorationRole:return self.icons.get(track.get('id'),self.default_icon)
-        if role==Qt.ItemDataRole.ToolTipRole and column<3:return track[('title','artist','album')[column]]
+        if role==Qt.ItemDataRole.ToolTipRole and column<3:
+            from .lyrics import label
+            return track['title']+'\n'+label(track) if column==0 else track[('title','artist','album')[column]]
         if role==Qt.ItemDataRole.ToolTipRole and column in (3,5):
             origin=track.get('format_source' if column==3 else 'size_source')
             return 'Comprobado por USB' if origin in ('header','usb') else 'Dato del catálogo; se comprobará al mostrar la fila' if origin else 'No hay información suficiente para determinarlo'

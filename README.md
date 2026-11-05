@@ -9,7 +9,7 @@ El objetivo es importar música local a la app Música del iPhone sin usar la
 aplicación iTunes ni 3uTools.
 
 El usuario confirmó la lectura y la importación con metadatos y portada en Música del iPhone.
-La **0.3.0-preview.16** conserva la biblioteca visible mientras se actualiza después
+La **0.3.0-preview.17** conserva la biblioteca visible mientras se actualiza después
 de una importación, incluidas selección, marcas, posición de lectura y carátulas.
 Si falla la lectura, mantiene la última vista válida e indica que no está actualizada.
 La comprobación de título, artista y álbum acepta las dos representaciones
@@ -20,6 +20,19 @@ afectados sin incluir sus valores. Revisar operación pendiente permite comproba
 un envío anterior sin volver a insertar canciones.
 La identidad **Encuentro** está integrada en la barra lateral, barra inferior,
 ventana y aplicación, con iconos nativos ICO para Windows e ICNS para Mac.
+La vista previa lee la **carátula original**, conserva sus proporciones y muestra
+su resolución, formato y peso original. «Ver carátula original» abre una vista
+al 100% con desplazamiento. Las miniaturas de la tabla siguen siendo pequeñas.
+Se elimina «Tus álbumes» del lateral.
+
+Un icono de letra sobre la miniatura identifica las letras detectadas. Se leen
+USLT/SYLT en MP3, WAV y AIFF y ©lyr en M4A; el inspector permite consultarlas.
+Importar conserva el audio original y sus letras incrustadas sin modificarlos.
+**Mostrar esas letras en Música del iPhone aún no está garantizado**: su registro
+nativo requiere una parte de transferencia separada cuyo contrato no está validado.
+El inspector distingue letras incrustadas, registradas en el catálogo y disponibles
+en línea; no confunde estos estados. [Alcance y límites](docs/LETRAS.md).
+
 El diseño **Estudio** sigue la nueva referencia de tres columnas: dispositivo y
 navegación a la izquierda, biblioteca compacta en el centro y carátula con
 propiedades a la derecha. Las acciones de importar y exportar están juntas;

@@ -14,11 +14,11 @@ import asyncio
 
 from PySide6.QtCore import Qt, QThread, Signal, QSize, QStandardPaths, QLockFile, QUrl, QTimer, QSettings, QPoint, QItemSelectionModel
 from PySide6.QtGui import QIcon, QPixmap, QDesktopServices, QFont, QFontInfo, QFontDatabase
-from PySide6.QtWidgets import QApplication,QFileDialog,QMainWindow,QMessageBox,QAbstractItemView,QListWidgetItem
+from PySide6.QtWidgets import QApplication,QFileDialog,QMainWindow,QMessageBox,QAbstractItemView,QDialog,QVBoxLayout,QScrollArea,QLabel,QPlainTextEdit
 
 from .i18n import tr, set_language, language, LANGUAGES, QMessageBox
 from .audio import inspect_audio, read_artwork
-from .artwork import thumbnail
+from .artwork import thumbnail, image_info, preview_image, PREVIEW_BYTES
 from .devices import discover, DiscoveryError
 from .sync.signing import FixedHostSession
 from .library import read_phone_library, read_catalogue, LibraryError, format_diagnostics
@@ -87,6 +87,7 @@ class LibraryReader(QThread):
 class ArtworkReader(QThread):
     image = Signal(int,str,bytes)
     details = Signal(int,str,dict)
+    preview = Signal(int,dict)
 
     def __init__(self, tracks, epoch, parent=None):
         super().__init__(parent)
@@ -103,6 +104,25 @@ class ArtworkReader(QThread):
 
     def run(self):
         async def work():
+            if self.tracks and self.tracks[0].get('_preview') is not None:
+                track=self.tracks[0]
+                if track.get('path'):
+                    import mutagen
+                    from .lyrics import embedded_lyrics
+                    audio=mutagen.File(track['path'])
+                    result=embedded_lyrics(audio.tags if audio is not None else None)
+                    data=read_artwork(track['path'],limit=PREVIEW_BYTES)
+                    if data and image_info(data):result.update(cover=data,cover_source='embedded',**image_info(data))
+                else:
+                    from .transfers import device
+                    from .remote_artwork import cover_for_track
+                    self.loop=asyncio.get_running_loop();self.task=asyncio.current_task()
+                    async with device() as (_,afc):
+                        result=await asyncio.wait_for(cover_for_track(afc,track,self.isInterruptionRequested,assets=True),timeout=20)
+                if not self.isInterruptionRequested():
+                    result=result or {'preview_unavailable':True};result['image']=preview_image(result.get('cover'))
+                    self.preview.emit(track['_preview'],result)
+                return
             from .transfers import device
             from .remote_artwork import cover_for_track
             from .remote_details import audio_details
@@ -127,7 +147,8 @@ class ArtworkReader(QThread):
         try:
             asyncio.run(work())
         except (Exception,asyncio.CancelledError):
-            pass
+            if self.tracks and self.tracks[0].get('_preview') is not None and not self.isInterruptionRequested():
+                self.preview.emit(self.tracks[0]['_preview'],{'preview_unavailable':True})
         finally:
             self.loop = self.task = None
 
@@ -187,6 +208,7 @@ class Window(QMainWindow):
         self.background_enabled = auto_connect
         self.thumbnail_worker = None
         self.after_artwork = None
+        self.preview_pending=None;self.preview_key=None;self.preview_result={};self.preview_generation=0;self.closing=False
         self.connection_token = None
         self.library_ready = False
         self.phone_tracks = []
@@ -285,7 +307,7 @@ class Window(QMainWindow):
                 for column in range(self.table.columnCount()):
                     self.table.item(row,column).retranslate()
         finally:self.table.setSortingEnabled(sorting)
-        self.update_album_shortcuts()
+        if hasattr(self,'preview_track'):self.request_preview(self.preview_track)
         if self.persist_settings:QSettings().setValue('language',language())
 
     def refresh_workspace(self):
@@ -296,7 +318,7 @@ class Window(QMainWindow):
         from .library_fields import local_tracks
         self.library_epoch += 1
         self.artwork_attempted.clear()
-        if self.thumbnail_worker is not None:
+        if self.thumbnail_worker is not None and not (self.thumbnail_worker.tracks and self.thumbnail_worker.tracks[0].get('_preview') is not None):
             self.thumbnail_worker.stop()
         local = local_tracks(self.phone_tracks)
         known = any('is_local' in track for track in self.phone_tracks)
@@ -313,7 +335,6 @@ class Window(QMainWindow):
         top_id=self.library_model.tracks[first.row()]['id'] if first.isValid() else None
         view.setUpdatesEnabled(False)
         self.library_model.replace(displayed,preserve_icons=bool(self.phone_tracks))
-        if not self.phone_tracks:self.album_shortcuts.clear()
         selection=view.selectionModel()
         for identifier in selected:
             row=self.library_model.rows.get(identifier)
@@ -346,24 +367,6 @@ class Window(QMainWindow):
         from .interface import apply_theme
         apply_theme(self)
         if getattr(self,'persist_settings',False):QSettings().setValue('glass_mood',self.mood_choice.currentIndex())
-
-    def open_album_shortcut(self,item):
-        self.navigate(0);self.search.setText(item.data(Qt.ItemDataRole.UserRole))
-
-    def update_album_shortcuts(self):
-        from collections import Counter
-        from .library_fields import local_tracks
-        counts=Counter(t.get('album') for t in local_tracks(self.phone_tracks) if t.get('album') and t['album']!='Sin álbum')
-        self.album_shortcuts.clear()
-        for album,count in counts.most_common(6):
-            item=QListWidgetItem(tr(f'{album}\n{count} canciones'));item.setData(Qt.ItemDataRole.UserRole,album);item.setToolTip(album);item.setSizeHint(QSize(180,56));self.album_shortcuts.addItem(item)
-        self.update_album_icons()
-
-    def update_album_icons(self):
-        for n in range(self.album_shortcuts.count()):
-            item=self.album_shortcuts.item(n);album=item.data(Qt.ItemDataRole.UserRole)
-            icon=next((self.library_model.icons[t['id']] for t in self.library_model.tracks if t.get('album')==album and t['id'] in self.library_model.icons),self.default_music_icon)
-            item.setIcon(icon)
 
     def change_theme(self, *ignored):
         hints = QApplication.styleHints()
@@ -440,13 +443,24 @@ class Window(QMainWindow):
             self.device_status.setText(tr(message))
 
     def schedule_artwork(self, *ignored):
-        if self.background_enabled and hasattr(self,'artwork_timer'):
-            self.artwork_timer.start()
+        if self.closing:return
+        if self.preview_pending is not None and hasattr(self,'artwork_timer'):
+            self.artwork_timer.start(0)
+        elif self.background_enabled and hasattr(self,'artwork_timer'):
+            self.artwork_timer.start(180)
 
     def fetch_visible_artwork(self):
-        if (self.thumbnail_worker is not None or self.library_worker is not None or self.transfer_worker is not None
+        if (self.thumbnail_worker is not None or self.library_worker is not None or self.transfer_worker is not None or self.device_worker is not None
             or self.after_artwork is not None or self.pages.currentIndex() != 0):
             return
+        if self.preview_pending is not None:
+            track,self.preview_pending=self.preview_pending,None
+            self.thumbnail_worker=ArtworkReader([track],self.library_epoch,self)
+            self.thumbnail_worker.preview.connect(self.preview_ready)
+            self.thumbnail_worker.finished.connect(self.artwork_finished)
+            self.thumbnail_worker.start()
+            return
+        if not self.background_enabled:return
         first = self.library_table.indexAt(QPoint(1,1)).row()
         first = max(first,0)
         count = min(32,max(1,self.library_table.viewport().height()//56+3))
@@ -472,7 +486,6 @@ class Window(QMainWindow):
             self.library_model.set_icon(identifier,QIcon(image))
             self.artwork_attempted.discard(identifier)
             self.library_selection_changed()
-            self.update_album_icons()
 
     def phone_details_ready(self, epoch, identifier, details):
         if epoch == self.library_epoch:
@@ -496,6 +509,8 @@ class Window(QMainWindow):
             if identifier in self.tracks:self.show_track_details(self.tracks[identifier],'Para importar')
 
     def clear_inspector(self):
+        self.preview_generation+=1;self.preview_key=None;self.preview_result={};self.preview_pending=None
+        self.cover_metadata.setText('—');self.view_cover.setEnabled(False);self.view_lyrics.setEnabled(False);self.lyrics_status.setText(tr('No se ha detectado letra'))
         self.now_cover.setPixmap(QPixmap());self.now_cover.setText('♪')
         self.now_title.setText(tr('Tu música, siempre contigo.'));self.info_artist.setText(tr('Selecciona una canción para ver sus detalles.'));self.info_origin.setText(tr('TU COLECCIÓN'))
         for value in self.info_fields.values():value.setText('—')
@@ -520,6 +535,55 @@ class Window(QMainWindow):
         icon=self.library_model.icons.get(track.get('id'),self.default_music_icon)
         from .visuals import rounded_cover
         self.now_cover.setPixmap(rounded_cover(image if not image.isNull() else icon.pixmap(224,224),224))
+        self.request_preview(track)
+
+    def request_preview(self,track):
+        from .lyrics import label
+        self.preview_track=track
+        key=('local',track.get('id'),track.get('path')) if track.get('path') else ('phone',self.connection_token,track.get('id'),self.library_model.cover_key(track))
+        if key!=self.preview_key:
+            self.preview_key=key;self.preview_generation+=1;self.preview_result={}
+            self.cover_metadata.setText(tr('Leyendo carátula original…'));self.view_cover.setEnabled(False);self.view_lyrics.setEnabled(False)
+            self.preview_pending={**track,'_preview':self.preview_generation} if track.get('path') or self.background_enabled else None
+            if self.thumbnail_worker is not None:self.thumbnail_worker.stop()
+            self.schedule_artwork()
+        self.lyrics_status.setText(('♫  ' if any(track.get(k) for k in ('lyrics_embedded','lyrics_registered','lyrics_online_available')) else '')+label(track))
+        self.render_preview()
+
+    def preview_ready(self,generation,result):
+        if generation!=self.preview_generation:return
+        self.preview_result=result
+        self.preview_track.update({key:value for key,value in result.items() if key.startswith('lyrics_') and key!='lyrics_text'})
+        identifier=self.preview_track.get('id')
+        if not self.preview_track.get('path'):
+            self.library_model.set_details(identifier,{key:value for key,value in self.preview_track.items() if key.startswith('lyrics_')})
+        from .lyrics import label
+        self.lyrics_status.setText(('♫  ' if any(self.preview_track.get(k) for k in ('lyrics_embedded','lyrics_registered','lyrics_online_available')) else '')+label(self.preview_track))
+        self.render_preview()
+
+    def render_preview(self):
+        result=self.preview_result;image=result.get('image')
+        if image is not None and not image.isNull():
+            ratio=self.devicePixelRatioF();pixmap=QPixmap.fromImage(image).scaled(round(224*ratio),round(224*ratio),Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation)
+            pixmap.setDevicePixelRatio(ratio);self.now_cover.setPixmap(pixmap)
+            self.cover_metadata.setText(f"{result['cover_width']} × {result['cover_height']} px · {byte_label(result['cover_bytes'])} · {result['cover_format']}")
+        elif result:self.cover_metadata.setText(tr('Sin carátula original accesible'))
+        self.view_cover.setEnabled(bool(result.get('cover')))
+        self.view_lyrics.setEnabled(bool(result.get('lyrics_text')))
+
+    def open_cover(self):
+        image=preview_image(self.preview_result.get('cover'),original=True)
+        if image is None:return
+        dialog=QDialog(self);dialog.setWindowTitle(tr('Carátula original · 100%'));dialog.resize(760,700)
+        layout=QVBoxLayout(dialog);metadata=QLabel(self.cover_metadata.text());layout.addWidget(metadata)
+        scroll=QScrollArea();label=QLabel();pixmap=QPixmap.fromImage(image);pixmap.setDevicePixelRatio(self.devicePixelRatioF());label.setPixmap(pixmap);label.setFixedSize(pixmap.deviceIndependentSize().toSize());scroll.setWidget(label);layout.addWidget(scroll);dialog.exec()
+
+    def open_lyrics(self):
+        text=self.preview_result.get('lyrics_text')
+        if not text:return
+        dialog=QDialog(self);dialog.setWindowTitle(tr('Letra incluida en el archivo'));dialog.resize(580,640)
+        layout=QVBoxLayout(dialog);notice=QLabel(tr('Conservar la letra dentro del archivo no garantiza que Música del iPhone la muestre.'));notice.setWordWrap(True);layout.addWidget(notice)
+        editor=QPlainTextEdit();editor.setReadOnly(True);editor.setPlainText(text);layout.addWidget(editor);dialog.exec()
 
     def stage_font(self,*ignored):
         if sys.platform=='darwin' or self.font_applying:return
@@ -754,6 +818,7 @@ class Window(QMainWindow):
             worker.deleteLater()
         self.device_button.setEnabled(True)
         self.update_buttons()
+        self.schedule_artwork()
 
     def load_library(self, automatic=False):
         if self.library_worker is not None or self.transfer_worker is not None:
@@ -790,7 +855,6 @@ class Window(QMainWindow):
         from .library_fields import local_tracks
         self.library_model.checked.intersection_update(t['id'] for t in local_tracks(tracks))
         self.filter_library()
-        self.update_album_shortcuts()
         self.last_diagnostic = self.transfer_diagnostic or diagnostic or format_diagnostics({'tracks_returned': len(tracks)})
         self.copy_diagnostic.setEnabled(True)
         self.library_ready = True
@@ -860,7 +924,9 @@ class Window(QMainWindow):
             elif column == 5:item.setData(SORT_ROLE,track['size'])
             if column == 0:
                 item.setData(Qt.ItemDataRole.UserRole, track['id'])
-                item.setToolTip(track['filename'])
+                from .lyrics import state,label
+                from .models import LYRICS_ROLE
+                item.setData(LYRICS_ROLE,state(track));item.setToolTip(track['filename']+'\n'+label(track))
                 if not picture.isNull():
                     item.setIcon(QIcon(picture))
                 else:
@@ -942,6 +1008,7 @@ class Window(QMainWindow):
             QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
             event.ignore()
             return
+        self.closing=True;self.preview_pending=None;self.preview_generation+=1
         self.after_artwork = None
         self.device_timer.stop()
         self.artwork_timer.stop()
@@ -1046,7 +1113,7 @@ def smoke(app, window, fixtures, output=None):
             globals()['read_phone_library'] = simulated_catalogue
             window.devices_found([{'token':'simulated-attach'}])
             deadline = time.monotonic()+10
-            while window.library_worker is not None:
+            while window.library_worker is not None or window.after_artwork is not None:
                 app.processEvents()
                 if time.monotonic() > deadline:
                     raise RuntimeError('Library result signal timed out')

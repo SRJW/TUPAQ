@@ -134,6 +134,8 @@ def read_catalogue(path, diagnostics=None):
             tracks = []
             from .remote_artwork import catalogue_artwork
             artwork = catalogue_artwork(db)
+            from .lyrics import catalogue_lyrics
+            lyrics=catalogue_lyrics(db)
             for pid, title, artist, album, ms, base, leaf, album_pid, size, placeholder, added, asset, codec, protected, frames, rate in rows:
                 if any(value is not None and not isinstance(value, str) for value in [title, artist, album]):
                     raise LibraryError('El catálogo contiene metadatos de un tipo no admitido.')
@@ -142,6 +144,7 @@ def read_catalogue(path, diagnostics=None):
                     raise LibraryError('El catálogo contiene una duración no válida.')
                 tracks.append({'id': str(pid), 'title': title or 'Sin título', 'artist': artist or 'Sin artista',
                                'album': album or 'Sin álbum', 'duration': max(0, duration),**binding})
+                if lyrics is not None:tracks[-1].update(lyrics.get(str(pid),{'lyrics_registered':False,'lyrics_online_available':False}))
                 if str(pid) in wire_map:tracks[-1]['library_wire']=wire_map[str(pid)]
                 if duration<=0 and type(frames) in (int,float) and type(rate) in (int,float) and frames>0 and rate>0:
                     seconds=frames/rate

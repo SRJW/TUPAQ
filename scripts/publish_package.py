@@ -16,19 +16,15 @@ def main():
     if subprocess.run(view, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         with tempfile.TemporaryDirectory() as directory:
             notes = Path(directory)/'notes.md'
-            notes.write_text('''TUPAQ 0.3.0-preview.16: diseño Estudio y verificación de metadatos.
+            notes.write_text('''TUPAQ 0.3.0-preview.17: carátulas originales y detección de letras.
 
-- Nueva distribución de tres columnas basada en la referencia elegida: dispositivo y navegación, biblioteca central y panel derecho con carátula y propiedades. Identidad Encuentro y acento naranja.
-- Estudio usa tonos neutros. Se conservan los otros estilos, fuente e idioma. Detalles permite ampliar la tabla; las acciones se reorganizan en ventanas pequeñas. Se mantienen casillas, búsqueda, orden y cola en la misma página.
-- Frecuencia, bits y tasa de bits se muestran solo con datos disponibles; las cabeceras se leen dentro del presupuesto anterior. No se añaden controles ficticios de reproducción o edición.
-- Corrección del falso fallo reproducido con acentos NFC/NFD visualmente idénticos. No cambia los originales ni lo enviado. Mayúsculas, espacios, acentos diferentes y audio corrupto siguen rechazándose.
-- Si los metadatos aún no coinciden, hasta tres lecturas finales permiten comprobar una actualización tardía. No se reenvía música y se conservan las capturas y verificaciones.
-- Revisar operación pendiente comprueba el envío existente sin duplicarlo. El diagnóstico identifica campos sin revelar sus valores y se conserva tras actualizar la biblioteca.
-- 154 pruebas y comprobación de cada aplicación empaquetada, incluidos iconos de Windows y Mac, interfaz y transferencia simulada.
+- Se elimina «Tus álbumes» del lateral.
+- La vista previa utiliza la carátula original accesible, sin recorte, y muestra resolución, formato y peso de la imagen original. Vista al 100% con desplazamiento; miniaturas ligeras en la lista.
+- Detección de letras incrustadas USLT/SYLT y ©lyr en MP3, WAV, AIFF y M4A; icono de texto y lectura del contenido en Detalles.
+- Se distinguen letras incrustadas en el archivo, registradas en Música y disponibles en línea. La importación conserva las letras dentro del audio original, pero su visualización en Música del iPhone NO está garantizada: la parte de registro nativo sigue pendiente de validar. Consulta docs/LETRAS.md.
+- Solo la selección actual conserva la imagen original y el texto. Lecturas con límites, resultados antiguos descartados y pausa antes de las transferencias.
 
-El usuario confirmó que la canción aparece en Música tras el error de preview.15. Sin el archivo ni las diferencias exactas no puede confirmarse la causa de ese caso. Primero usa Preferencias → Mostrar opciones avanzadas de recuperación → Revisar operación pendiente. Si aún quedan metadatos por revisar, copia el diagnóstico completo de esta versión. Conserva catalogue-backups.
-
-Windows y Mac: no necesitas Python ni abrir iTunes. Cada paquete aparece después de pasar sus comprobaciones. Paquetes sin firma ni notarización. No se redistribuyen fuentes de Apple. La copia del catálogo no incluye todos los audios ni permite restaurarlos automáticamente. Instrucciones: docs/TRANSFERENCIAS.md.
+Pruebas automatizadas y comprobación de cada paquete antes de publicarlo. No se dispone de iPhone físico en este entorno. Windows y Mac no necesitan Python ni abrir iTunes. Paquetes sin firma ni notarización; no se redistribuyen fuentes de Apple. Conserva catalogue-backups; no incluye todos los audios ni es una restauración automática.
 ''', encoding='utf-8')
             created = subprocess.run(['gh','release','create',tag,'--repo',repo,'--title',
                 'TUPAQ '+tag,'--notes-file',str(notes),'--prerelease','--verify-tag'])

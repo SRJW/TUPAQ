@@ -51,15 +51,16 @@ def catalogue_artwork(db):
     return result
 
 
-async def cover_for_track(afc, track, stopped=lambda:False,thumbnail_size=96):
-    """At most 8 MiB of tags plus tiny headers, with all handles in mode r."""
+async def cover_for_track(afc, track, stopped=lambda:False,thumbnail_size=96,assets=False):
+    """Read-only tag ranges: 8 MiB for rows, 24 MiB for the selected original/lyrics."""
     async def fetch(path, embedded=False):
         stat = await afc.stat(path)
         size = stat.get('st_size',-1)
         if stat.get('st_ifmt') != 'S_IFREG' or not 0 < size <= 2*1024**3:
             return None
         handle = await afc.fopen(path,'r')
-        budget = TAG_LIMIT+65536
+        tag_limit=24*1024*1024 if assets else TAG_LIMIT
+        budget = tag_limit+65536
         async def read(offset,length):
             nonlocal budget
             if stopped() or length < 0 or offset < 0 or offset+length > size or length > budget:
@@ -77,15 +78,15 @@ async def cover_for_track(afc, track, stopped=lambda:False,thumbnail_size=96):
             return bytes(data)
         try:
             if not embedded:
-                return thumbnail(await read(0,size),thumbnail_size) if size <= IMAGE_LIMIT else None
+                return render(await read(0,size)) if size <= (20*1024*1024 if assets else IMAGE_LIMIT) else None
             first = await read(0,min(12,size))
             if first.startswith(b'ID3'):
                 if len(first)<10 or any(v&128 for v in first[6:10]):
                     return None
                 tag_size = 10+sum(v << shift for v,shift in zip(first[6:10],(21,14,7,0)))
-                if not 10 <= tag_size <= min(TAG_LIMIT,size):
+                if not 10 <= tag_size <= min(tag_limit,size):
                     return None
-                return _id3_cover(await read(0,tag_size),thumbnail_size)
+                return from_tags(ID3(io.BytesIO(await read(0,tag_size))))
             if len(first)>=8 and first[4:8] == b'ftyp':
                 offset, ftyp = 0, b''
                 for _ in range(1024):
@@ -104,11 +105,10 @@ async def cover_for_track(afc, track, stopped=lambda:False,thumbnail_size=96):
                     if kind == b'ftyp' and length<=4096:
                         ftyp = await read(offset,length)
                     if kind == b'moov':
-                        if length>TAG_LIMIT or not ftyp:
+                        if length>tag_limit or not ftyp:
                             return None
                         audio = MP4(io.BytesIO(ftyp+await read(offset,length)))
-                        covers = (audio.tags or {}).get('covr')
-                        return thumbnail(bytes(covers[0]),thumbnail_size) if covers else None
+                        return from_tags(audio.tags)
                     offset += length
             if first[:4] in (b'RIFF',b'FORM'):
                 endian = '<I' if first[:4] == b'RIFF' else '>I'
@@ -121,11 +121,26 @@ async def cover_for_track(afc, track, stopped=lambda:False,thumbnail_size=96):
                     if length>size-offset-8:
                         return None
                     if header[:4].lower() == b'id3 ':
-                        return _id3_cover(await read(offset+8,length)) if length<=TAG_LIMIT else None
+                        return from_tags(ID3(io.BytesIO(await read(offset+8,length)))) if length<=tag_limit else None
                     offset += 8+length+(length&1)
             return None
         finally:
             await afc.fclose(handle)
+    def render(data):
+        from .artwork import image_info
+        info=image_info(data) if assets else None
+        return {'cover':bytes(data),**info} if info else thumbnail(data,thumbnail_size) if not assets else {}
+    def from_tags(tags):
+        tags=tags or {}
+        covers=tags.get('covr')
+        pictures=tags.getall('APIC') if hasattr(tags,'getall') else []
+        data=bytes(covers[0]) if covers else next((p.data for p in pictures if p.type==3),pictures[0].data if pictures else None)
+        result=render(data) if data else ({} if assets else None)
+        if assets:
+            from .lyrics import embedded_lyrics
+            result.update(embedded_lyrics(tags))
+        return result
+    best={}
     for path in track.get('artwork_paths',[]):
         if stopped():
             return None
@@ -135,8 +150,10 @@ async def cover_for_track(afc, track, stopped=lambda:False,thumbnail_size=96):
             continue
         try:
             image = await fetch(path)
-            if image:
+            if image and not assets:
                 return image
+            if assets and image and image.get('cover_width',0)*image.get('cover_height',0)>best.get('cover_width',0)*best.get('cover_height',0):
+                best={**image,'cover_source':'catalogue'}
         except Exception:
             continue
     path = track.get('afc_path')
@@ -145,16 +162,12 @@ async def cover_for_track(afc, track, stopped=lambda:False,thumbnail_size=96):
         base,_,leaf = path.rpartition('/')
         if media_path(base,leaf) == path:
             try:
-                return await fetch(path,embedded=True)
+                result=await fetch(path,embedded=True)
+                if not assets:return result
+                result=result or {}
+                if result.get('cover_width',0)*result.get('cover_height',0)>best.get('cover_width',0)*best.get('cover_height',0):
+                    best={**result,'cover_source':'embedded'}
+                else:best.update({key:value for key,value in result.items() if key.startswith('lyrics_')})
             except Exception:
-                return None
-    return None
-
-
-def _id3_cover(data,size=96):
-    tags = ID3(io.BytesIO(data))
-    pictures = tags.getall('APIC')
-    if not pictures:
-        return None
-    picture = next((p for p in pictures if p.type == 3),pictures[0])
-    return thumbnail(picture.data,size)
+                pass
+    return best if assets else None

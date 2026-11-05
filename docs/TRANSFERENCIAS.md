@@ -584,3 +584,11 @@ Las pruebas de interfaz comprueban tamaños de ventana, acciones, apertura/cierr
 del panel y conservación de selección. Las propiedades de audio se contrastan
 con los formatos reales de los archivos de prueba. Las capturas usan datos y
 portadas sintéticos, sin conexión con la biblioteca privada del usuario.
+
+## Letras y vista previa (preview.17)
+
+La vista previa utiliza la carátula original accesible y muestra medidas y peso.
+«Ver carátula original» permite revisarla al 100%. Se elimina «Tus álbumes».
+El icono de texto y el inspector distinguen letra incrustada, registrada y en línea.
+La importación conserva las letras dentro del audio, pero el registro separado
+que usa Música del iPhone sigue pendiente de validación: [detalle](LETRAS.md).

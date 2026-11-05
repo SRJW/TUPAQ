@@ -37,9 +37,7 @@ def build(window):
     for number,(label,kind) in enumerate([('Biblioteca','library'),('Preferencias','settings')]):
         value=button(label,kind);value.setObjectName('nav');value.setCheckable(True);value.setMinimumHeight(36)
         window.navigation.addButton(value,number);window.nav_buttons.append(value);side.addWidget(value)
-    album_label=QLabel(tr('TUS ÁLBUMES'));album_label.setObjectName('section');side.addSpacing(18);side.addWidget(album_label)
-    window.album_shortcuts=QListWidget();window.album_shortcuts.setObjectName('albumShortcuts');window.album_shortcuts.setIconSize(QSize(32,32))
-    window.album_shortcuts.itemClicked.connect(window.open_album_shortcut);side.addWidget(window.album_shortcuts,1)
+    side.addStretch(1)
     card=QFrame();card.setObjectName('deviceCard');device_layout=QVBoxLayout(card);device_layout.setContentsMargins(10,12,10,12)
     window.device_name=QLabel(tr('iPhone'));window.device_name.setObjectName('deviceName');window.device_name.setWordWrap(True);window.device_name.setTextFormat(Qt.TextFormat.PlainText)
     window.connection_badge=QLabel(tr('Sin conexión USB'));window.connection_badge.setObjectName('muted');window.connection_badge.setWordWrap(True)
@@ -85,7 +83,7 @@ def build(window):
     window.export=button('CSV','folder',window.choose_export)
     for value in (window.remove,window.clear,window.export):queue_header.addWidget(value)
     queue_layout.addLayout(queue_header)
-    window.table=QTableWidget(0,6);window.table.setHorizontalHeaderLabels(['Canción','Artista','Álbum','Formato','Duración','Tamaño']);queue_layout.addWidget(window.table)
+    window.table=QTableWidget(0,6);window.table.setHorizontalHeaderLabels(['Canción','Artista','Álbum','Formato','Duración','Tamaño']);queue_layout.addWidget(window.table);window.table.setItemDelegateForColumn(0,SelectionDelegate(window.table))
     window.queue_panel.setMaximumHeight(250);splitter.addWidget(window.queue_panel);splitter.setStretchFactor(0,3);splitter.setStretchFactor(1,1)
     center_layout.addWidget(splitter,1);window.main_splitter.addWidget(center)
     window.inspector=QFrame();window.inspector.setObjectName('hero')
@@ -95,6 +93,10 @@ def build(window):
     window.info_artist=QLabel(tr('Selecciona una canción para ver sus detalles.'));window.info_artist.setObjectName('muted');window.info_artist.setWordWrap(True);window.info_artist.setTextFormat(Qt.TextFormat.PlainText);hero_layout.addWidget(window.info_artist)
     window.now_cover=QLabel('♪');window.now_cover.setFixedSize(224,224);window.now_cover.setObjectName('cover');window.now_cover.setAlignment(Qt.AlignmentFlag.AlignCenter)
     hero_layout.addWidget(window.now_cover,0,Qt.AlignmentFlag.AlignHCenter)
+    window.cover_metadata=QLabel('—');window.cover_metadata.setObjectName('muted');window.cover_metadata.setWordWrap(True);window.cover_metadata.setTextFormat(Qt.TextFormat.PlainText);hero_layout.addWidget(window.cover_metadata)
+    window.view_cover=button('Ver carátula original',handler=window.open_cover);window.view_cover.setEnabled(False);hero_layout.addWidget(window.view_cover)
+    window.lyrics_status=QLabel(tr('No se ha detectado letra'));window.lyrics_status.setWordWrap(True);window.lyrics_status.setTextFormat(Qt.TextFormat.PlainText);hero_layout.addWidget(window.lyrics_status)
+    window.view_lyrics=button('Ver letra incluida',handler=window.open_lyrics);window.view_lyrics.setEnabled(False);hero_layout.addWidget(window.view_lyrics)
     properties_title=QLabel(tr('PROPIEDADES DE AUDIO'));properties_title.setObjectName('section');hero_layout.addSpacing(10);hero_layout.addWidget(properties_title)
     properties=QFrame();properties.setObjectName('propertiesCard');details=QGridLayout(properties);details.setContentsMargins(12,12,12,12);details.setHorizontalSpacing(12);details.setVerticalSpacing(12)
     window.info_fields={}
@@ -291,10 +293,6 @@ def apply_theme(window):
         QComboBox QAbstractItemView {{background:{c['card']};color:{c['text']};}}
         QFrame#tableCard {{background:{c['card']};border:1px solid {c['border']};border-radius:12px;}}
         QFrame#queuePanel {{border-top:1px solid {line};}}
-        QListWidget#albumShortcuts {{background:transparent;border:0;outline:0;}}
-        QListWidget#albumShortcuts::item {{padding:8px;border-radius:10px;}}
-        QListWidget#albumShortcuts::item:hover {{background:{soft};}}
-        QListWidget#albumShortcuts::item:selected {{background:{selected};}}
         QScrollArea#inspector {{background:{c['bg']};border:0;border-left:1px solid {c['border']};}}
         QScrollArea#inspector > QWidget > QWidget {{background:{c['bg']};}}
         QProgressBar {{background:{c['border']};border:0;border-radius:3px;text-align:center;}}

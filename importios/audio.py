@@ -55,6 +55,7 @@ def inspect_audio(path, filename):
     with open(path, 'rb') as stream:
         digest = hashlib.file_digest(stream, 'sha256').hexdigest()
     year=tag('TDRC','TYER','\xa9day')[:4]
+    from .lyrics import descriptor
     return {
         'id': digest,
         'filename': name,
@@ -72,11 +73,12 @@ def inspect_audio(path, filename):
         **({'year':int(year)} if len(year)==4 and year.isdigit() and 0<int(year)<=9999 else {}),
         'size': Path(path).stat().st_size,
         'has_artwork': bool(tags.get('covr')) or any(str(key).startswith('APIC') for key in tags),
+        **descriptor(tags),
     }
 
 
-def read_artwork(path):
-    """Read an embedded front cover, bounded to 5 MiB; never modify tags."""
+def read_artwork(path,limit=5*1024*1024):
+    """Read an embedded front cover within the requested byte limit; never modify tags."""
     try:
         audio = mutagen.File(path)
     except (mutagen.MutagenError, OSError, ValueError):
@@ -94,4 +96,4 @@ def read_artwork(path):
         data = next((picture.data for picture in pictures if picture.type == 3), pictures[0].data)
     else:
         return None
-    return bytes(data) if 0 < len(data) <= 5*1024*1024 else None
+    return bytes(data) if 0 < len(data) <= limit else None
