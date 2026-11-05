@@ -754,7 +754,7 @@ class Window(QMainWindow):
                 self.transfer_diagnostic=f"TUPAQ {VERSION}\nDiagnóstico: {result['diagnostic']}\nLotes comprobados: {result['batches_completed']}"
                 self.last_diagnostic=self.transfer_diagnostic;self.copy_diagnostic.setEnabled(True)
         elif result.get('cancelled'):
-            self.status.setText(tr(f"Exportación cancelada. Se conservaron {result.get('exported',0)} archivos completos." if 'exported' in result else 'Importación cancelada antes de enviar cambios a Música.'))
+            self.status.setText(tr(f"Exportación cancelada. Se conservaron {result.get('exported',0)} archivos completos." if 'exported' in result else 'Operación cancelada antes de enviar cambios a Música.'))
         elif 'deleted' in result:
             self.status.setText(tr(f"{result['deleted']} canciones eliminadas de la biblioteca."))
             self.library_model.checked.difference_update(result.get('item_ids',[]))
