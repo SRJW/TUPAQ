@@ -22,6 +22,17 @@ def checked_run(command, **options):
         raise subprocess.CalledProcessError(result.returncode, command)
 
 
+def verify_build_image(image):
+    """Retry only macOS's transient resource error; never skip image verification."""
+    for attempt in range(3):
+        result=subprocess.run(['hdiutil','verify',str(image)],stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True)
+        if result.returncode==0:return
+        if 'resource temporarily unavailable' not in result.stdout.lower() or attempt==2:
+            print(result.stdout,end='',flush=True)
+            raise subprocess.CalledProcessError(result.returncode,result.args,output=result.stdout)
+        time.sleep(.5*(attempt+1))
+
+
 def detach_build_image(mountpoint):
     """Release only this build's read-only image, allowing transient indexer reads."""
     mountpoint=Path(mountpoint).resolve()
@@ -68,7 +79,7 @@ def main():
             (stage/'Applications').symlink_to('/Applications')
             checked_run(['hdiutil', 'create', '-volname', 'TUPAQ', '-srcfolder',
                             str(stage), '-ov', '-format', 'UDZO', str(destination)], check=True)
-        checked_run(['hdiutil', 'verify', str(destination)], check=True)
+        verify_build_image(destination)
         (ROOT/'dist'/'mounted-dmg').mkdir(exist_ok=True)
         checked_run(['hdiutil', 'attach', '-readonly', '-nobrowse', '-mountpoint',
                         str(ROOT/'dist'/'mounted-dmg'), str(destination)], check=True)

@@ -26,7 +26,7 @@ def main():
 - Windows usa PP Mori instalada automáticamente: Regular, Medium, SemiBold y Bold. Se eliminan el selector de fuentes, Agregar y Aplicar. Mac conserva la fuente del sistema.
 - Mori tiene licencia personal: sus archivos no se incluyen en estos paquetes. Extrae tu Mori.zip, instala los cuatro pesos desde Windows y vuelve a abrir TUPAQ. Si falta, se usa y se identifica la fuente del sistema. Instrucciones en docs/INTERACCION.md.
 - Corregida la prueba de tipografía de macOS para reconocer .AppleSystemUIFont como alias de San Francisco. No se sustituye la fuente del sistema.
-- Creación del DMG más robusta: reintento limitado al desmontar la imagen temporal de solo lectura si el indexador de macOS la mantiene ocupada.
+- Creación del DMG más robusta: reintentos limitados para errores temporales de recursos al verificar y desmontar la imagen de solo lectura; nunca se omite su verificación.
 - Se conservan las funciones de música, selección, orden, importación/exportación y sus comprobaciones. Las letras dentro de Música del iPhone siguen pendientes de validar.
 
 Pruebas automatizadas y comprobación de cada paquete antes de publicarlo. No necesitas Python ni abrir iTunes. Paquetes sin firma ni notarización. No se redistribuyen fuentes de Apple ni Mori con licencia personal.
