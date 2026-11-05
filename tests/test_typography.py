@@ -8,9 +8,18 @@ from importios.typography import configure
 class TypographyTests(unittest.TestCase):
     def test_native_font_status_matches_actual_resolution(self):
         status=configure(APP);actual=QFontInfo(APP.font()).family()
-        self.assertIn('Mori' if APP.typography_is_mori else actual,status)
+        if APP.typography_is_apple:self.assertTrue(status.startswith('San Francisco'))
+        else:self.assertIn('Mori' if APP.typography_is_mori else actual,status)
         if not APP.typography_is_mori:self.assertIn('fuente del sistema',status)
         self.assertEqual(APP.font().pixelSize(),14 if APP.typography_is_mori else 13)
+
+    def test_mac_system_alias_is_displayed_as_san_francisco(self):
+        with patch('importios.typography.sys.platform','darwin'),patch('importios.typography.QFontInfo') as resolved:
+            resolved.return_value.family.return_value='.AppleSystemUIFont'
+            status=configure(APP)
+            self.assertEqual(APP.typography_family,'.AppleSystemUIFont');self.assertTrue(APP.typography_is_apple)
+            self.assertEqual(status,'San Francisco · fuente del sistema')
+        configure(APP)
 
     def test_reset_removes_previous_application_font(self):
         APP.typography_font_id=777
