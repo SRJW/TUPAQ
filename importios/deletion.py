@@ -41,6 +41,8 @@ async def delete_selected(selected,root,progress):
             try:
                 await afc.lock(lock,AFC_LOCK_EX);locked=True
                 before=await capture(afc,directory/'before')
+                from .bulk import validate_binding
+                validate_binding(lockdown,before)
                 identity,voice=await preferences(afc,directory,before)
                 ensure_resolved(await reconcile(root,afc,before,identity,progress,exclude=directory))
                 inverse={item:wire for wire,item in before['wire_to_item'].items()};entries=[]

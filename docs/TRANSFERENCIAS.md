@@ -11,8 +11,9 @@ y controlador USB de Apple que ya permite leer la biblioteca.
 1. Conecta un solo iPhone por USB y desbloquéalo.
 2. Entra en **Biblioteca**. Usa **Elegir canciones** o arrastra los archivos a TUPAQ.
 3. En la lista del ordenador, selecciona las canciones y pulsa **Importar al
-   iPhone**. Sin selección se usa toda la cola. Se admiten hasta 49 archivos y
-   2 GiB por operación, con un máximo de 256 MiB por archivo.
+   iPhone**. Sin selección se usa toda la cola. Se admiten hasta 50.000 canciones por selección, con un máximo de 256 MiB
+   por archivo. TUPAQ divide el trabajo en lotes de hasta 49 archivos y 2 GiB,
+   comprobando cada lote antes de continuar. [Pruebas y límites](ESTRES.md).
 4. Espera a que termine el envío y su comprobación. La miniatura cambia con la
    canción actual. Al finalizar se vuelve a leer la biblioteca.
 
@@ -338,13 +339,13 @@ comprobaciones de solo lectura y no abre una nueva sesión ATC.
 Las casillas seleccionan canciones por identidad, incluso al ordenar o buscar.
 Seleccionar visibles afecta solo a los resultados actuales; el contador incluye
 las marcas ocultas por la búsqueda. La confirmación de eliminación permite
-revisar la lista completa. Al desconectar o cambiar de iPhone se borran las marcas.
+revisar el total y hasta 100 títulos. Al desconectar o cambiar de iPhone se borran las marcas.
 El buscador admite formatos con o sin punto, códec y términos de metadatos juntos:
 `.m4a`, `mp3`, `wav`, `alac`, `.m4a artista`. Una cabecera de archivo comprobada
 prevalece sobre una extensión incorrecta. Eliminar los filtros visuales de acceso
 no convierte una descarga protegida en un original exportable.
 
-**Eliminar** admite de 1 a 100 canciones marcadas. Pide confirmación con Cancelar
+**Eliminar** admite de 1 a 50.000 canciones marcadas, en lotes de hasta 100. Pide confirmación con Cancelar
 como opción predeterminada. La copia automática del catálogo no guarda sus audios:
 exporta previamente los originales que quieras conservar.
 

@@ -11,6 +11,7 @@ import sqlite3
 import tempfile
 import time
 import asyncio
+import threading
 
 from PySide6.QtCore import Qt, QThread, Signal, QSize, QStandardPaths, QLockFile, QUrl, QTimer, QSettings, QPoint, QItemSelectionModel
 from PySide6.QtGui import QIcon, QPixmap, QDesktopServices, QShortcut, QKeySequence
@@ -26,6 +27,8 @@ from .models import LibraryModel, SortableItem, SORT_ROLE, byte_label, duration_
 from .version import VERSION
 from .transfers import run_transfer, TransferError
 
+from .bulk import MAX_SELECTION
+
 MAX_SIZE = 256 * 1024 * 1024
 
 
@@ -37,8 +40,11 @@ class Reader(QThread):
     def __init__(self, paths, parent=None):
         super().__init__(parent)
         self.paths = paths
+        self.credits=threading.Semaphore(64)
+        self.problem_count=0
 
     def run(self):
+        last_progress=0.
         for index, path in enumerate(self.paths):
             if self.isInterruptionRequested():
                 break
@@ -48,13 +54,20 @@ class Reader(QThread):
                 track = inspect_audio(path, path.name)
                 track['path'] = str(path.resolve())
                 try:
-                    track['thumbnail'] = thumbnail(read_artwork(path),224)
+                    track['thumbnail'] = thumbnail(read_artwork(path),64) if index<96 else None
                 except (OSError, ValueError):
                     track['thumbnail'] = None
+                while not self.credits.acquire(timeout=.1):
+                    if self.isInterruptionRequested():return
+                if self.isInterruptionRequested():self.credits.release();return
                 self.track.emit(track)
             except (OSError, ValueError) as error:
-                self.problem.emit(f'{path.name}: {error}')
-            self.progress.emit(index+1, len(self.paths))
+                self.problem_count+=1
+                if self.problem_count<=100:self.problem.emit(f'{path.name}: {error}')
+            now=time.monotonic()
+            if now-last_progress>=.1 or index+1==len(self.paths):
+                self.progress.emit(index+1,len(self.paths));last_progress=now
+        if self.problem_count>100:self.problem.emit(f'{self.problem_count-100} archivos adicionales no se pudieron preparar.')
 
 
 class DeviceReader(QThread):
@@ -275,7 +288,7 @@ class Window(QMainWindow):
         self.library_button.setEnabled(not phone_busy)
         self.import_phone.setEnabled(not phone_busy and bool(self.tracks))
         selected=self.marked_tracks()
-        self.export_phone.setEnabled(not phone_busy and bool(selected) and all(t.get('afc_path') for t in selected))
+        self.export_phone.setEnabled(not phone_busy and bool(selected) and all(t.get('afc_path') for t in selected[:100]))
         self.delete_phone.setEnabled(not phone_busy and bool(selected))
         self.verify_import.setEnabled(not phone_busy and self.backup_root.exists())
         self.resume_import.setEnabled(not phone_busy and self.backup_root.exists())
@@ -650,14 +663,14 @@ class Window(QMainWindow):
     def delete_songs(self):
         selected=self.marked_tracks()
         if not selected:return
-        if len(selected)>100:
-            QMessageBox.information(self,tr('Eliminar canciones'),tr('Puedes eliminar hasta 100 canciones por operación.'));return
+        if len(selected)>MAX_SELECTION:
+            QMessageBox.information(self,tr('Selección demasiado grande'),tr('Puedes procesar hasta 50.000 canciones por operación.'));return
         dialog=QMessageBox(self);dialog.setWindowTitle(tr('Eliminar del iPhone'))
         dialog.setTextFormat(Qt.TextFormat.PlainText)
         dialog.setText(tr(f"¿Eliminar {len(selected)} canciones de la biblioteca de Música del iPhone?"))
-        dialog.setInformativeText(tr('Esta acción elimina las canciones del iPhone. Conserva los audios que quieras guardar en el ordenador. La copia del catálogo no permite recuperar por sí sola los audios.\n\n'+'\n'.join(t['title'] for t in selected[:5])))
+        dialog.setInformativeText(tr('Esta acción elimina las canciones del iPhone. Conserva los audios que quieras guardar en el ordenador. La copia del catálogo no permite recuperar por sí sola los audios.')+'\n\n'+'\n'.join(t['title'] for t in selected[:5]))
         dialog.setStandardButtons(QMessageBox.StandardButton.Cancel|QMessageBox.StandardButton.Yes)
-        dialog.setDetailedText('\n'.join(f"{t['title']} — {t.get('artist','Sin artista')}" for t in selected))
+        dialog.setDetailedText('\n'.join(f"{t['title']} — {t.get('artist','Sin artista')}" for t in selected[:100]))
         dialog.button(QMessageBox.StandardButton.Cancel).setText(tr('Cancelar'))
         dialog.setDefaultButton(QMessageBox.StandardButton.Cancel);dialog.button(QMessageBox.StandardButton.Yes).setText(tr('Eliminar canciones'))
         if dialog.exec()==QMessageBox.StandardButton.Yes:self.start_transfer('delete',selected,self.backup_root)
@@ -677,7 +690,7 @@ class Window(QMainWindow):
             return
         if self.thumbnail_worker is not None:
             self.after_artwork = ('transfer',mode,selected,destination)
-            self.cancel_transfer_button.setText(tr('Cancelar'));self.cancel_transfer_button.setEnabled(True);self.cancel_transfer_button.setVisible(mode in ('import','export'))
+            self.cancel_transfer_button.setText(tr('Cancelar'));self.cancel_transfer_button.setEnabled(True);self.cancel_transfer_button.setVisible(mode in ('import','export','delete'))
             self.thumbnail_worker.stop()
             self.update_buttons()
             return
@@ -700,7 +713,7 @@ class Window(QMainWindow):
         self.progress.setValue(0)
         self.progress.show()
         self.cancel_transfer_button.setText(tr('Cancelar'));self.cancel_transfer_button.setEnabled(True)
-        self.cancel_transfer_button.setVisible(mode in ('import','export'))
+        self.cancel_transfer_button.setVisible(mode in ('import','export','delete'))
         self.status.setText(tr('Preparando transferencia…'))
         self.update_buttons()
         self.transfer_worker.start()
@@ -708,10 +721,10 @@ class Window(QMainWindow):
     def cancel_transfer(self):
         worker=self.transfer_worker
         if worker is None:
-            if self.after_artwork and self.after_artwork[0]=='transfer' and self.after_artwork[1] in ('import','export'):
+            if self.after_artwork and self.after_artwork[0]=='transfer' and self.after_artwork[1] in ('import','export','delete'):
                 self.after_artwork=None;self.cancel_transfer_button.hide();self.status.setText(tr('Operación cancelada antes de iniciar el envío.'));self.update_buttons()
             return
-        if worker.mode not in ('import','export'):return
+        if worker.mode not in ('import','export','delete'):return
         immediate=worker.cancel()
         self.cancel_transfer_button.setEnabled(False)
         self.cancel_transfer_button.setText(tr('Cancelando…' if immediate else 'Finalizando…'))
@@ -735,7 +748,12 @@ class Window(QMainWindow):
 
     def transfer_result(self, result):
         self.transfer_outcome = result
-        if result.get('cancelled'):
+        if result.get('bulk') and (result.get('cancelled') or result.get('bulk_stopped')):
+            self.status.setText(tr(f"Operación detenida: {result['processed']} de {result['requested']} canciones comprobadas."))
+            if result.get('diagnostic'):
+                self.transfer_diagnostic=f"TUPAQ {VERSION}\nDiagnóstico: {result['diagnostic']}\nLotes comprobados: {result['batches_completed']}"
+                self.last_diagnostic=self.transfer_diagnostic;self.copy_diagnostic.setEnabled(True)
+        elif result.get('cancelled'):
             self.status.setText(tr(f"Exportación cancelada. Se conservaron {result.get('exported',0)} archivos completos." if 'exported' in result else 'Importación cancelada antes de enviar cambios a Música.'))
         elif 'deleted' in result:
             self.status.setText(tr(f"{result['deleted']} canciones eliminadas de la biblioteca."))
@@ -887,6 +905,8 @@ class Window(QMainWindow):
         self.schedule_artwork()
 
     def add_paths(self, paths):
+        if len(paths)+len(self.tracks)>MAX_SELECTION:
+            QMessageBox.information(self,tr('Selección demasiado grande'),tr('Puedes procesar hasta 50.000 canciones por operación.'));return
         if self.worker is not None or self.transfer_worker is not None or not paths:
             return
         self.errors.clear()
@@ -898,12 +918,20 @@ class Window(QMainWindow):
         self.progress.show()
         self.status.setText(tr('Revisando canciones…'))
         self.worker = Reader([Path(path) for path in paths], self)
-        self.worker.track.connect(self.accept_track)
+        self.worker.track.connect(self.accept_reader_track)
         self.worker.problem.connect(self.show_problem)
-        self.worker.progress.connect(lambda value, total: self.progress.setValue(value))
+        self.worker.progress.connect(self.preparation_progress)
         self.worker.finished.connect(self.read_finished)
         self.update_buttons()
         self.worker.start()
+
+    def preparation_progress(self,value,total):
+        self.progress.setValue(value);self.status.setText(tr(f'Preparando {value} de {total} canciones…'))
+
+    def accept_reader_track(self,track):
+        worker=self.sender()
+        try:self.accept_track(track)
+        finally:worker.credits.release()
 
     def accept_track(self, track):
         if track['id'] in self.tracks:
@@ -912,7 +940,7 @@ class Window(QMainWindow):
         self.tracks[track['id']] = track
         picture=QPixmap()
         if track.get('thumbnail'):picture.loadFromData(track['thumbnail'])
-        self.show_track_details(track,'Para importar')
+        if not self.table.rowCount() or self.worker is None:self.show_track_details(track,'Para importar')
         sorting = self.table.isSortingEnabled()
         self.table.setSortingEnabled(False)
         row = self.table.rowCount()
@@ -934,20 +962,22 @@ class Window(QMainWindow):
                     item.setIcon(self.default_music_icon)
             self.table.setItem(row, column, item)
         self.table.setRowHeight(row, 44)
-        self.table.setSortingEnabled(sorting)
+        self.table.setSortingEnabled(sorting and self.worker is None)
 
     def show_problem(self, message):
         self.errors.addItem(tr(message))
         self.errors.show()
 
     def read_finished(self):
+        self.table.setSortingEnabled(True)
         worker = self.worker
         self.worker = None
         if worker is not None:
             worker.deleteLater()
         self.progress.hide()
+        failed=getattr(worker,'problem_count',self.errors.count()) if worker is not None else self.errors.count()
         self.status.setText(tr(f'{len(self.tracks)} para importar · Duplicadas omitidas: {self.duplicates}'
-                            f' · No añadidas: {self.errors.count()}'))
+                            f' · No añadidas: {failed}'))
         self.update_buttons()
 
     def remove_selection(self):
@@ -1082,6 +1112,8 @@ def smoke(app, window, fixtures, output=None):
         assert {track['format'] for track in window.tracks.values()} == {'MP3', 'WAV', 'AIFF', 'ALAC', 'AAC'}
         covered_row = next(row for row in range(window.table.rowCount()) if window.table.item(row,0).text() == 'M4A con portada')
         assert not window.table.item(covered_row,0).icon().isNull()
+        window.table.selectRow(covered_row)
+        app.processEvents()
         assert window.now_title.text() == 'M4A con portada'
         assert window.duplicates == 1
         assert window.errors.count() == 1

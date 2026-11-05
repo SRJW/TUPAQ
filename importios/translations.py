@@ -1,5 +1,17 @@
 """English UI catalogue. Spanish source messages are the fallback."""
 EN = {
+    'Esta acción elimina las canciones del iPhone. Conserva los audios que quieras guardar en el ordenador. La copia del catálogo no permite recuperar por sí sola los audios.':'This deletes songs from your iPhone. Keep any audio you want to save on your computer. The catalogue copy alone cannot restore audio files.',
+    '{count} archivos adicionales no se pudieron preparar.':'{count} additional files could not be prepared.',
+
+    'Preparando {done} de {total} canciones…':'Preparing {done} of {total} songs…',
+    'Se muestran 100 de {total} canciones seleccionadas.':'Showing 100 of {total} selected songs.',
+    'Selección demasiado grande':'Selection too large',
+    'Puedes procesar hasta 50.000 canciones por operación.':'You can process up to 50,000 songs per operation.',
+
+    'Operación detenida: {done} de {total} canciones comprobadas.':'Operation stopped: {done} of {total} songs verified.',
+    'Lote {batch}/{total} · {message}':'Batch {batch}/{total} · {message}',
+    '{done} de {total} canciones comprobadas':'{done} of {total} songs verified',
+
     'Tonal':'Tonal',
 
     'Tu biblioteca por USB':'Your library by USB',

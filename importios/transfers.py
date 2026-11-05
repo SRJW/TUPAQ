@@ -235,22 +235,23 @@ async def check_empty_staging(afc):
     require(all(name in ('.','..') for name in files), 'staging-not-empty')
 
 
-async def available_path(afc, before, source):
-    folders = sorted({str(PurePosixPath(t['afc_path']).parent) for t in before['tracks'].values()
-        if t.get('afc_path') and re.fullmatch(r'iTunes_Control/Music/F[0-9]{2}',str(PurePosixPath(t['afc_path']).parent))})
-    if not folders:
-        folders = ['iTunes_Control/Music/F00']
+def music_folders(before):
+    return sorted({str(PurePosixPath(t['afc_path']).parent) for t in before['tracks'].values()
+        if t.get('afc_path') and re.fullmatch(r'iTunes_Control/Music/F[0-9]{2}',str(PurePosixPath(t['afc_path']).parent))}) or ['iTunes_Control/Music/F00']
+
+
+async def available_path(afc,before,source,reserved_paths=None,folders=None):
+    folders=music_folders(before) if folders is None else folders
+    occupied={t['afc_path'].lower() for t in before['tracks'].values() if t.get('afc_path')} if reserved_paths is None else reserved_paths
     for folder in folders:
-        if await missing(afc,folder):
-            continue
-        require((await afc.stat(folder)).get('st_ifmt') == 'S_IFDIR', 'music-directory-kind')
+        if await missing(afc,folder):continue
+        require((await afc.stat(folder)).get('st_ifmt')=='S_IFDIR','music-directory-kind')
         for _ in range(128):
-            leaf = ''.join(secrets.choice(string.ascii_uppercase) for _ in range(4))+source['extension']
-            destination = media_path(folder,leaf)
-            require(destination is not None, 'music-path')
-            if await missing(afc,destination) and not any(t.get('afc_path','').lower() == destination.lower()
-                    for t in before['tracks'].values() if t.get('afc_path')):
-                return destination
+            leaf=''.join(secrets.choice(string.ascii_uppercase) for _ in range(4))+source['extension']
+            destination=media_path(folder,leaf)
+            require(destination is not None,'music-path')
+            if destination.lower() not in occupied and await missing(afc,destination):
+                occupied.add(destination.lower());return destination
     raise ProtocolError('music-directory-unavailable')
 
 
@@ -267,6 +268,8 @@ async def plan_entries(afc, before, sources, directory):
     artists = {k:v[0] for k,v in before['artists'].items() if len(v) == 1}
     albums = {k:v[0] for k,v in before['albums'].items() if len(v) == 1}
     entries, destinations = [], set()
+    occupied={t['afc_path'].lower() for t in before['tracks'].values() if t.get('afc_path')}
+    folders=music_folders(before)
     artwork_ids = set(before['artwork_ids'])
     for source in sources:
         artist = source['album_artist']
@@ -275,7 +278,7 @@ async def plan_entries(afc, before, sources, directory):
         album = (source['album'],artist)
         if album not in albums:
             albums[album] = allocate_id(reserved)
-        destination = await available_path(afc,before,source)
+        destination = await available_path(afc,before,source,occupied,folders)
         require(destination.lower() not in destinations, 'plan-path-collision')
         destinations.add(destination.lower())
         entry = {'track_id':allocate_id(reserved),'album_id':albums[album],'artist_id':artists[artist],
@@ -448,6 +451,8 @@ async def import_selected(selected, backup_root, progress, expected_snapshot=Non
                 locked = True
                 progress(0,100,'Leyendo el estado actual de Música…')
                 before = await capture(afc,directory/'before')
+                from .bulk import validate_binding
+                validate_binding(lockdown,before)
                 require(expected_snapshot is None or before == expected_snapshot, 'recovery-catalogue-changed')
                 identity, voice = await preferences(afc,directory,before)
                 from .reconciliation import reconcile,ensure_resolved
@@ -491,6 +496,8 @@ async def import_selected(selected, backup_root, progress, expected_snapshot=Non
                     receipt.update(phase='completed',database=before['database'],primary=before['primary'])
                     save_receipt(directory,receipt)
                     return {'imported':0,'already_imported':len(already),'source_ids':list(hashes),'backup':str(directory),'reconciled':reconciliation['reconciled'],'metadata_unverified':reconciliation['metadata_unverified'],'metadata_diagnostics':reconciliation['metadata_diagnostics']}
+                from .library import MAX_TRACKS
+                require(len(before['tracks'])+len(sources)<=MAX_TRACKS,'import-catalogue-limit')
                 await check_empty_staging(afc)
                 checkpoint()
                 progress(0,100,'Preparando el envío de canciones…')
@@ -544,6 +551,13 @@ def transfer_error(error, mode):
         'verify-new-metadata':'Los metadatos leídos del iPhone no coinciden con los enviados. La canción puede estar ya importada. Conserva el respaldo y usa Revisar operación pendiente en Preferencias.',
         'catalogue:changing':'Música sigue actualizando su catálogo y no se pudo obtener una lectura estable. Conserva los registros y vuelve a actualizar la biblioteca.',
         'delete-stale-selection':'La biblioteca o el dispositivo cambió. Actualiza la lista y vuelve a marcar las canciones.',
+        'import-catalogue-limit':'Este lote excedería el máximo de canciones que TUPAQ puede comprobar. No se ha enviado.',
+        'bulk-device-binding':'No se pudo vincular la operación masiva al iPhone.',
+        'bulk-device-changed':'Cambió el iPhone o su catálogo. Se detuvieron los siguientes lotes.',
+        'bulk-selection-limit':'Selecciona entre 1 y 50.000 canciones.',
+        'bulk-duplicate-selection':'La selección contiene identificadores duplicados. Actualiza la biblioteca.',
+        'bulk-local-space':'No hay suficiente espacio local para conservar las copias de catálogo. Se detuvieron los siguientes lotes.',
+        'bulk-batch-unverified':'El lote necesita una revisión. No se enviaron los siguientes lotes.',
         'delete-selection-limit':'Marca entre 1 y 100 canciones para eliminarlas.',
         'delete-recovery-readonly':'Una eliminación pendiente se comprueba con Revisar operación; no se reenvía audio.',
         'previous-import-unverified':'Hay una operación anterior sin confirmar. En Preferencias → Mostrar opciones avanzadas de recuperación → Revisar operación pendiente puedes comprobarla. Si falta audio, Completar importación pendiente utiliza el original.',
@@ -599,6 +613,10 @@ def run_transfer(mode, selected, destination, progress):
         from .deletion import delete_selected
         from .recovery import resume_pending
         from .metadata_update import repair_imported
+        bulk=mode in ('import','delete') and (len(selected)>(49 if mode=='import' else 100) or (mode=='import' and sum(Path(t['path']).stat().st_size for t in selected)>2*1024**3))
+        if bulk:
+            from .bulk import execute
+            return asyncio.run(execute(mode,selected,destination,progress))
         work = (delete_selected(selected,destination,progress) if mode=='delete' else
                 import_selected(selected,destination,progress) if mode == 'import' else
                 verify_pending(destination,progress) if mode == 'verify' else

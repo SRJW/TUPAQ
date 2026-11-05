@@ -1,0 +1,12 @@
+{
+  "tracks": 1000,
+  "simulation": true,
+  "import_seconds": 8.487,
+  "delete_seconds": 0.686,
+  "imported": 1000,
+  "deleted": 1000,
+  "survivors": 1,
+  "original_audio_unchanged": true,
+  "backup_bytes": 9577229,
+  "seconds": 9.453
+}

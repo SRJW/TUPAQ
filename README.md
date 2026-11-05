@@ -9,7 +9,13 @@ El objetivo es importar música local a la app Música del iPhone sin usar la
 aplicación iTunes ni 3uTools.
 
 El usuario confirmó la lectura y la importación con metadatos y portada en Música del iPhone.
-La **0.3.0-preview.22** conserva la biblioteca visible mientras se actualiza después
+**Lotes grandes:** importación y eliminación divididas automáticamente en
+transacciones comprobadas, con cancelación entre lotes y parada ante el primer
+fallo. Se probaron **10.000 importaciones y 10.000 eliminaciones en un iPhone
+simulado**, conservando el audio ajeno a la selección. Esto no sustituye una prueba
+USB con un dispositivo físico. [Informe reproducible](docs/ESTRES.md).
+
+La **0.3.0-preview.23** conserva la biblioteca visible mientras se actualiza después
 de una importación, incluidas selección, marcas, posición de lectura y carátulas.
 Si falla la lectura, mantiene la última vista válida e indica que no está actualizada.
 La comprobación de título, artista y álbum acepta las dos representaciones
@@ -100,7 +106,7 @@ notarización de Apple.
 - Dos secciones en la misma página: canciones del iPhone y cola del ordenador. Importar y exportar están juntos.
 - Descargadas por defecto: usa estado local y el indicador de descarga protegida de suscripción; nube y pendientes no se presentan como canciones descargadas; las rutas ausentes se ocultan tras comprobar su carpeta USB. No fusiona por título: solo evita contar dos referencias al mismo archivo físico.
 - Buscar por canción, artista, álbum y formato/codec, con o sin punto en la extensión.
-- Eliminar: hasta 100 canciones marcadas por operación, con confirmación y vinculación al dispositivo, biblioteca e IDs leídos. Usa delete_track nativo; comprueba la desaparición de los objetivos y la conservación de IDs y metadatos de las demás canciones. No borra archivos por AFC; iOS gestiona la limpieza del audio. Función nueva pendiente de validación física.
+- Eliminar: hasta 50.000 canciones marcadas por operación, divididas en lotes de hasta 100, con confirmación y vinculación al dispositivo, biblioteca e IDs leídos. Usa delete_track nativo; comprueba la desaparición de los objetivos y la conservación de IDs y metadatos de las demás canciones. No borra archivos por AFC; iOS gestiona la limpieza del audio. Función nueva pendiente de validación física.
 - Formato y tamaño: catálogo como lectura inicial, verificación de cabeceras y stat por USB para filas visibles. Se muestra — cuando no hay información; no se descarga cada audio completo para mostrarlo.
 - Errores de conexión por etapa y botón **Copiar diagnóstico**, también cuando la consulta devuelve cero resultados. Incluye versión, recuentos por tipo y presencia/tamaño del WAL, sin títulos ni credenciales ni identificadores del dispositivo.
 - Las canciones sin fila de metadatos complementarios se muestran como «Sin título» en lugar de descartarse.
