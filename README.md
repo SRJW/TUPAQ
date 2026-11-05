@@ -183,7 +183,7 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m importios.native --smoke-fixtures 
 .venv/bin/python scripts/build_desktop.py
 ```
 
-La suite contiene 154 pruebas de formatos, HTTP local, descubrimiento USB simulado,
+La suite incluye pruebas de formatos, HTTP local, descubrimiento USB simulado,
 paquetes de investigación, firmas candidatas, conexión automática y portadas remotas. La prueba nativa comprueba una
 ventana Qt real, lectura en un hilo de trabajo, los AAC/ALAC dentro de M4A, portadas, duplicados,
 archivos dañados, CSV, quitar/vaciar y las firmas. En Linux se ha probado también
