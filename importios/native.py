@@ -210,6 +210,7 @@ class Window(QMainWindow):
         self.after_artwork = None
         self.preview_pending=None;self.preview_key=None;self.preview_result={};self.preview_generation=0;self.closing=False
         self.connection_token = None
+        self.connection_generation=0
         self.library_ready = False
         self.phone_tracks = []
         self.retry_library_at = 0
@@ -402,8 +403,14 @@ class Window(QMainWindow):
             return
         self.check_device(automatic=True)
 
+    def set_connection_status(self,connected,message):
+        self.connection_dot.setProperty('connected',bool(connected))
+        self.connection_dot.style().unpolish(self.connection_dot);self.connection_dot.style().polish(self.connection_dot);self.connection_dot.update()
+        self.connection_badge.setText(tr(message))
+
     def devices_found(self, devices):
         if len(devices) != 1:
+            self.connection_generation+=1
             self.connection_token = None
             self.library_ready = False
             self.library_epoch += 1
@@ -412,12 +419,13 @@ class Window(QMainWindow):
             self.filter_library()
             self.artwork_attempted.clear()
             self.device_name.setText('iPhone')
-            self.connection_badge.setText(tr('○ Sin conexión USB' if not devices else '● Conecta un solo iPhone'))
+            self.set_connection_status(False,'Sin conexión USB' if not devices else 'Conecta un solo iPhone')
             self.device_status.setText(tr('Conecta tu iPhone. Su biblioteca aparecerá automáticamente.' if not devices else 'Se detectó más de un dispositivo Apple. Conecta un solo iPhone para continuar.'))
             return
         token = devices[0].get('token','usb')
         changed = token != self.connection_token
         if changed:
+            self.connection_generation+=1
             self.connection_token = token
             self.library_ready = False
             self.retry_library_at = 0
@@ -426,11 +434,12 @@ class Window(QMainWindow):
             self.library_model.checked.clear()
             self.filter_library()
             self.artwork_attempted.clear()
-        self.connection_badge.setText(tr('● Conectado por USB'))
+        self.set_connection_status(True,'Conectado por USB')
         if not self.library_ready and time.monotonic() >= self.retry_library_at:
             self.load_library(automatic=True)
 
     def device_problem(self, message):
+        self.connection_generation+=1
         self.connection_token = None
         self.library_ready = False
         self.library_epoch += 1
@@ -438,7 +447,7 @@ class Window(QMainWindow):
         self.library_model.checked.clear()
         self.filter_library()
         self.artwork_attempted.clear()
-        self.connection_badge.setText(tr('○ Servicio USB no disponible'))
+        self.set_connection_status(False,'Servicio USB no disponible')
         if self.connection_token is None:
             self.device_status.setText(tr(message))
 
@@ -820,6 +829,19 @@ class Window(QMainWindow):
         self.update_buttons()
         self.schedule_artwork()
 
+    def current_library_result(self):
+        worker=self.sender()
+        return worker is not None and worker is self.library_worker and worker.connection_generation==self.connection_generation
+
+    def accept_library_result(self,tracks,diagnostic):
+        if self.current_library_result():self.show_library(tracks,diagnostic)
+
+    def accept_library_problem(self,message):
+        if self.current_library_result():self.library_problem(message)
+
+    def accept_library_name(self,name):
+        if self.current_library_result():self.device_name.setText(name)
+
     def load_library(self, automatic=False):
         if self.library_worker is not None or self.transfer_worker is not None:
             return
@@ -838,9 +860,10 @@ class Window(QMainWindow):
             self.navigate(0)
         self.device_status.setText(tr('Actualizando biblioteca… Puedes seguir viendo tus canciones.' if self.phone_tracks else 'Leyendo la biblioteca del iPhone…'))
         self.library_worker = LibraryReader(self)
-        self.library_worker.result.connect(self.show_library)
-        self.library_worker.problem.connect(self.library_problem)
-        self.library_worker.name.connect(self.device_name.setText)
+        self.library_worker.connection_generation=self.connection_generation
+        self.library_worker.result.connect(self.accept_library_result)
+        self.library_worker.problem.connect(self.accept_library_problem)
+        self.library_worker.name.connect(self.accept_library_name)
         self.library_worker.finished.connect(self.library_finished)
         self.update_buttons()
         self.library_worker.start()
@@ -859,7 +882,7 @@ class Window(QMainWindow):
         self.copy_diagnostic.setEnabled(True)
         self.library_ready = True
         self.retry_library_at = 0
-        self.connection_badge.setText(tr('● Conectado por USB'))
+        self.set_connection_status(True,'Conectado por USB')
         self.update_library_summary()
         if not tracks:self.device_status.setText(tr('No se encontraron canciones. Esto no confirma que Música esté vacía. Copia el diagnóstico.'))
         self.update_buttons()

@@ -60,6 +60,26 @@ class SelectedAssetTests(unittest.TestCase):
             self.assertEqual(state(rows['1']),'registered');self.assertEqual(state(rows['2']),'online');self.assertIsNone(state(rows['3']))
             self.assertNotIn('lyrics_text',rows['1'])
 
+    def test_checksum_research_is_bounded_and_never_exposes_text_or_values(self):
+        import zlib,json
+        from importios.lyrics import checksum_probe
+        with closing(sqlite3.connect(':memory:')) as db:
+            self.assertFalse(checksum_probe(db)['schema_available'])
+            db.execute('CREATE TABLE lyrics(checksum,lyrics)')
+            text='Privado: versos de prueba'
+            checksum=zlib.crc32(text.encode('utf-8'))
+            db.executemany('INSERT INTO lyrics VALUES(?,?)',[(checksum,text)]*40)
+            result=checksum_probe(db)
+            self.assertEqual(result['samples_checked'],32);self.assertTrue(result['more_samples_available'])
+            self.assertEqual(result['algorithm_matches']['crc32_utf8'],32)
+            self.assertEqual(result['algorithm_matches']['crc32_utf16be'],0)
+            self.assertFalse(result['usb_contract_verified'])
+            self.assertNotIn(text,json.dumps(result));self.assertNotIn(str(checksum),json.dumps(result))
+            db.execute('DELETE FROM lyrics');db.executemany('INSERT INTO lyrics VALUES(?,?)',[(0,text),(123,' '),(2**50,text),(123,'x'*65537)])
+            self.assertEqual(checksum_probe(db)['samples_checked'],0)
+            db.execute("INSERT INTO lyrics VALUES(123,CAST(x'ff' AS TEXT))")
+            self.assertTrue(checksum_probe(db)['probe_unavailable'])
+
     def test_remote_original_prefers_larger_embedded_cover_and_reads_lyrics(self):
         with tempfile.TemporaryDirectory() as temporary:
             path=Path(temporary)/'test.m4a';shutil.copyfile(FIXTURES/'covered-aac.m4a',path)

@@ -20,3 +20,17 @@ No se declara esa parte por conjetura, no se escribe SQL en el teléfono y no se
 Las miniaturas mantienen su caché pequeña. Solo la selección actual conserva los bytes originales de carátula y el texto. Límite de carátula: 20 MiB / 36 megapíxeles; lectura de etiquetas remotas seleccionadas: 24 MiB; texto visible: 256 KiB. Una imagen inaccesible o demasiado grande usa el estado correspondiente. No se recupera una resolución que no exista en la fuente. Las lecturas de vista previa se cancelan antes de iniciar una transferencia o releer el catálogo.
 
 Pruebas con imágenes y etiquetas sintéticas: dimensiones y peso original, proporciones, vista al 100%, prioridad de la imagen mayor, estados de letras, lectura MP3/M4A/WAV/AIFF, límites, descarte de resultados antiguos y acceso AFC solo lectura. La visualización final en Música de un iPhone físico no está verificada aquí.
+
+## Investigación y diagnóstico (preview.18)
+
+### Diagnóstico de campo sin extraer letras
+
+El diagnóstico de biblioteca de preview.18 incluye `lyrics_checksum_probe`: en
+la copia local del catálogo se comparan como hipótesis CRC32/Adler32 de UTF-8
+y CRC32 de UTF-16 LE/BE. Máximo 32 textos, de hasta 65.536 caracteres cada uno;
+no se escribe en el teléfono, no se leen audios adicionales y no se incluyen
+letras, identificadores ni valores de checksum en el informe. Solo se cuentan
+las coincidencias y el número de muestras. Cero muestras no prueba que no haya
+letras: requiere texto y checksum no nulo en la misma fila. Una coincidencia
+tampoco acredita el contrato USB. Este dato permite contrastar la hipótesis
+con un catálogo real usando el botón Diagnóstico habitual.

@@ -168,6 +168,8 @@ def read_catalogue(path, diagnostics=None):
                 if covers:
                     tracks[-1]['artwork_paths'] = list(dict.fromkeys(covers))
             if diagnostics is not None:
+                from .lyrics import checksum_probe
+                diagnostics['lyrics_checksum_probe']=checksum_probe(db)
                 diagnostics['tracks_returned'] = len(tracks)
                 diagnostics['location_schema'] = locations
                 diagnostics['usb_audio_paths'] = sum(bool(t.get('afc_path')) for t in tracks)

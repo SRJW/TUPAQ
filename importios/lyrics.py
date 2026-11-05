@@ -53,3 +53,39 @@ def label(track):
     if track.get('lyrics_embedded'):return tr('Letra incluida en el archivo; uso en Música no verificado')
     if track.get('lyrics_online_available'):return tr('Letra disponible en línea; no se ha comprobado su descarga')
     return tr('No se ha detectado letra')
+
+
+def _checksum_probe(db):
+    """Bounded, local, read-only hypotheses; never return lyrics or checksum values.
+
+    Matches are observations about this catalogue, not a qualified USB contract.
+    No whole-file/tag checksum is compared with a text checksum.
+    """
+    import zlib
+    columns={row[1] for row in db.execute('PRAGMA table_info(lyrics)')}
+    if not {'checksum','lyrics'}<=columns:return {'schema_available':False}
+    counts={name:0 for name in ('crc32_utf8','adler32_utf8','crc32_utf16le','crc32_utf16be')}
+    checked=0;scanned=0
+    rows=db.execute("SELECT checksum,lyrics FROM lyrics WHERE typeof(checksum)='integer' AND checksum!=0 AND typeof(lyrics)='text' AND length(lyrics) BETWEEN 1 AND 65536 LIMIT 33")
+    for checksum,text in rows:
+        scanned+=1
+        if scanned>32:break
+        if not -2**31<=checksum<=2**32-1:continue
+        if not text.strip():continue
+        checked+=1;expected=checksum&0xffffffff
+        for name,value in (
+            ('crc32_utf8',zlib.crc32(text.encode('utf-8'))),
+            ('adler32_utf8',zlib.adler32(text.encode('utf-8'))),
+            ('crc32_utf16le',zlib.crc32(text.encode('utf-16le'))),
+            ('crc32_utf16be',zlib.crc32(text.encode('utf-16be')))):
+            counts[name]+=int(value==expected)
+    return {'schema_available':True,'samples_checked':checked,'sample_limit':32,
+            'more_samples_available':scanned>32,'algorithm_matches':counts,'usb_contract_verified':False}
+
+
+def checksum_probe(db):
+    # Optional research diagnostics must never prevent the library from loading.
+    import sqlite3
+    try:return _checksum_probe(db)
+    except (sqlite3.Error,UnicodeError,ValueError,OverflowError):
+        return {'probe_unavailable':True,'usb_contract_verified':False}

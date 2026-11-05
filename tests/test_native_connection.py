@@ -9,7 +9,7 @@ from unittest.mock import patch, Mock
 from importios.cancellation import TransferControl
 
 from PySide6.QtCore import Qt, QEvent
-from PySide6.QtGui import QCloseEvent,QFontDatabase
+from PySide6.QtGui import QCloseEvent,QFontDatabase,QPalette
 from PySide6.QtWidgets import QApplication, QMessageBox
 from importios.native import Window
 from importios.visuals import app_icon
@@ -40,6 +40,41 @@ class NativeConnectionTests(unittest.TestCase):
         self.window.close();self.window.deleteLater()
         APP.sendPostedEvents(None,QEvent.Type.DeferredDelete)
         APP.processEvents()
+
+    def test_connection_indicator_tracks_usb_across_themes_and_languages(self):
+        w=self.window
+        from importios.i18n import set_language
+        with patch.object(w,'load_library'):
+            self.assertFalse(w.connection_dot.property('connected'))
+            w.devices_found([{'token':'one'}]);self.assertTrue(w.connection_dot.property('connected'))
+            for theme in (1,2):
+                w.theme_choice.setCurrentIndex(theme);w.language_choice.setCurrentIndex(1);APP.processEvents()
+                self.assertTrue(w.connection_dot.property('connected'));self.assertEqual(w.connection_badge.text(),'Connected by USB')
+                color=w.connection_dot.palette().color(QPalette.ColorRole.WindowText)
+                self.assertGreater(color.green(),color.red()*1.3);self.assertGreater(color.green(),color.blue()*1.3)
+                w.devices_found([]);self.assertFalse(w.connection_dot.property('connected'))
+                color=w.connection_dot.palette().color(QPalette.ColorRole.WindowText)
+                self.assertLess(max(color.red(),color.green(),color.blue())-min(color.red(),color.green(),color.blue()),10)
+                w.devices_found([{'token':'one'}]);self.assertTrue(w.connection_dot.property('connected'))
+            w.device_problem('USB error');self.assertFalse(w.connection_dot.property('connected'))
+            w.devices_found([{'token':'one'},{'token':'two'}]);self.assertFalse(w.connection_dot.property('connected'))
+        w.language_choice.setCurrentIndex(0);set_language('es')
+
+    def test_delayed_library_result_cannot_turn_disconnected_indicator_green(self):
+        import threading
+        ready=threading.Event();release=threading.Event()
+        def delayed(diagnostics=None,device_info=None):
+            ready.set();release.wait(3)
+            if device_info is not None:device_info['name']='Stale phone'
+            return [dict(TRACK)]
+        w=self.window
+        try:
+            with patch('importios.native.read_phone_library',side_effect=delayed):
+                w.devices_found([{'token':'one'}]);self.assertTrue(ready.wait(2))
+                w.devices_found([]);release.set();self.drain_library()
+                self.assertFalse(w.connection_dot.property('connected'));self.assertEqual(w.library_model.rowCount(),0)
+                self.assertEqual(w.device_name.text(),'iPhone')
+        finally:release.set()
 
     def drain_library(self):
         end=time.monotonic()+5

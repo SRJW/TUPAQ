@@ -1,5 +1,9 @@
 """English UI catalogue. Spanish source messages are the fallback."""
 EN = {
+    'Conectado por USB':'Connected by USB',
+    'Conecta un solo iPhone':'Connect only one iPhone',
+    'Servicio USB no disponible':'USB service unavailable',
+
     'Ver carátula original':'View original artwork',
     'Ver letra incluida':'View embedded lyrics',
     'No se ha detectado letra':'No lyrics detected',

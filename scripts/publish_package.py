@@ -16,15 +16,14 @@ def main():
     if subprocess.run(view, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         with tempfile.TemporaryDirectory() as directory:
             notes = Path(directory)/'notes.md'
-            notes.write_text('''TUPAQ 0.3.0-preview.17: carátulas originales y detección de letras.
+            notes.write_text('''TUPAQ 0.3.0-preview.18: estado USB claro y diagnóstico de letras de solo lectura.
 
-- Se elimina «Tus álbumes» del lateral.
-- La vista previa utiliza la carátula original accesible, sin recorte, y muestra resolución, formato y peso de la imagen original. Vista al 100% con desplazamiento; miniaturas ligeras en la lista.
-- Detección de letras incrustadas USLT/SYLT y ©lyr en MP3, WAV, AIFF y M4A; icono de texto y lectura del contenido en Detalles.
-- Se distinguen letras incrustadas en el archivo, registradas en Música y disponibles en línea. La importación conserva las letras dentro del audio original, pero su visualización en Música del iPhone NO está garantizada: la parte de registro nativo sigue pendiente de validar. Consulta docs/LETRAS.md.
-- Solo la selección actual conserva la imagen original y el texto. Lecturas con límites, resultados antiguos descartados y pausa antes de las transferencias.
+- Punto verde cuando se detecta un iPhone por USB; gris al desconectarlo, si el servicio USB falla o si se conectan varios dispositivos. El color funciona en los temas claros/oscuros y en español/inglés.
+- Las respuestas tardías de una lectura anterior ya no vuelven a mostrar conectado un dispositivo retirado, ni repueblan su biblioteca.
+- El diagnóstico compara, solo en la copia local, hasta 32 textos con hipótesis CRC32/Adler32. Devuelve únicamente recuentos; no copia letras, identificadores ni valores privados al informe.
+- Se conserva la detección y lectura de letras incrustadas. Mostrarlas dentro de Música del iPhone sigue pendiente de validar; esta versión no activa una entrega experimental de letras.
 
-Pruebas automatizadas y comprobación de cada paquete antes de publicarlo. No se dispone de iPhone físico en este entorno. Windows y Mac no necesitan Python ni abrir iTunes. Paquetes sin firma ni notarización; no se redistribuyen fuentes de Apple. Conserva catalogue-backups; no incluye todos los audios ni es una restauración automática.
+Pruebas automatizadas y comprobación de cada paquete antes de publicarlo. Windows y Mac no necesitan Python ni abrir iTunes. Paquetes sin firma ni notarización; no se redistribuyen fuentes de Apple. Conserva catalogue-backups.
 ''', encoding='utf-8')
             created = subprocess.run(['gh','release','create',tag,'--repo',repo,'--title',
                 'TUPAQ '+tag,'--notes-file',str(notes),'--prerelease','--verify-tag'])

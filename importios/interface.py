@@ -40,9 +40,11 @@ def build(window):
     side.addStretch(1)
     card=QFrame();card.setObjectName('deviceCard');device_layout=QVBoxLayout(card);device_layout.setContentsMargins(10,12,10,12)
     window.device_name=QLabel(tr('iPhone'));window.device_name.setObjectName('deviceName');window.device_name.setWordWrap(True);window.device_name.setTextFormat(Qt.TextFormat.PlainText)
+    connection_row=QHBoxLayout();connection_row.setSpacing(5)
+    window.connection_dot=QLabel('●');window.connection_dot.setObjectName('connectionDot');window.connection_dot.setProperty('connected',False);window.connection_dot.setFixedWidth(10)
     window.connection_badge=QLabel(tr('Sin conexión USB'));window.connection_badge.setObjectName('muted');window.connection_badge.setWordWrap(True)
     window.device_button=button('Comprobar USB','phone',window.check_device)
-    device_layout.addWidget(window.device_name);device_layout.addWidget(window.connection_badge);device_layout.addWidget(window.device_button);side.addWidget(card);side.removeWidget(card);side.insertWidget(2,card)
+    device_layout.addWidget(window.device_name);connection_row.addWidget(window.connection_dot);connection_row.addWidget(window.connection_badge,1);device_layout.addLayout(connection_row);device_layout.addWidget(window.device_button);side.addWidget(card);side.removeWidget(card);side.insertWidget(2,card)
     privacy=QLabel(tr('Música local · conexión por USB'));privacy.setObjectName('muted');privacy.setWordWrap(True);side.addWidget(privacy)
     outer.addWidget(sidebar)
     window.pages=QStackedWidget();outer.addWidget(window.pages,1)
@@ -268,6 +270,8 @@ def apply_theme(window):
         QLabel#heroDescription {{color:{c['muted']};font-size:13px;}}
         QLabel#metadata {{color:{c['muted']};font-size:12px;}}
         QLabel#section {{font-size:12px;font-weight:600;color:{c['muted']};}}
+        QLabel#connectionDot {{color:#8e8e93;font-size:12px;}}
+        QLabel#connectionDot[connected="true"] {{color:{'#30d158' if dark else '#16823b'};}}
         QLabel#muted {{font-size:12px;color:{c['muted']};}}
         QFrame#deviceCard {{border:1px solid {line};border-radius:14px;background:{soft};}}
         QLabel#deviceName {{font-weight:600;}}
