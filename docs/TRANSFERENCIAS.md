@@ -37,6 +37,15 @@ El audio no se reescribe. Se incluyen date_created/date_modified como fechas
 plist y se comprueba item.date_added; la aparición en Recientes aún necesita
 confirmación visual en el iPhone.
 
+### Numeración opcional de pistas y discos (preview.24)
+
+Se conservan los pares válidos, como pista 3 de 12. Un total sin posición
+(`0/12`) se omite; si la posición supera el total (`9/3`), se conserva la
+posición 9 y se omite el total. Se aceptan espacios y ceros iniciales en ID3.
+Los valores inválidos o fuera de 1–65.535 no se inventan ni provocan
+`import:metadata-numbering`. El ajuste solo afecta a los metadatos del envío;
+el audio y las etiquetas del archivo original no se reescriben.
+
 ## Exportar del iPhone al ordenador
 
 1. Conecta el iPhone: su biblioteca se carga automáticamente. Puedes entrar en **Biblioteca** o pulsar **Actualizar** para releerla.

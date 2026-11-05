@@ -2,10 +2,36 @@
 from pathlib import Path
 import math
 import struct
+import unicodedata
 import mutagen
 
 from ..audio import inspect_audio
 from .protocol import require
+
+
+def numbering(tags,id3_key,mp4_key):
+    """Project optional numbering without inventing a position or changing tags."""
+    value=tags.get(mp4_key)
+    if isinstance(value,(list,tuple)) and value and isinstance(value[0],(list,tuple)):
+        parts=value[0]
+    else:
+        value=tags.get(id3_key)
+        if hasattr(value,'text'):value=value.text
+        if isinstance(value,(list,tuple)):value=value[0] if value else ''
+        label=str(value) if value is not None else ''
+        parts=label.split('/',2) if len(label)<=4096 else []
+    def positive_integer(value):
+        value=str(value).strip()
+        if not value or len(value)>4096 or not value.isdecimal():return None
+        digits=''.join(str(unicodedata.decimal(c)) for c in value).lstrip('0')
+        if not digits or len(digits)>5:return None
+        number=int(digits)
+        return number if number<=65535 else None
+    position=positive_integer(parts[0]) if parts else None
+    total=positive_integer(parts[1]) if len(parts)>1 else None
+    # A total without a position, or smaller than it, is not a qualified pair.
+    # Keep a valid position; omit only the unusable optional information.
+    return position,total if position is not None and total is not None and total>=position else None
 
 
 def inspect_source(path, expected_hash=None):
@@ -74,16 +100,8 @@ def inspect_source(path, expected_hash=None):
     require(source['samples'] > 0 and source['bit_rate'] > 0, 'source-timing')
     require(fmt != 'MP3' or source['bit_rate'] <= 320, 'mp3-bitrate')
     for keys, first, second in [(('TRCK','trkn'),'track_number','track_count'),(('TPOS','disk'),'disc_number','disc_count')]:
-        value = tags.get(keys[1])
-        if value:
-            numbers = value[0]
-        else:
-            label = text(keys[0])
-            numbers = label.split('/') if label else []
-        for key, number in zip((first,second),numbers):
-            if str(number).isdigit() and 0 < int(number) < 65536:
-                source[key] = int(number)
-        require(not source.get(second) or (source.get(first,0) > 0 and source[first] <= source[second]), 'metadata-numbering')
+        for key,number in zip((first,second),numbering(tags,*keys)):
+            if number is not None:source[key]=number
     year = text('TDRC','TYER','\xa9day')[:4]
     if year.isdigit() and 0 < int(year) <= 9999:
         source['year'] = int(year)

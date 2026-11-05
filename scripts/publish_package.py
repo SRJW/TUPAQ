@@ -16,11 +16,13 @@ def main():
     if subprocess.run(view, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         with tempfile.TemporaryDirectory() as directory:
             notes = Path(directory)/'notes.md'
-            notes.write_text('''TUPAQ: lotes grandes comprobados, interfaz tonal y tipografía fija.
+            notes.write_text('''TUPAQ: numeración opcional compatible, lotes grandes comprobados e interfaz tonal.
+
+- Corregido import:metadata-numbering: los totales de pistas o discos sin una posición, o menores que ella, ya no detienen la importación. Se conserva la posición válida y se omite el total incoherente solo en los datos del envío; no se reescribe el archivo original. Se prueban MP3, WAV, AIFF, M4A ALAC y AAC y un envío de 51 canciones en dos lotes.
 
 - Importar y eliminar hasta 50.000 canciones por selección, divididas en transacciones nativas de hasta 49 y 100 canciones respectivamente. Cada lote se comprueba antes del siguiente; una cancelación o un error detiene el resto.
 - Prueba de 10.000 importaciones y 10.000 eliminaciones en un iPhone simulado; también 1.000 archivos mezclados con portadas y 10.000 archivos preparados en la interfaz. Corregidas colisiones de rutas dentro del mismo lote y acumulación de trabajo en la interfaz.
-- 192 pruebas automáticas aprobadas en la revisión de desarrollo. Estos resultados no sustituyen una prueba USB con un iPhone físico ni garantizan cero fallos. Informe y reproducción en docs/ESTRES.md.
+- 196 pruebas automáticas aprobadas en la revisión de desarrollo. Estos resultados no sustituyen una prueba USB con un iPhone físico ni garantizan cero fallos. Informe y reproducción en docs/ESTRES.md.
 
 - Composición completamente renovada: navegación compacta, tarjeta protagonista del iPhone, tres acciones grandes y biblioteca a todo el ancho. Detalles abre una ventana secundaria; se elimina la tercera columna permanente.
 - Contraste del botón principal comprobado sobre su imagen renderizada al pasar el cursor, en claro y oscuro.

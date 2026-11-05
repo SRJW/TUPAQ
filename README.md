@@ -9,13 +9,18 @@ El objetivo es importar música local a la app Música del iPhone sin usar la
 aplicación iTunes ni 3uTools.
 
 El usuario confirmó la lectura y la importación con metadatos y portada en Música del iPhone.
+**Numeración de pistas y discos:** se corrige `import:metadata-numbering`.
+Un total sin posición (`0/12`) o menor que ella (`9/3`) ya no detiene la
+importación: se conserva la posición válida y se omite el total incoherente
+en los datos enviados. Los originales permanecen intactos.
+
 **Lotes grandes:** importación y eliminación divididas automáticamente en
 transacciones comprobadas, con cancelación entre lotes y parada ante el primer
 fallo. Se probaron **10.000 importaciones y 10.000 eliminaciones en un iPhone
 simulado**, conservando el audio ajeno a la selección. Esto no sustituye una prueba
 USB con un dispositivo físico. [Informe reproducible](docs/ESTRES.md).
 
-La **0.3.0-preview.23** conserva la biblioteca visible mientras se actualiza después
+La **0.3.0-preview.24** conserva la biblioteca visible mientras se actualiza después
 de una importación, incluidas selección, marcas, posición de lectura y carátulas.
 Si falla la lectura, mantiene la última vista válida e indica que no está actualizada.
 La comprobación de título, artista y álbum acepta las dos representaciones
