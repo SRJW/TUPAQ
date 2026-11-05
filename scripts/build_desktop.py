@@ -5,6 +5,7 @@ import platform
 import os
 import subprocess
 import sys
+import time
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -19,6 +20,20 @@ def checked_run(command, **options):
             message = result.stdout[-3500:].replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
             print('::error title=Error al empaquetar::'+message, flush=True)
         raise subprocess.CalledProcessError(result.returncode, command)
+
+
+def detach_build_image(mountpoint):
+    """Release only this build's read-only image, allowing transient indexer reads."""
+    mountpoint=Path(mountpoint).resolve()
+    if mountpoint!=(ROOT/'dist'/'mounted-dmg').resolve():raise ValueError('Not the build image mountpoint')
+    for attempt in range(3):
+        result=subprocess.run(['hdiutil','detach',str(mountpoint)],stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True)
+        if result.returncode==0:return
+        if 'resource busy' not in result.stdout.lower():
+            raise subprocess.CalledProcessError(result.returncode,result.args,output=result.stdout)
+        if attempt<2:time.sleep(.5*(attempt+1))
+    # This mount was created with -readonly above; no user volume is targeted.
+    checked_run(['hdiutil','detach','-force',str(mountpoint)],check=True)
 
 
 def main():
@@ -62,7 +77,7 @@ def main():
                             str(ROOT/'dist'/'mounted-dmg'/'TUPAQ.app'/'Contents'/'MacOS'/'TUPAQ')],
                            cwd=ROOT, check=True)
         finally:
-            checked_run(['hdiutil', 'detach', str(ROOT/'dist'/'mounted-dmg')], check=True)
+            detach_build_image(ROOT/'dist'/'mounted-dmg')
 
 
 if __name__ == '__main__':

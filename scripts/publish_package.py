@@ -16,7 +16,7 @@ def main():
     if subprocess.run(view, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         with tempfile.TemporaryDirectory() as directory:
             notes = Path(directory)/'notes.md'
-            notes.write_text('''TUPAQ 0.3.0-preview.21: interfaz tonal, interacciones cuidadas y tipografía fija.
+            notes.write_text('''TUPAQ 0.3.0-preview.22: interfaz tonal, interacciones cuidadas y tipografía fija.
 
 - Composición completamente renovada: navegación compacta, tarjeta protagonista del iPhone, tres acciones grandes y biblioteca a todo el ancho. Detalles abre una ventana secundaria; se elimina la tercera columna permanente.
 - Contraste del botón principal comprobado sobre su imagen renderizada al pasar el cursor, en claro y oscuro.
@@ -26,6 +26,7 @@ def main():
 - Windows usa PP Mori instalada automáticamente: Regular, Medium, SemiBold y Bold. Se eliminan el selector de fuentes, Agregar y Aplicar. Mac conserva la fuente del sistema.
 - Mori tiene licencia personal: sus archivos no se incluyen en estos paquetes. Extrae tu Mori.zip, instala los cuatro pesos desde Windows y vuelve a abrir TUPAQ. Si falta, se usa y se identifica la fuente del sistema. Instrucciones en docs/INTERACCION.md.
 - Corregida la prueba de tipografía de macOS para reconocer .AppleSystemUIFont como alias de San Francisco. No se sustituye la fuente del sistema.
+- Creación del DMG más robusta: reintento limitado al desmontar la imagen temporal de solo lectura si el indexador de macOS la mantiene ocupada.
 - Se conservan las funciones de música, selección, orden, importación/exportación y sus comprobaciones. Las letras dentro de Música del iPhone siguen pendientes de validar.
 
 Pruebas automatizadas y comprobación de cada paquete antes de publicarlo. No necesitas Python ni abrir iTunes. Paquetes sin firma ni notarización. No se redistribuyen fuentes de Apple ni Mori con licencia personal.
