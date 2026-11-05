@@ -35,6 +35,23 @@ def line_icon(kind, color='#52576d', size=22):
         dy = 4 if kind == 'upload' else -4
         p.drawLine(12,y2,8,y2+dy);p.drawLine(12,y2,16,y2+dy)
         p.drawPolyline([QPointF(4,17),QPointF(4,21),QPointF(20,21),QPointF(20,17)])
+    elif kind == 'pulse':
+        p.drawPolyline([QPointF(2,12),QPointF(7,12),QPointF(10,4),QPointF(14,20),QPointF(17,12),QPointF(22,12)])
+    elif kind == 'pause':
+        p.drawLine(8,5,8,19);p.drawLine(16,5,16,19)
+    elif kind == 'history':
+        p.drawArc(QRectF(4,4,16,16),0,300*16);p.drawLine(12,7,12,12);p.drawLine(12,12,16,14)
+    elif kind == 'file':
+        p.drawPolyline([QPointF(6,2),QPointF(14,2),QPointF(19,7),QPointF(19,22),QPointF(6,22),QPointF(6,2)]);p.drawPolyline([QPointF(14,2),QPointF(14,8),QPointF(19,8)])
+    elif kind == 'tag':
+        p.drawPolyline([QPointF(3,3),QPointF(12,3),QPointF(22,13),QPointF(13,22),QPointF(3,12),QPointF(3,3)]);p.drawEllipse(QRectF(6,6,3,3))
+    elif kind == 'image':
+        p.drawRoundedRect(QRectF(3,3,18,18),2,2);p.drawEllipse(QRectF(6,6,3,3));p.drawPolyline([QPointF(4,18),QPointF(10,12),QPointF(14,16),QPointF(18,12),QPointF(21,15)])
+    elif kind == 'sun':
+        p.drawEllipse(QRectF(7,7,10,10))
+        for a,b,c,d in [(12,1,12,4),(12,20,12,23),(1,12,4,12),(20,12,23,12),(4,4,6,6),(18,18,20,20),(4,20,6,18),(18,6,20,4)]:p.drawLine(a,b,c,d)
+    elif kind == 'globe':
+        p.drawEllipse(QRectF(3,3,18,18));p.drawEllipse(QRectF(8,3,8,18));p.drawLine(3,12,21,12)
     elif kind == 'info':
         p.drawEllipse(QRectF(3,3,18,18));p.drawPoint(12,7);p.drawLine(12,11,12,17)
     elif kind == 'settings':

@@ -19,11 +19,13 @@ class LibraryEmptyState(QFrame):
     def refresh(self):
         w=self.owner
         if w.library_model.rowCount():self.hide();return
-        if w.search.text().strip():
+        if w.format_filter.currentIndex() or w.content_filter.currentIndex():
+            title,description,action='Sin coincidencias','Prueba otro título, artista, álbum o formato.','Limpiar filtros';callback=w.clear_filters
+        elif w.search.text().strip():
             title,description,action='Sin coincidencias','Prueba otro título, artista, álbum o formato.','Limpiar búsqueda';callback=w.search.clear
         elif w.library_worker is not None or (w.after_artwork and w.after_artwork[0]=='library'):
             title,description,action='Leyendo tu biblioteca','Tus canciones aparecerán aquí cuando termine la lectura.',None;callback=None
-        elif w.connection_token is not None:
+        elif w.usb_connected or w.connection_token is not None:
             title,description,action='Sin canciones visibles','Añade música del ordenador o actualiza la biblioteca del iPhone.','Añadir canciones';callback=w.choose_files
         else:
             title,description,action='Tu música empieza aquí','Conecta tu iPhone por USB para ver su biblioteca. También puedes preparar canciones del ordenador.','Comprobar USB';callback=w.check_device

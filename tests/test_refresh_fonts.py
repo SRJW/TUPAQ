@@ -59,7 +59,7 @@ class FontApplicationTests(unittest.TestCase):
                     self.assertEqual(QFontInfo(widget.font()).family(),actual,widget.objectName())
                 from PySide6.QtWidgets import QMessageBox
                 dialog=QMessageBox(w);self.assertEqual(QFontInfo(dialog.font()).family(),actual);dialog.deleteLater()
-                self.assertIn('Mori',w.font_status.text())
+                self.assertIn('fuente del sistema',w.font_status.text());self.assertFalse(APP.typography_is_mori)
             finally:w.close();w.deleteLater();APP.processEvents()
 
     def test_mac_keeps_system_font_even_when_mori_is_available(self):
@@ -70,27 +70,10 @@ class FontApplicationTests(unittest.TestCase):
                 self.assertIn('fuente del sistema',w.font_status.text());self.assertFalse(APP.typography_is_mori)
             finally:w.close();w.deleteLater();APP.processEvents()
 
-    def test_real_mori_weights_when_personal_test_fonts_are_available(self):
-        import os
-        from pathlib import Path
+    def test_available_custom_fonts_cannot_override_the_native_system_font(self):
         from importios.typography import configure
-        root=Path(os.environ.get('TUPAQ_TEST_MORI_DIR','/nonexistent-private-test-fonts'))
-        files=[root/f'PPMori-{weight}.ttf' for weight in ('Regular','Medium','SemiBold','Bold')]
-        if not all(file.is_file() for file in files):self.skipTest('Personal Mori files are not redistributed with tests')
-        identifiers=[QFontDatabase.addApplicationFont(str(file)) for file in files]
-        try:
-            with patch('importios.native.sys.platform','win32'):
-                w=Window(auto_connect=False);w.show();APP.processEvents()
-                try:
-                    self.assertTrue(APP.typography_is_mori);self.assertEqual(APP.font().pixelSize(),14)
-                    for weight,style in ((400,'Regular'),(500,'Medium'),(600,'SemiBold'),(700,'Bold')):
-                        font=QFont('PP Mori');font.setWeight(QFont.Weight(weight));info=QFontInfo(font)
-                        self.assertEqual(info.family(),'PP Mori');self.assertEqual(info.weight(),weight);self.assertEqual(info.styleName(),style)
-                    from PySide6.QtGui import QFontMetrics
-                    self.assertGreaterEqual(w.library_table.columnWidth(3),QFontMetrics(w.library_table.font()).horizontalAdvance('M4A · ALAC')+18)
-                    for widget in (w.choose,w.heading,w.nav_buttons[0],w.library_table,w.library_table.horizontalHeader(),w.info_artist,w.status,w.font_status):
-                        self.assertEqual(QFontInfo(widget.font()).family(),'PP Mori')
-                finally:w.close();w.deleteLater();APP.processEvents()
-        finally:
-            for identifier in identifiers:QFontDatabase.removeApplicationFont(identifier)
-            configure(APP)
+        native=QFontInfo(QFontDatabase.systemFont(QFontDatabase.SystemFont.GeneralFont)).family()
+        with patch('importios.typography.sys.platform','win32'),patch('importios.typography.QFontDatabase.families',return_value=['PP Mori']) as families,patch('importios.typography.QFontDatabase.addApplicationFont') as load:
+            configure(APP,'/missing/Mori.ttf','PP Mori')
+            self.assertEqual(QFontInfo(APP.font()).family(),native);families.assert_not_called();load.assert_not_called()
+        configure(APP)

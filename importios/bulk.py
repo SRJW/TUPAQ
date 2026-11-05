@@ -7,7 +7,7 @@ import shutil
 import time
 import uuid
 from contextvars import ContextVar
-from .cancellation import CURRENT,TransferCancelled,checkpoint
+from .cancellation import CURRENT,TransferCancelled,checkpoint,wait_if_paused
 from .sync.protocol import require
 
 MAX_SELECTION=50_000
@@ -72,6 +72,7 @@ async def execute(mode,selected,root,progress):
     control=CURRENT.get();reserve=MIN_FREE;binding_token=BINDING.set({})
     try:
         for number,chunk in enumerate(chunks):
+            await wait_if_paused(lambda _value,_total,label:progress(result['processed']*100,len(selected)*100,label))
             checkpoint()
             require(shutil.disk_usage(root).free>=reserve,'bulk-local-space')
             base=result['processed'];last_emit=0.;last_value=base*100

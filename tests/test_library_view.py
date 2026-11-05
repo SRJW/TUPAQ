@@ -64,10 +64,10 @@ class LibraryViewTests(unittest.TestCase):
             self.assertEqual(window.library_model.data(window.library_model.index(0,5)),'20.0 MB')
         finally:window.close();window.deleteLater();APP.processEvents()
 
-    def test_only_library_and_preferences_and_both_transfer_actions_share_one_page(self):
+    def test_reference_navigation_preserves_library_transfer_actions(self):
         window=Window(auto_connect=False);window.show();APP.processEvents()
         try:
-            self.assertEqual([button.text() for button in window.nav_buttons],['Biblioteca','Preferencias'])
+            self.assertEqual([button.text() for button in window.nav_buttons],['Biblioteca','Preferencias','Importar','Diagnóstico'])
             self.assertTrue(window.choose.isVisible());self.assertTrue(window.import_phone.isVisible());self.assertTrue(window.export_phone.isVisible())
             rows=[{'id':'local','title':'Local','artist':'A','album':'B','duration':1,'is_local':True,'usb_exists':True},
                   {'id':'cloud','title':'Local','artist':'A','album':'B','duration':1,'is_local':False}]

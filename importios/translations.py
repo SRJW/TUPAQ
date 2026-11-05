@@ -1043,3 +1043,75 @@ EN = {
  'Género': 'Genre',
  'Año': 'Year',
  'Estilo visual': 'Visual style'}
+
+# Teal/orange workspace and native system typography.
+EN.update({
+    'Actualizar':'Refresh','Actualizar la biblioteca después de transferir':'Refresh the library after transfers',
+    'Almacenamiento (datos)':'Storage (data volume)','Última lectura del volumen de datos del dispositivo.':'Last reading of the device data volume.',
+    'Arrastra archivos o carpetas de música aquí':'Drag music files or folders here',
+    'Añade música a la biblioteca de tu iPhone.':'Add music to your iPhone library.',
+    'Cambiar carpeta…':'Change folder…','Carpeta de música':'Music folder','Elegir carpeta de música':'Choose music folder',
+    'Carpeta inicial para elegir y exportar música.':'Starting folder for selecting and exporting music.',
+    'Cola de importación':'Import queue','CSV':'CSV',
+    'Completa la carátula de la copia exportada cuando exista en el catálogo. El audio del iPhone no se modifica.':'Fill missing artwork in exported copies when available in the catalogue. Audio on the iPhone stays unchanged.',
+    'Comprobar archivos':'Check files','Copiar diagnóstico':'Copy diagnostics','Elegir archivos…':'Choose files…','Elegir carpeta…':'Choose folder…',
+    'Estado del dispositivo y comprobaciones de lectura.':'Device status and read checks.',
+    'Formatos admitidos':'Supported formats','Formatos compatibles':'Supported formats',
+    'Historial':'History','Historial de transferencias':'Transfer history',
+    'Importar al iPhone':'Import to iPhone','Importar automáticamente al preparar canciones':'Automatically import after preparing songs',
+    'Importar carátulas cuando estén disponibles':'Import artwork when available',
+    'Incrustar carátulas en las copias exportadas':'Embed artwork in exported copies',
+    'Información pendiente de lectura.':'Device information has not been read yet.',
+    'La comprobación de cada transferencia siempre permanece activa.':'Verification of each transfer always remains active.',
+    'Las comprobaciones solo leen el dispositivo; no modifican su biblioteca.':'Checks only read the device; they do not modify its library.',
+    'Los originales se conservan.':'Original files are preserved.',
+    'O elige una opción para preparar tus canciones.':'Or choose an option to prepare your songs.',
+    'Pausar':'Pause','Pendiente':'Pending','Reanudar':'Resume','Pausado entre lotes.':'Paused between batches.',
+    'Personaliza TUPAQ y la gestión de tu música.':'Customize TUPAQ and your music library experience.',
+    'Reducir transparencia':'Reduce transparency',
+    'Se aplica a los próximos envíos. Los archivos originales se conservan.':'Applies to upcoming transfers. Original files are preserved.',
+    'Se pausará al terminar el lote o archivo en curso.':'Will pause when the current batch or file finishes.',
+    'Selecciona canciones para preparar la importación.':'Choose songs to prepare an import.',
+    'Sincronización':'Sync','Rutas de biblioteca':'Library paths','Metadatos':'Metadata','Carátulas':'Artwork',
+    'Solo con el mismo iPhone conectado y su biblioteca leída. Desactivado inicialmente.':'Only with the same connected iPhone and its library loaded. Off by default.',
+    'TUPAQ utiliza la fuente del sistema en toda la interfaz.':'TUPAQ uses the system font throughout the interface.',
+    'Todavía no hay operaciones registradas.':'No operations have been recorded yet.',
+    'Usar el color naranja de TUPAQ':'Use TUPAQ orange accent',
+    'Conservar metadatos':'Keep existing metadata','Usar nombre de archivo como título':'Use filename as title',
+    'Todos los formatos':'All formats','Toda la música':'All music','Con carátula':'With artwork','Con letra':'With lyrics',
+    'Catálogo leído desde el iPhone.':'Catalogue read from iPhone.',
+    'Conexión USB':'USB connection','Detección y acceso al dispositivo.':'Device detection and access.',
+    'Lectura de audios':'Audio reads','Comprobación completa de los archivos seleccionados o de la biblioteca.':'Complete reads of selected files, or of the library.',
+    'Compatibilidad':'Compatibility','MP3 · WAV · M4A (AAC/ALAC) · AIFF':'MP3 · WAV · M4A (AAC/ALAC) · AIFF',
+    'Sin canciones para importar.':'No songs to import.','iPhone (USB)':'iPhone (USB)',
+    '{count} canciones · {size}':'{count} songs · {size}',
+    '{count} audios leídos · {failed} no disponibles':'{count} audio files read · {failed} unavailable',
+    'Comprobando lectura de audios…':'Checking audio reads…',
+    'Fecha':'Date','Operación':'Operation','Estado':'Status','Canciones':'Songs',
+    'Completada':'Completed','Detenida':'Stopped','Cancelada':'Cancelled',
+})
+
+EN.update({
+    'Preparada':'Ready','Enviada':'Sent','Enviando…':'Sending…','Preparación':'Preparation','Transferencia':'Transfer','Comprobación':'Verification',
+    'AAC y ALAC dentro de M4A. Los originales se conservan.':'AAC and ALAC inside M4A. Original files are preserved.',
+    'Conservar metadatos (recomendado)':'Keep existing metadata (recommended)',
+    'Controla el envío al catálogo. Las carátulas ya incrustadas en los originales se conservan.':'Controls catalogue artwork delivery. Artwork already embedded in originals is preserved.',
+    '{count} carátulas incrustadas en las copias.':'{count} covers embedded in exported copies.',
+})
+
+EN.update({
+    'Limpiar filtros':'Clear filters',
+    '{count} hashes conocidos comprobados · {different} distintos':'{count} known hashes checked · {different} mismatches',
+})
+
+EN.update({'Actualizar la biblioteca al detectar cambios':'Refresh the library when changes are detected'})
+
+EN.update({'{count} canciones preparadas. Pulsa Importar para continuar.':'{count} songs ready. Click Import to continue.'})
+
+EN.update({
+    'Comprobar todo':'Run all checks','Comprobar selección':'Check selection','Comprobaciones':'Health checks',
+    'Conexión del dispositivo':'Device connection','Base de datos':'Library database','Permisos del catálogo':'Catalogue read access',
+    'Integridad con recibos':'Integrity against receipts','Comprobado':'Checked','Diferencias detectadas':'Mismatches detected','Sin recibos previos':'No previous receipts',
+})
+
+EN.update({'No se completaron las comprobaciones de lectura. No se modificó el iPhone.':'Read checks did not complete. The iPhone was not modified.','La biblioteca cambió. Actualiza la lista antes de comprobarla.':'The library changed. Refresh the list before checking it.','Comprobación detenida. Consulta el diagnóstico.':'Check stopped. Review diagnostics.'})

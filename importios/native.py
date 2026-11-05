@@ -14,7 +14,7 @@ import asyncio
 import threading
 
 from PySide6.QtCore import Qt, QThread, Signal, QSize, QStandardPaths, QLockFile, QUrl, QTimer, QSettings, QPoint, QItemSelectionModel
-from PySide6.QtGui import QIcon, QPixmap, QDesktopServices, QShortcut, QKeySequence
+from PySide6.QtGui import QImage,QFontMetrics,QIcon, QPixmap, QDesktopServices, QShortcut, QKeySequence
 from PySide6.QtWidgets import QApplication,QFileDialog,QMainWindow,QMessageBox,QAbstractItemView,QDialog,QVBoxLayout,QScrollArea,QLabel,QPlainTextEdit
 
 from .i18n import tr, set_language, language, LANGUAGES, QMessageBox
@@ -37,13 +37,19 @@ class Reader(QThread):
     problem = Signal(str)
     progress = Signal(int, int)
 
-    def __init__(self, paths, parent=None):
+    def __init__(self, paths, parent=None,limit=MAX_SELECTION):
         super().__init__(parent)
-        self.paths = paths
+        self.paths = paths;self.limit=limit
         self.credits=threading.Semaphore(64)
         self.problem_count=0
 
     def run(self):
+        try:
+            from .preparation import expand
+            self.paths=expand(self.paths,self.isInterruptionRequested,self.limit)
+        except (OSError,ValueError) as error:
+            self.problem_count=1;self.problem.emit(str(error));return
+        self.progress.emit(0,len(self.paths))
         last_progress=0.
         for index, path in enumerate(self.paths):
             if self.isInterruptionRequested():
@@ -74,9 +80,20 @@ class DeviceReader(QThread):
     result = Signal(list)
     problem = Signal(str)
 
+    def __init__(self,parent=None,stamp=None,token=None):
+        super().__init__(parent);self.stamp=stamp;self.token=token
+
     def run(self):
         try:
-            self.result.emit(discover(fingerprint=True))
+            devices=discover(fingerprint=True)
+            if self.stamp is not None and len(devices)==1 and devices[0].get('token')==self.token:
+                async def probe():
+                    from .transfers import device
+                    from .library import catalogue_stamp
+                    async with device() as (_,afc):return await asyncio.wait_for(catalogue_stamp(afc),timeout=5)
+                try:devices[0]['catalogue_stamp']=asyncio.run(probe())
+                except Exception:pass # Keep the last valid view when an optional probe fails.
+            self.result.emit(devices)
         except DiscoveryError as error:
             self.problem.emit(str(error))
 
@@ -85,13 +102,14 @@ class LibraryReader(QThread):
     result = Signal(list, str)
     problem = Signal(str)
     name = Signal(str)
+    info = Signal(dict)
 
     def run(self):
         try:
             diagnostics = {}
             info = {}
             tracks = read_phone_library(diagnostics=diagnostics,device_info=info)
-            self.name.emit(info.get('name','iPhone'))
+            self.name.emit(info.get('name','iPhone'));self.info.emit(info)
             self.result.emit(tracks, format_diagnostics(diagnostics))
         except LibraryError as error:
             self.problem.emit(f'TUPAQ {VERSION}\n{error}\nDiagnóstico: {error.diagnostic}')
@@ -209,7 +227,7 @@ class Window(QMainWindow):
         self.setMinimumSize(1080,680)
         self.resize(min(1500,area.width()-48) if area else 1500,min(880,area.height()-70) if area else 880)
         self.setAcceptDrops(True)
-        self.tracks = {}
+        self.tracks = {};self.queue_status={}
         self.worker = None
         self.device_worker = None
         self.library_worker = None
@@ -223,14 +241,16 @@ class Window(QMainWindow):
         self.after_artwork = None
         self.preview_pending=None;self.preview_key=None;self.preview_result={};self.preview_generation=0;self.closing=False
         self.connection_token = None
+        self.usb_connected=False
         self.connection_generation=0
         self.library_ready = False
         self.phone_tracks = []
         self.retry_library_at = 0
         self.library_epoch = 0
         self.artwork_attempted = set()
-        self.duplicates = 0
+        self.duplicates = 0;self.preparation_count_before=0
         self.activity_message=''
+        self.device_details={};self.diagnostic_result=None;self.auto_target_token=None;self.transfer_phase=0;self.last_stamp_probe=0.
         saved_language=QSettings().value('language','es') if auto_connect else 'es'
         set_language(saved_language)
         from .typography import configure
@@ -250,12 +270,20 @@ class Window(QMainWindow):
         if self.persist_settings:
             settings = QSettings()
             choice=int(settings.value('appearance',2))
-            if settings.value('design_version','')!='tonal-19':settings.setValue('glass_mood',3)
-            settings.setValue('design_version','tonal-19')
+            if settings.value('design_version','')!='teal-system-25':settings.setValue('glass_mood',3)
+            settings.setValue('design_version','teal-system-25')
             settings.setValue('appearance',choice)
             self.theme_choice.setCurrentIndex(choice)
             self.mood_choice.blockSignals(True);self.mood_choice.setCurrentIndex(int(settings.value('glass_mood',3)));self.mood_choice.blockSignals(False)
             self.auto_read.setChecked(settings.value('automatic_library',True,type=bool))
+        settings=QSettings()
+        music_folder=QStandardPaths.writableLocation(QStandardPaths.StandardLocation.MusicLocation) or str(Path.home())
+        self.library_path.setText(str(settings.value('library_path',music_folder)) if auto_connect else music_folder)
+        for control,key,default in [(self.use_accent,'use_accent',True),(self.reduce_transparency,'reduce_transparency',False),
+                                   (self.import_artwork,'send_artwork',True),(self.embed_artwork,'embed_export_artwork',False),
+                                   (self.auto_import,'auto_import',False),(self.refresh_after_transfer,'refresh_after_transfer',True)]:
+            control.blockSignals(True);control.setChecked(settings.value(key,default,type=bool) if auto_connect else default);control.blockSignals(False)
+        self.metadata_choice.blockSignals(True);self.metadata_choice.setCurrentIndex(1 if auto_connect and settings.value('metadata_policy','keep')=='filename' else 0);self.metadata_choice.blockSignals(False)
         self.theme_choice.currentIndexChanged.connect(self.change_theme)
         self.auto_read.toggled.connect(self.change_auto_read)
         QApplication.styleHints().colorSchemeChanged.connect(self.system_theme_changed)
@@ -294,14 +322,24 @@ class Window(QMainWindow):
         self.resume_import.setEnabled(not phone_busy and self.backup_root.exists())
         self.repair_metadata.setEnabled(not phone_busy and self.backup_root.exists())
         self.open_backup.setEnabled(self.backup_root.exists())
-        self.queue_toggle.setVisible(bool(self.tracks) or self.worker is not None)
+        self.queue_toggle.hide()
         self.queue_toggle.setText(tr(f'Cola ({len(self.tracks)})'))
-        self.queue_panel.setVisible((bool(self.tracks) or self.worker is not None) and self.queue_toggle.isChecked())
-        self.queue_panel.setMinimumHeight(min(210,100+44*len(self.tracks)) if self.tracks else 110)
+        self.queue_panel.show()
+        self.queue_panel.setMinimumHeight(160)
+        self.import_choose.setEnabled(not busy);self.folder_choose.setEnabled(not busy);self.import_submit.setEnabled(self.import_phone.isEnabled())
+        size=sum(t.get('size',0) for t in self.tracks.values() if isinstance(t.get('size'),int))
+        self.queue_summary.setText(tr(f'{len(self.tracks)} canciones · {byte_label(size)}'))
+        self.diagnostic_refresh.setEnabled(not phone_busy);self.diagnostic_run.setEnabled(not phone_busy and (self.usb_connected or bool(self.phone_tracks)))
+        self.diagnostic_run.setText(tr('Comprobar selección' if selected else 'Comprobar todo'))
+        self.update_diagnostics()
 
     def navigate(self, number):
-        self.motion.navigate(self.pages,1 if number == 1 else 0)
-        self.nav_buttons[1 if number == 1 else 0].setChecked(True)
+        if number not in (0,1,2,3):return
+        self.nav_buttons[number].setChecked(True)
+        from .visuals import line_icon
+        colors=getattr(self,'colors',{'text':'#ffffff'})
+        for nav in self.nav_buttons:nav.setIcon(line_icon(nav.property('iconKind'),'#ffffff' if nav.isChecked() else colors['text'],18))
+        self.motion.navigate(self.pages,number)
         self.update_buttons()
         self.schedule_artwork()
         self.library_empty.refresh()
@@ -328,11 +366,19 @@ class Window(QMainWindow):
         finally:self.table.setSortingEnabled(sorting)
         if hasattr(self,'preview_track'):self.request_preview(self.preview_track)
         self.library_empty.refresh()
+        from .interface import fit_controls,set_column_metrics
+        fit_controls(self);set_column_metrics(self);self.update_diagnostics()
         if self.persist_settings:QSettings().setValue('language',language())
 
     def refresh_workspace(self):
         self.update_buttons()
         self.schedule_artwork()
+
+    def clear_filters(self):
+        for control in (self.search,self.format_filter,self.content_filter):control.blockSignals(True)
+        self.search.clear();self.format_filter.setCurrentIndex(0);self.content_filter.setCurrentIndex(0)
+        for control in (self.search,self.format_filter,self.content_filter):control.blockSignals(False)
+        self.filter_library()
 
     def filter_library(self, *ignored):
         from .library_fields import local_tracks
@@ -344,6 +390,12 @@ class Window(QMainWindow):
         known = any('is_local' in track for track in self.phone_tracks)
         displayed=local
         text=self.search.text().strip().casefold()
+        from .search import matches
+        if self.format_filter.currentIndex():displayed=[t for t in displayed if matches(t,self.format_filter.currentText())]
+        if self.content_filter.currentIndex()==1:displayed=[t for t in displayed if t.get('has_artwork') or t.get('artwork_paths')]
+        elif self.content_filter.currentIndex()==2:
+            from .lyrics import state
+            displayed=[t for t in displayed if state(t)]
         if text:
             from .search import matches
             displayed=[track for track in displayed if matches(track,text)]
@@ -381,9 +433,104 @@ class Window(QMainWindow):
         from .library_fields import local_tracks
         local=local_tracks(self.phone_tracks)
         missing=sum(track.get('usb_exists') is False for track in self.phone_tracks)
-        self.device_metric.setText(tr(f'{len(local)} canciones') if self.connection_token is not None or self.phone_tracks else tr('Tu biblioteca por USB'))
+        self.device_metric.setText(tr(f'{len(local)} canciones') if self.usb_connected or self.phone_tracks else tr('Tu biblioteca por USB'))
         text=f'{len(local)} canciones en el iPhone'
         self.device_status.setText(tr(text if self.phone_tracks else 'Conecta tu iPhone para mostrar su música.'))
+
+    def auto_import_prepared(self,target):
+        native_token=self.device_details.get('_device_token')
+        if self.auto_import.isChecked() and self.connection_token==target and self.library_ready and isinstance(native_token,str) and len(native_token)==64:self.import_songs()
+
+    def paint_transfer_stages(self):
+        if not hasattr(self,'stage_labels'):return
+        colors=getattr(self,'colors',{'muted':'#8a9b9c','text':'#edf4f3','orange':'#e97824'})
+        for index,(widget,title) in enumerate(zip(self.stage_labels,('Preparación','Transferencia','Comprobación'))):
+            widget.setText(('✓  ' if index<self.transfer_phase else '●  ' if index==self.transfer_phase else '○  ')+tr(title))
+            widget.setStyleSheet('color:'+colors['text' if index<self.transfer_phase else 'orange' if index==self.transfer_phase else 'muted'])
+
+    def choose_folder(self):
+        folder=QFileDialog.getExistingDirectory(self,tr('Elegir carpeta de música'),self.library_path.text())
+        if folder:self.add_paths([folder])
+
+    def choose_library_path(self):
+        folder=QFileDialog.getExistingDirectory(self,tr('Carpeta de música'),self.library_path.text())
+        if folder:
+            self.library_path.setText(folder)
+            if self.persist_settings:QSettings().setValue('library_path',folder)
+
+    def save_transfer_preferences(self,*ignored):
+        if not getattr(self,'persist_settings',False):return
+        settings=QSettings()
+        for control,key in [(self.import_artwork,'send_artwork'),(self.embed_artwork,'embed_export_artwork'),(self.auto_import,'auto_import'),(self.refresh_after_transfer,'refresh_after_transfer')]:settings.setValue(key,control.isChecked())
+        settings.setValue('metadata_policy','filename' if self.metadata_choice.currentIndex()==1 else 'keep')
+
+    def change_visual_options(self,*ignored):
+        from .interface import apply_theme
+        apply_theme(self)
+        if getattr(self,'persist_settings',False):
+            QSettings().setValue('use_accent',self.use_accent.isChecked());QSettings().setValue('reduce_transparency',self.reduce_transparency.isChecked())
+
+    def pause_transfer(self):
+        worker=self.transfer_worker
+        if worker is None:return
+        if worker.control.pause_requested.is_set():
+            worker.control.pause_requested.clear();self.pause_transfer_button.setText(tr('Pausar'))
+        else:
+            worker.control.pause_requested.set();self.pause_transfer_button.setText(tr('Reanudar'))
+            self.status.setText(tr('Se pausará al terminar el lote o archivo en curso.'))
+
+    def refresh_device_details(self):
+        self.library_ready=False;self.check_device()
+
+    def run_diagnostics(self):
+        self.diagnostic_result=None;self.navigate(3);self.start_transfer('diagnose',self.marked_tracks(),self.backup_root)
+
+    def update_diagnostics(self):
+        if not hasattr(self,'diagnostic_fields'):return
+        from .library_fields import local_tracks
+        tracks=local_tracks(self.phone_tracks);known=[t['size'] for t in tracks if type(t.get('size')) is int]
+        self.diagnostic_name.setText(self.device_name.text())
+        info=self.device_details
+        self.diagnostic_model.setText(' · '.join(v for v in (info.get('model'),('iOS '+info['version']) if info.get('version') else '') if v) or tr('Información pendiente de lectura.'))
+        self.diagnostic_fields['connection'].setText(tr('Conectado por USB' if self.usb_connected else 'Sin conexión USB'))
+        self.diagnostic_fields['library'].setText(tr(f'{len(tracks)} canciones') if self.library_ready else tr('Pendiente'))
+        total=info.get('total_bytes');free=info.get('free_bytes')
+        if type(total) is int and total>0 and type(free) is int and 0<=free<=total:
+            self.diagnostic_fields['storage'].setText(f'{(total-free)/10**9:.1f} GB / {total/10**9:.1f} GB')
+            self.storage_bar.setValue(round((total-free)*1000/total));self.storage_bar.show()
+        else:self.diagnostic_fields['storage'].setText(tr('Pendiente'));self.storage_bar.hide()
+        result=self.diagnostic_result
+        self.diagnostic_fields['files'].setText(tr(f"{result['diagnosed']} audios leídos · {result.get('files_failed',0)} no disponibles") if result else tr('Pendiente'))
+        self.diagnostic_fields['formats'].setText(tr('Formatos admitidos'))
+        self.diagnostic_note.setText(tr('Las comprobaciones solo leen el dispositivo; no modifican su biblioteca.')+((' '+tr(f"{result.get('hash_verified',0)} hashes conocidos comprobados · {result.get('hash_mismatches',0)} distintos")) if result else ''))
+        if known:self.diagnostic_fields['library'].setText(tr(f'{len(tracks)} canciones')+' · '+byte_label(sum(known)))
+        states={'connection':self.usb_connected,'database':self.library_ready,'permissions':self.library_ready}
+        for key,passed in states.items():
+            value=self.health_fields[key];value.setText(tr('Comprobado' if passed else 'Pendiente'))
+            if value.property('passed')!=passed:value.setProperty('passed',passed);value.style().unpolish(value);value.style().polish(value)
+        integrity=self.health_fields['integrity'];passed=bool(result and result.get('hash_verified') and not result.get('files_failed'));failed=bool(result and result.get('hash_mismatches'))
+        integrity.setText(tr('Diferencias detectadas' if failed else 'Comprobado' if passed else 'Sin recibos previos' if result else 'Pendiente'))
+        for key,state in [('passed',passed),('failed',failed)]:
+            if integrity.property(key)!=state:integrity.setProperty(key,state);integrity.style().unpolish(integrity);integrity.style().polish(integrity)
+
+    def open_history(self):
+        from .history import recent
+        from datetime import datetime
+        from .i18n import QTableWidget
+        dialog=QDialog(self);dialog.setWindowTitle(tr('Historial de transferencias'));dialog.resize(780,440)
+        layout=QVBoxLayout(dialog);rows=recent(self.backup_root.parent)
+        table=QTableWidget(len(rows),4);table.setHorizontalHeaderLabels(['Fecha','Operación','Estado','Canciones'])
+        operations={'import':'Importar','export':'Exportar','delete':'Eliminar','verify':'Revisar operación pendiente','resume':'Completar importación pendiente','repair':'Actualizar portadas y fecha','diagnose':'Diagnóstico'}
+        states={'completed':'Completada','stopped':'Detenida','cancelled':'Cancelada'}
+        for row,item in enumerate(rows):
+            try:date=datetime.fromisoformat(item['time']).astimezone().strftime('%Y-%m-%d %H:%M')
+            except (ValueError,KeyError):date='—'
+            values=[date,tr(operations[item['operation']]),tr(states.get(item.get('status'),'Detenida')),str(item.get('confirmed',0))+' / '+str(item.get('requested',0))]
+            for column,value in enumerate(values):table.setItem(row,column,SortableItem(value))
+        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers);table.horizontalHeader().setStretchLastSection(True);table.resizeColumnsToContents();layout.addWidget(table)
+        if not rows:layout.addWidget(QLabel(tr('Todavía no hay operaciones registradas.')))
+        from .interface import button
+        layout.addWidget(button('Cerrar','close',dialog.close));dialog.exec()
 
     def change_motion(self,reduced):
         self.motion.set_enabled(not reduced)
@@ -424,14 +571,19 @@ class Window(QMainWindow):
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.backup_root)))
 
     def poll_device(self):
-        if not self.background_enabled or not self.auto_read.isChecked() or self.thumbnail_worker is not None or self.after_artwork is not None:
+        if not self.background_enabled or not self.auto_read.isChecked() or self.worker is not None or self.thumbnail_worker is not None or self.after_artwork is not None:
             return
         self.check_device(automatic=True)
 
     def set_connection_status(self,connected,message):
+        self.usb_connected=bool(connected)
         self.connection_dot.setProperty('connected',bool(connected))
         self.connection_dot.style().unpolish(self.connection_dot);self.connection_dot.style().polish(self.connection_dot);self.connection_dot.update()
         self.connection_badge.setText(tr(message))
+        self.sidebar_dot.setProperty('connected',bool(connected));self.sidebar_dot.style().unpolish(self.sidebar_dot);self.sidebar_dot.style().polish(self.sidebar_dot)
+        self.sidebar_connection.setText(tr('iPhone (USB)' if connected else 'Sin conexión USB'))
+        self.diagnostic_state.setProperty('connected',bool(connected));self.diagnostic_state.style().unpolish(self.diagnostic_state);self.diagnostic_state.style().polish(self.diagnostic_state);self.diagnostic_state.setText(tr(message))
+        self.update_diagnostics()
 
     def devices_found(self, devices):
         if len(devices) != 1:
@@ -443,7 +595,7 @@ class Window(QMainWindow):
             self.library_model.checked.clear()
             self.filter_library()
             self.artwork_attempted.clear()
-            self.device_name.setText('iPhone')
+            self.device_name.setText('iPhone');self.device_details={};self.diagnostic_result=None
             self.set_connection_status(False,'Sin conexión USB' if not devices else 'Conecta un solo iPhone')
             self.device_status.setVisible(bool(devices))
             self.device_status.setText(tr('Conecta tu iPhone. Su biblioteca aparecerá automáticamente.' if not devices else 'Se detectó más de un dispositivo Apple. Conecta un solo iPhone para continuar.'))
@@ -451,6 +603,7 @@ class Window(QMainWindow):
         token = devices[0].get('token','usb')
         changed = token != self.connection_token
         if changed:
+            self.device_details={};self.diagnostic_result=None
             self.connection_generation+=1
             self.connection_token = token
             self.library_ready = False
@@ -460,6 +613,9 @@ class Window(QMainWindow):
             self.library_model.checked.clear()
             self.filter_library()
             self.artwork_attempted.clear()
+        stamp=devices[0].get('catalogue_stamp')
+        if self.refresh_after_transfer.isChecked() and stamp is not None and self.device_details.get('_catalogue_stamp') is not None and stamp!=self.device_details['_catalogue_stamp']:
+            self.library_ready=False;self.retry_library_at=0
         self.set_connection_status(True,'Conectado por USB')
         if not self.library_ready and time.monotonic() >= self.retry_library_at:
             self.load_library(automatic=True)
@@ -679,18 +835,18 @@ class Window(QMainWindow):
         selected=self.marked_tracks()
         if not selected:
             return
-        folder = QFileDialog.getExistingDirectory(self,tr('Guardar audio del iPhone en…'))
+        folder = QFileDialog.getExistingDirectory(self,tr('Guardar audio del iPhone en…'),self.library_path.text())
         if folder:
-            self.start_transfer('export',selected,Path(folder))
+            self.start_transfer('export',[dict(t,embed_artwork=self.embed_artwork.isChecked()) for t in selected],Path(folder))
 
     def start_transfer(self, mode, selected, destination):
         if self.transfer_worker is not None or self.worker is not None or self.library_worker is not None or self.device_worker is not None:
             return
-        if mode == 'import' and not selected:
-            return
+        if mode == 'import' and not selected:return
+        if mode=='import':selected=[dict(t,metadata_policy='filename' if self.metadata_choice.currentIndex()==1 else 'keep',send_artwork=self.import_artwork.isChecked(),required_device_token=self.device_details.get('_device_token')) for t in selected]
         if self.thumbnail_worker is not None:
             self.after_artwork = ('transfer',mode,selected,destination)
-            self.cancel_transfer_button.setText(tr('Cancelar'));self.cancel_transfer_button.setEnabled(True);self.cancel_transfer_button.setVisible(mode in ('import','export','delete'))
+            self.cancel_transfer_button.setText(tr('Cancelar'));self.cancel_transfer_button.setEnabled(True);self.cancel_transfer_button.setVisible(mode in ('import','export','delete','diagnose'))
             self.thumbnail_worker.stop()
             self.update_buttons()
             return
@@ -703,6 +859,8 @@ class Window(QMainWindow):
         self.transfer_outcome = None
         self.transfer_diagnostic = ''
         self.activity_message=''
+        self.table.setSortingEnabled(False)
+        self.transfer_phase=0;self.paint_transfer_stages()
         self.progress_track_id = None
         self.transfer_worker = TransferWorker(mode,selected,destination,self.backup_root.parent/'transfer.lock',self)
         self.transfer_worker.progress.connect(self.transfer_progress)
@@ -711,9 +869,11 @@ class Window(QMainWindow):
         self.transfer_worker.finished.connect(self.transfer_finished)
         self.progress.setRange(0,100)
         self.progress.setValue(0)
-        self.progress.show()
+        self.progress.show();self.import_progress.show()
         self.cancel_transfer_button.setText(tr('Cancelar'));self.cancel_transfer_button.setEnabled(True)
-        self.cancel_transfer_button.setVisible(mode in ('import','export','delete'))
+        self.cancel_transfer_button.setVisible(mode in ('import','export','delete','diagnose'))
+        self.pause_transfer_button.setText(tr('Pausar'));self.pause_transfer_button.setEnabled(True)
+        self.pause_transfer_button.setVisible(mode in ('export','diagnose') or mode=='import' and (len(selected)>49 or sum(t.get('size',0) for t in selected)>2*1024**3) or mode=='delete' and len(selected)>100)
         self.status.setText(tr('Preparando transferencia…'))
         self.update_buttons()
         self.transfer_worker.start()
@@ -721,33 +881,42 @@ class Window(QMainWindow):
     def cancel_transfer(self):
         worker=self.transfer_worker
         if worker is None:
-            if self.after_artwork and self.after_artwork[0]=='transfer' and self.after_artwork[1] in ('import','export','delete'):
+            if self.after_artwork and self.after_artwork[0]=='transfer' and self.after_artwork[1] in ('import','export','delete','diagnose'):
                 self.after_artwork=None;self.cancel_transfer_button.hide();self.status.setText(tr('Operación cancelada antes de iniciar el envío.'));self.update_buttons()
             return
-        if worker.mode not in ('import','export','delete'):return
+        if worker.mode not in ('import','export','delete','diagnose'):return
         immediate=worker.cancel()
-        self.cancel_transfer_button.setEnabled(False)
+        self.cancel_transfer_button.setEnabled(False);self.pause_transfer_button.setEnabled(False)
         self.cancel_transfer_button.setText(tr('Cancelando…' if immediate else 'Finalizando…'))
         self.status.setText(tr('Cancelando la operación…' if immediate else 'El envío de cambios ya comenzó. Se finalizará este lote para no dejar canciones incompletas.'))
 
     def transfer_progress(self, value, total, label, identifier=''):
-        self.progress.setRange(0,max(1,total))
-        self.progress.setValue(value)
+        if total>0:
+            self.progress.setRange(0,max(1,total));self.progress.setValue(value)
+            self.import_progress.setRange(0,max(1,total));self.import_progress.setValue(value)
         control=self.transfer_worker.control if self.transfer_worker is not None else None
-        if not (control and control.event.is_set()):self.status.setText(tr(label))
+        if not (control and control.event.is_set()):self.status.setText(tr(label));self.transfer_stage.setText(tr(label))
+        phase_label=label.partition(' · ')[2] if label.startswith('Lote ') else label
+        if phase_label.startswith(('Importando:','Exportando:','Enviando metadatos')):self.transfer_phase=1
+        elif phase_label.startswith(('Comprobando las canciones','Esperando la actualización','Importación comprobada','Exportada:')):self.transfer_phase=2
+        elif phase_label.startswith(('Leyendo el estado','Preparando el envío','Comprobando operaciones','Buscando canciones')):self.transfer_phase=0
+        self.paint_transfer_stages()
         if identifier and identifier != self.progress_track_id and identifier in self.tracks:
+            if self.progress_track_id in self.queue_status:self.queue_status[self.progress_track_id].setText(tr('Enviada'))
             self.progress_track_id = identifier
+            if identifier in self.queue_status:self.queue_status[identifier].setText(tr('Enviando…'))
             track = self.tracks[identifier]
             self.show_track_details(track,'Importando')
 
     def transfer_problem(self, message):
         self.transfer_diagnostic=message
         self.show_library_error(message)
-        self.status.setText(tr('Transferencia detenida. Consulta el diagnóstico antes de repetirla.'))
+        self.status.setText(tr('Comprobación detenida. Consulta el diagnóstico.' if self.transfer_worker is not None and self.transfer_worker.mode=='diagnose' else 'Transferencia detenida. Consulta el diagnóstico antes de repetirla.'))
         self.activity_message=self.status.text()
 
     def transfer_result(self, result):
         self.transfer_outcome = result
+        if not any(result.get(k) for k in ('cancelled','bulk_stopped','metadata_unverified','files_failed')) and any(k in result for k in ('imported','exported','deleted','diagnosed')):self.transfer_phase=3;self.paint_transfer_stages()
         if result.get('bulk') and (result.get('cancelled') or result.get('bulk_stopped')):
             self.status.setText(tr(f"Operación detenida: {result['processed']} de {result['requested']} canciones comprobadas."))
             if result.get('diagnostic'):
@@ -755,11 +924,17 @@ class Window(QMainWindow):
                 self.last_diagnostic=self.transfer_diagnostic;self.copy_diagnostic.setEnabled(True)
         elif result.get('cancelled'):
             self.status.setText(tr(f"Exportación cancelada. Se conservaron {result.get('exported',0)} archivos completos." if 'exported' in result else 'Operación cancelada antes de enviar cambios a Música.'))
+        elif 'diagnosed' in result:
+            self.diagnostic_result=result
+            self.transfer_diagnostic=format_diagnostics(result);self.last_diagnostic=self.transfer_diagnostic;self.copy_diagnostic.setEnabled(True)
+            self.status.setText(tr(f"{result['diagnosed']} audios leídos · {result.get('files_failed',0)} no disponibles"))
+            self.update_diagnostics()
         elif 'deleted' in result:
             self.status.setText(tr(f"{result['deleted']} canciones eliminadas de la biblioteca."))
             self.library_model.checked.difference_update(result.get('item_ids',[]))
         elif 'exported' in result:
             self.status.setText(tr(f"{result['exported']} archivos exportados y comprobados."))
+            if result.get('covers_embedded'):self.status.setText(self.status.text()+' '+tr(f"{result['covers_embedded']} carátulas incrustadas en las copias."))
         elif 'reconciled' in result and 'imported' not in result:
             self.status.setText(tr(f"{result.get('verified',0)} audios comprobados · {result.get('metadata_unverified',0)} con metadatos por revisar · {result.get('retired',0)} retirados por el iPhone · {result.get('removed',0)} eliminaciones comprobadas"))
         elif 'updated' in result:
@@ -775,26 +950,35 @@ class Window(QMainWindow):
         if result.get('metadata_unverified'):
             self.transfer_diagnostic=f'TUPAQ {VERSION}\nDiagnóstico: metadata:unverified\nDatos del protocolo: '+json.dumps(result.get('metadata_diagnostics',[]),sort_keys=True)
             self.last_diagnostic=self.transfer_diagnostic;self.copy_diagnostic.setEnabled(True)
+        self.transfer_stage.setText(self.status.text())
         self.activity_message=self.status.text()
 
     def transfer_finished(self):
         worker = self.transfer_worker
         self.transfer_worker = None
+        try:
+            from .history import record
+            if isinstance(worker.mode,str) and isinstance(worker.selected,(list,tuple)):record(self.backup_root.parent,worker.mode,len(worker.selected),self.transfer_outcome or ({'exported':len(worker.control.files)} if worker.mode=='export' else {}),self.transfer_diagnostic)
+        except OSError:pass # History never changes a verified native operation's result.
         worker.deleteLater()
-        self.progress.hide();self.cancel_transfer_button.hide()
+        self.progress.hide();self.cancel_transfer_button.hide();self.pause_transfer_button.hide();self.import_progress.hide()
         if self.transfer_outcome:
             completed = set(self.transfer_outcome.get('source_ids',[]))
             for row in range(self.table.rowCount()-1,-1,-1):
                 identifier = self.table.item(row,0).data(Qt.ItemDataRole.UserRole)
                 if identifier in completed:
-                    self.tracks.pop(identifier,None)
+                    self.tracks.pop(identifier,None);self.queue_status.pop(identifier,None)
                     self.table.removeRow(row)
+        self.table.setSortingEnabled(True)
+        if self.transfer_outcome and self.transfer_outcome.get('deleted'):
+            removed=set(self.transfer_outcome.get('item_ids',[]));self.phone_tracks=[t for t in self.phone_tracks if t['id'] not in removed]
+            self.library_model.checked.difference_update(removed);self.filter_library()
         self.update_buttons()
-        if self.transfer_outcome and any(key in self.transfer_outcome for key in ('imported','verified','updated','deleted')):
+        if self.refresh_after_transfer.isChecked() and self.transfer_outcome and any(key in self.transfer_outcome for key in ('imported','verified','updated','deleted')):
             self.load_library()
 
     def choose_files(self):
-        paths, _ = QFileDialog.getOpenFileNames(self, tr('Elegir canciones'), '',
+        paths, _ = QFileDialog.getOpenFileNames(self, tr('Elegir canciones'), self.library_path.text(),
             tr('Audio (*.mp3 *.wav *.m4a *.alac *.aif *.aiff);;Todos los archivos (*)'))
         self.add_paths(paths)
 
@@ -804,7 +988,9 @@ class Window(QMainWindow):
         self.device_button.setEnabled(False)
         if not automatic:
             self.device_status.setText(tr('Consultando el servicio local de Apple…'))
-        self.device_worker = DeviceReader(self)
+        probe=automatic and self.refresh_after_transfer.isChecked() and time.monotonic()-self.last_stamp_probe>=30
+        if probe:self.last_stamp_probe=time.monotonic()
+        self.device_worker = DeviceReader(self,stamp=self.device_details.get('_catalogue_stamp') if probe else None,token=self.connection_token)
         self.device_worker.result.connect(self.devices_found)
         self.device_worker.problem.connect(self.device_problem)
         self.device_worker.finished.connect(self.device_finished)
@@ -831,7 +1017,10 @@ class Window(QMainWindow):
         if self.current_library_result():self.library_problem(message)
 
     def accept_library_name(self,name):
-        if self.current_library_result():self.device_name.setText(name)
+        if self.current_library_result():self.device_name.setText(name);self.update_diagnostics()
+
+    def accept_library_info(self,info):
+        if self.current_library_result():self.device_details=info;self.update_diagnostics()
 
     def load_library(self, automatic=False):
         if self.library_worker is not None or self.transfer_worker is not None:
@@ -847,8 +1036,7 @@ class Window(QMainWindow):
         if not self.phone_tracks:self.library_heading.setText(tr('En el iPhone · leyendo…'))
         self.library_button.setEnabled(False)
         self.copy_diagnostic.setEnabled(False)
-        if not self.phone_tracks and (not automatic or (not self.tracks and self.pages.currentIndex() == 0)):
-            self.navigate(0)
+        # Preserve the active page while refreshing: imported music never blanks the UI.
         self.device_status.show()
         self.device_status.setText(tr('Actualizando biblioteca… Puedes seguir viendo tus canciones.' if self.phone_tracks else 'Leyendo la biblioteca del iPhone…'))
         self.library_worker = LibraryReader(self)
@@ -856,6 +1044,7 @@ class Window(QMainWindow):
         self.library_worker.result.connect(self.accept_library_result)
         self.library_worker.problem.connect(self.accept_library_problem)
         self.library_worker.name.connect(self.accept_library_name)
+        self.library_worker.info.connect(self.accept_library_info)
         self.library_worker.finished.connect(self.library_finished)
         self.update_buttons()
         self.library_empty.refresh()
@@ -910,14 +1099,16 @@ class Window(QMainWindow):
         if self.worker is not None or self.transfer_worker is not None or not paths:
             return
         self.errors.clear()
-        self.navigate(0)
+        self.preparation_count_before=len(self.tracks)
+        self.auto_target_token=self.connection_token if self.auto_import.isChecked() and self.library_ready else None
+        self.navigate(2)
         self.errors.hide()
         self.duplicates = 0
         self.progress.setRange(0, len(paths))
         self.progress.setValue(0)
         self.progress.show()
         self.status.setText(tr('Revisando canciones…'))
-        self.worker = Reader([Path(path) for path in paths], self)
+        self.worker = Reader([Path(path) for path in paths], self,MAX_SELECTION-len(self.tracks))
         self.worker.track.connect(self.accept_reader_track)
         self.worker.problem.connect(self.show_problem)
         self.worker.progress.connect(self.preparation_progress)
@@ -926,7 +1117,7 @@ class Window(QMainWindow):
         self.worker.start()
 
     def preparation_progress(self,value,total):
-        self.progress.setValue(value);self.status.setText(tr(f'Preparando {value} de {total} canciones…'))
+        self.progress.setRange(0,max(1,total));self.progress.setValue(value);self.status.setText(tr(f'Preparando {value} de {total} canciones…'))
 
     def accept_reader_track(self,track):
         worker=self.sender()
@@ -946,7 +1137,7 @@ class Window(QMainWindow):
         row = self.table.rowCount()
         self.table.insertRow(row)
         values = [track['title'], track['artist'] or tr('Sin artista'), track['album'] or tr('Sin álbum'),
-                  (f"M4A · {track['format']}" if track.get('container') == 'M4A' else track['format']), duration_label(track.get('duration')), byte_label(track['size'])]
+                  (f"M4A · {track['format']}" if track.get('container') == 'M4A' else track['format']), duration_label(track.get('duration')), byte_label(track['size']),tr('Preparada')]
         for column, value in enumerate(values):
             item = SortableItem(value)
             if column == 4:item.setData(SORT_ROLE,track['duration'])
@@ -961,7 +1152,8 @@ class Window(QMainWindow):
                 else:
                     item.setIcon(self.default_music_icon)
             self.table.setItem(row, column, item)
-        self.table.setRowHeight(row, 44)
+            if column==6:self.queue_status[track['id']]=item
+        self.table.setRowHeight(row,max(44,QFontMetrics(self.table.font()).height()+16))
         self.table.setSortingEnabled(sorting and self.worker is None)
 
     def show_problem(self, message):
@@ -978,21 +1170,24 @@ class Window(QMainWindow):
         failed=getattr(worker,'problem_count',self.errors.count()) if worker is not None else self.errors.count()
         self.status.setText(tr(f'{len(self.tracks)} para importar · Duplicadas omitidas: {self.duplicates}'
                             f' · No añadidas: {failed}'))
+        self.transfer_stage.setText(tr(f'{len(self.tracks)} canciones preparadas. Pulsa Importar para continuar.') if self.tracks else tr('Selecciona canciones para preparar la importación.'))
         self.update_buttons()
+        if self.auto_import.isChecked() and self.auto_target_token is not None and self.auto_target_token==self.connection_token and self.library_ready and len(self.tracks)>self.preparation_count_before:
+            target=self.auto_target_token;self.auto_target_token=None;QTimer.singleShot(0,lambda:self.auto_import_prepared(target))
 
     def remove_selection(self):
         self.activity_message=''
         for row in sorted({index.row() for index in self.table.selectionModel().selectedRows()}, reverse=True):
-            self.tracks.pop(self.table.item(row, 0).data(Qt.ItemDataRole.UserRole))
+            identifier=self.table.item(row,0).data(Qt.ItemDataRole.UserRole);self.tracks.pop(identifier);self.queue_status.pop(identifier,None)
             self.table.removeRow(row)
         self.status.setText(tr(f'{len(self.tracks)} para importar. Los archivos originales se conservan.'))
         self.update_buttons()
 
     def clear_tracks(self):
         self.activity_message=''
-        self.clear_inspector()
+        self.clear_inspector();self.transfer_phase=0;self.paint_transfer_stages()
         self.table.setRowCount(0)
-        self.tracks.clear()
+        self.tracks.clear();self.queue_status.clear()
         self.errors.clear()
         self.errors.hide()
         self.status.setText(tr('Lista vaciada. Los archivos originales se conservan.'))
@@ -1061,6 +1256,8 @@ class Window(QMainWindow):
 
 
 def smoke(app, window, fixtures, output=None):
+    for name in ('check-light.svg','check-dark.svg'):
+        assert not QImage(str(Path(__file__).with_name('assets')/name)).isNull()
     assert window.windowTitle() == f'TUPAQ {VERSION}' and app.applicationName() == 'TUPAQ'
     # Import the USB transport inside the frozen build without opening a device.
     from pymobiledevice3.lockdown import create_using_usbmux
@@ -1164,7 +1361,8 @@ def smoke(app, window, fixtures, output=None):
         assert '"music_type_code": 8' in QApplication.clipboard().text()
         assert window.library_model.rowCount() == 1
         assert window.library_model.data(window.library_model.index(0, 0)) == 'Canción de catálogo iOS 27'
-        assert window.pages.currentIndex() == 0 and window.library_ready
+        assert window.pages.currentIndex() == 2 and window.library_ready
+        window.navigate(0)
         window.devices_found([{'token':'simulated-attach'}])
         assert window.library_worker is None
         window.library_model.set_icon(window.library_model.tracks[0]['id'],window.default_music_icon)
@@ -1217,7 +1415,7 @@ def smoke(app, window, fixtures, output=None):
             assert not window.now_cover.pixmap().isNull()
             window.backup_root.mkdir()
             window.update_buttons()
-            window.navigate(1)
+            window.navigate(3);window.advanced.setChecked(True)
             assert window.resume_import.isEnabled()
             for button in (window.resume_import,window.repair_metadata):
                 button.click()

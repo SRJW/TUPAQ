@@ -251,6 +251,30 @@ async def copy_catalogue(afc,directory,missing_errors=(FileNotFoundError,),diagn
             shutil.rmtree(work,ignore_errors=True)
 
 
+async def catalogue_stamp(afc):
+    """Only stat the catalogue/WAL; no audio or catalogue body is downloaded."""
+    from pymobiledevice3.services.afc import AfcFileNotFoundError
+    result=[]
+    for suffix in ('','-wal'):
+        try:
+            value=await afc.stat(REMOTE_DB+suffix)
+            result.append((value.get('st_size'),str(value.get('st_mtime'))))
+        except (FileNotFoundError,AfcFileNotFoundError):result.append(None)
+    return tuple(result)
+
+
+def device_volume(values):
+    """Optional AFC volume figures, never substitute guesses or zeros."""
+    if not isinstance(values,dict):return {}
+    try:
+        total_text=str(values.get('FSTotalBytes',''));free_text=str(values.get('FSFreeBytes',''))
+        if not (0<len(total_text)<=24 and 0<len(free_text)<=24):return {}
+        total=int(total_text);free=int(free_text)
+        if 0<=free<=total<2**64 and total>0:return dict(total_bytes=total,free_bytes=free)
+    except (ValueError,TypeError):pass
+    return {}
+
+
 async def _read_phone(diagnostics=None, device_info=None):
     stage = 'modules'
     try:
@@ -270,6 +294,9 @@ async def _read_phone(diagnostics=None, device_info=None):
                 name = lockdown.all_values.get('DeviceName')
                 if isinstance(name,str) and 0 < len(name)<=120 and not any(ord(c)<32 for c in name):
                     device_info['name'] = name
+                for field,key in [('ProductType','model'),('ProductVersion','version')]:
+                    value=lockdown.all_values.get(field)
+                    if isinstance(value,str) and 0<len(value)<=80 and not any(ord(c)<32 for c in value):device_info[key]=value
             stage = 'trust'
             # The pinned SDK validates existing trust and starts a session in
             # create_using_usbmux even with autopair=False. A second validation
@@ -278,11 +305,19 @@ async def _read_phone(diagnostics=None, device_info=None):
                 raise LibraryError('No se encontró una autorización de confianza válida para TUPAQ. No restablezcas la confianza ni la biblioteca; copia el diagnóstico para revisarlo.', 'trust:missing-record')
             stage = 'afc'
             async with AfcService(lockdown) as afc:
+                if device_info is not None:
+                    try:device_info['_catalogue_stamp']=await asyncio.wait_for(catalogue_stamp(afc),timeout=5)
+                    except Exception:pass
+                    try:
+                        volume=await asyncio.wait_for(afc.get_device_info(),timeout=5)
+                        device_info.update(device_volume(volume))
+                    except Exception:pass # Optional capacity data must not break catalogue reading.
                 stage = 'catalogue'
                 with tempfile.TemporaryDirectory(prefix='importios-library-') as directory:
                     tracks=await copy_catalogue(afc, directory, (FileNotFoundError, AfcFileNotFoundError), diagnostics=diagnostics)
                     from .presence import probe_files
                     from .devices import device_token
+                    if device_info is not None:device_info['_device_token']=device_token(devices[0].serial)
                     for track in tracks:track['_device_token']=device_token(devices[0].serial)
                     return await probe_files(afc,tracks,diagnostics)
     except LibraryError:

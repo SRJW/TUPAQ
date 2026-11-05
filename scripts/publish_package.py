@@ -16,26 +16,21 @@ def main():
     if subprocess.run(view, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         with tempfile.TemporaryDirectory() as directory:
             notes = Path(directory)/'notes.md'
-            notes.write_text('''TUPAQ: numeración opcional compatible, lotes grandes comprobados e interfaz tonal.
+            notes.write_text('''TUPAQ 0.3.0-preview.25: nuevo diseño claro/oscuro y tipografía del sistema.
 
-- Corregido import:metadata-numbering: los totales de pistas o discos sin una posición, o menores que ella, ya no detienen la importación. Se conserva la posición válida y se omite el total incoherente solo en los datos del envío; no se reescribe el archivo original. Se prueban MP3, WAV, AIFF, M4A ALAC y AAC y un envío de 51 canciones en dos lotes.
+- Cuatro vistas: Biblioteca, Importar, Diagnóstico y Preferencias. Superficies marfil o verde profundo, navegación horizontal de icono y texto, acentos naranjas y selección verde azulado.
+- Windows y Mac usan siempre la fuente de su sistema. Se elimina la selección de Mori y cualquier selector de fuentes; tamaños en puntos, letras sin comprimir y controles calculados con métricas reales.
+- Archivos y carpetas completas, cola con estado por canción, progreso real, pausa segura entre lotes/archivos e historial privado agregado.
+- Filtros por formato, carátula o letra; selección persistente y acciones de importar, exportar y eliminar.
+- Preferencias funcionales: carpeta inicial, política de títulos, envío de carátulas, completar carátulas en copias exportadas, idioma, acento, reducir transparencia/movimiento e importación automática opcional (desactivada inicialmente y vinculada al mismo iPhone).
+- Actualización opcional al detectar cambios: sondeo de atributos DB/WAL cada 30 segundos, sin vaciar la vista ni competir con transferencias.
+- Diagnóstico de conexión, catálogo, volumen de datos y lectura completa; compara hashes cuando existen recibos propios y muestra pendiente cuando no hay evidencia. No inventa salud del dispositivo ni velocidad USB.
+- Formatos: MP3, WAV, M4A (AAC/ALAC) y AIFF. FLAC no se incluye.
+- 215 pruebas automáticas aprobadas en desarrollo y 10.000 archivos preparados con la interfaz nueva. Las simulaciones no sustituyen una prueba USB con el iPhone físico.
 
-- Importar y eliminar hasta 50.000 canciones por selección, divididas en transacciones nativas de hasta 49 y 100 canciones respectivamente. Cada lote se comprueba antes del siguiente; una cancelación o un error detiene el resto.
-- Prueba de 10.000 importaciones y 10.000 eliminaciones en un iPhone simulado; también 1.000 archivos mezclados con portadas y 10.000 archivos preparados en la interfaz. Corregidas colisiones de rutas dentro del mismo lote y acumulación de trabajo en la interfaz.
-- 196 pruebas automáticas aprobadas en la revisión de desarrollo. Estos resultados no sustituyen una prueba USB con un iPhone físico ni garantizan cero fallos. Informe y reproducción en docs/ESTRES.md.
+Galería y alcance: docs/DISENO-25.md. Se conservan los límites y comprobaciones de las transferencias nativas. Las letras dentro de Música del iPhone siguen pendientes de validar. Los originales del ordenador se conservan; la copia del catálogo no sustituye una copia de sus audios.
 
-- Composición completamente renovada: navegación compacta, tarjeta protagonista del iPhone, tres acciones grandes y biblioteca a todo el ancho. Detalles abre una ventana secundaria; se elimina la tercera columna permanente.
-- Contraste del botón principal comprobado sobre su imagen renderizada al pasar el cursor, en claro y oscuro.
-- Modo Tonal verde azulado, espaciado y radios amplios, estados vacíos con acciones y preferencias organizadas en tarjetas.
-- Transiciones breves al navegar, respuesta de controles y mezcla de carátulas sin cuadros vacíos. Reducir movimiento detiene todo inmediatamente y se conserva entre aperturas. Sin animaciones decorativas continuas; la biblioteca no se desvanece al actualizar.
-- Zona de arrastre visible: los archivos van a la cola y no se importan automáticamente. Atajos habituales para buscar y abrir canciones.
-- Windows usa PP Mori instalada automáticamente: Regular, Medium, SemiBold y Bold. Se eliminan el selector de fuentes, Agregar y Aplicar. Mac conserva la fuente del sistema.
-- Mori tiene licencia personal: sus archivos no se incluyen en estos paquetes. Extrae tu Mori.zip, instala los cuatro pesos desde Windows y vuelve a abrir TUPAQ. Si falta, se usa y se identifica la fuente del sistema. Instrucciones en docs/INTERACCION.md.
-- Corregida la prueba de tipografía de macOS para reconocer .AppleSystemUIFont como alias de San Francisco. No se sustituye la fuente del sistema.
-- Creación del DMG más robusta: reintentos limitados para errores temporales de recursos al verificar y desmontar la imagen de solo lectura; nunca se omite su verificación.
-- Se conservan las funciones de música, selección, orden, importación/exportación y sus comprobaciones. Las letras dentro de Música del iPhone siguen pendientes de validar.
-
-Pruebas automatizadas y comprobación de cada paquete antes de publicarlo. No necesitas Python ni abrir iTunes. Paquetes sin firma ni notarización. No se redistribuyen fuentes de Apple ni Mori con licencia personal.
+No necesitas Python ni abrir iTunes. Windows necesita el servicio/controlador USB de Apple. Paquetes sin firma ni notarización. No se distribuyen fuentes de Apple ni Mori, ni DLL de Apple/3uTools.
 ''', encoding='utf-8')
             created = subprocess.run(['gh','release','create',tag,'--repo',repo,'--title',
                 'TUPAQ '+tag,'--notes-file',str(notes),'--prerelease','--verify-tag'])

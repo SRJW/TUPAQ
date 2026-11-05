@@ -37,7 +37,7 @@ class SelectionTests(unittest.TestCase):
             w.delete_songs();self.assertEqual(transfer.call_args.args[0],'delete');self.assertEqual(len(transfer.call_args.args[1]),2)
 
     def test_recovery_tools_are_collapsed_by_default(self):
-        w=self.window;w.navigate(1);APP.processEvents()
+        w=self.window;w.navigate(3);APP.processEvents()
         self.assertFalse(w.verify_import.isVisible());w.advanced.setChecked(True);APP.processEvents();self.assertTrue(w.verify_import.isVisible())
 
 class SearchTests(unittest.TestCase):

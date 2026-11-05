@@ -1,221 +1,127 @@
 # TUPAQ
 
-<img src="importios/assets/tupaq.png" alt="TUPAQ · Encuentro" width="100">
+<img src="importios/assets/tupaq.png" alt="TUPAQ · Encuentro" width="88">
 
-Antes llamado Importios. El código interno conserva el módulo `importios`; el repositorio es `SRJW/TUPAQ`.
+Gestiona por USB la música del iPhone desde Windows o macOS: importa canciones
+del ordenador, exporta originales y elimina canciones seleccionadas de Música.
+Aplicación nativa, con ventana propia, sin navegador ni necesidad de instalar Python.
 
-Aplicación de escritorio para Windows y macOS, en español, con ventana propia.
-El objetivo es importar música local a la app Música del iPhone sin usar la
-aplicación iTunes ni 3uTools.
+La **0.3.0-preview.25** adopta las referencias claras y oscuras: navegación lateral,
+superficies marfil o verde oscuro, selección verde azulado y acentos naranjas.
+**Windows y Mac usan siempre la fuente de su sistema**; no hay selector ni carga
+de fuentes. Los controles y columnas reservan el ancho real del texto, sin comprimirlo.
 
-El usuario confirmó la lectura y la importación con metadatos y portada en Música del iPhone.
-**Numeración de pistas y discos:** se corrige `import:metadata-numbering`.
-Un total sin posición (`0/12`) o menor que ella (`9/3`) ya no detiene la
-importación: se conserva la posición válida y se omite el total incoherente
-en los datos enviados. Los originales permanecen intactos.
+![Biblioteca clara de TUPAQ, datos sintéticos](docs/diseno-25/biblioteca-claro.png)
 
-**Lotes grandes:** importación y eliminación divididas automáticamente en
-transacciones comprobadas, con cancelación entre lotes y parada ante el primer
-fallo. Se probaron **10.000 importaciones y 10.000 eliminaciones en un iPhone
-simulado**, conservando el audio ajeno a la selección. Esto no sustituye una prueba
-USB con un dispositivo físico. [Informe reproducible](docs/ESTRES.md).
+![Biblioteca oscura de TUPAQ, datos sintéticos](docs/diseno-25/biblioteca-oscuro.png)
 
-La **0.3.0-preview.24** conserva la biblioteca visible mientras se actualiza después
-de una importación, incluidas selección, marcas, posición de lectura y carátulas.
-Si falla la lectura, mantiene la última vista válida e indica que no está actualizada.
-La comprobación de título, artista y álbum acepta las dos representaciones
-Unicode equivalentes de los acentos. Si los metadatos aún no coinciden, realiza
-hasta tres lecturas finales sin reenviar la música; conserva las observaciones
-y sigue rechazando las diferencias reales. El diagnóstico identifica los campos
-afectados sin incluir sus valores. Revisar operación pendiente permite comprobar
-un envío anterior sin volver a insertar canciones.
-La identidad **Encuentro** está integrada en la barra lateral, barra inferior,
-ventana y aplicación, con iconos nativos ICO para Windows e ICNS para Mac.
-La vista previa lee la **carátula original**, conserva sus proporciones y muestra
-su resolución, formato y peso original. «Ver carátula original» abre una vista
-al 100% con desplazamiento. Las miniaturas de la tabla siguen siendo pequeñas.
-Se elimina «Tus álbumes» del lateral.
-
-Un icono de letra sobre la miniatura identifica las letras detectadas. Se leen
-USLT/SYLT en MP3, WAV y AIFF y ©lyr en M4A; el inspector permite consultarlas.
-Importar conserva el audio original y sus letras incrustadas sin modificarlos.
-**Mostrar esas letras en Música del iPhone aún no está garantizado**: su registro
-nativo requiere una parte de transferencia separada cuyo contrato no está validado.
-El inspector distingue letras incrustadas, registradas en el catálogo y disponibles
-en línea; no confunde estos estados. [Alcance y límites](docs/LETRAS.md).
-
-La composición **Tonal** cambia la pantalla completa: una navegación compacta,
-tarjeta protagonista del iPhone, tres acciones grandes y biblioteca a todo el
-ancho. «Detalles» abre la carátula y las propiedades en una ventana secundaria;
-la lista no pierde espacio con una tercera columna permanente. Importar y
-exportar siguen en la misma página, con casillas y cabeceras para ordenar.
-
-Preferencias → Estilo visual ofrece Tonal, Nocturno, Aurora y Atardecer.
-Tonal usa superficies suaves de color verde azulado, en claro y oscuro. Las
-propiedades de audio solo muestran datos conocidos. La barra inferior conserva
-el progreso real y Cancelar, sin controles ficticios de reproducción o edición.
-La tabla sigue siendo virtual, sin motor web ni desenfoque continuo.
-Windows usa **PP Mori instalada**, automáticamente y sin selector de fuentes.
-En Mac se usa siempre la fuente del sistema. Hay [propuestas concretas para continuar](docs/MEJORAS-PROPUESTAS.md).
-En **Preferencias → Idioma** puedes elegir **Español** o **English**. El cambio
-es inmediato, se conserva al cerrar y alcanza navegación, cabeceras, diálogos,
-ayudas y mensajes de progreso/error, sin reiniciar ni vaciar la cola. Los metadatos
-de las canciones, nombres de dispositivos y códigos técnicos no se traducen.
-Los selectores nativos de archivos también dependen del idioma del sistema operativo.
-Véase [cómo transferir y recuperar](docs/TRANSFERENCIAS.md).
-
-**Tipografía:** Windows utiliza PP Mori cuando está instalada, con Regular (lectura),
-Medium (controles), SemiBold (títulos) y Bold (énfasis). Se retiran los controles
-para cargar, elegir o aplicar otras fuentes. Las preferencias antiguas de fuente
-se ignoran. Mac conserva su fuente nativa. No se redistribuyen archivos de Mori
-con licencia personal ni fuentes de Apple. Si falta Mori, TUPAQ identifica
-honestamente la fuente del sistema que está usando. [Instalación personal](docs/INTERACCION.md).
-
-La revisión visual incorpora superficies tonales, tarjetas de preferencias,
-estados vacíos útiles, indicación al arrastrar archivos y transiciones breves.
-«Reducir movimiento» elimina las animaciones. La biblioteca no se desvanece al
-actualizar. [Ver animaciones con datos sintéticos](docs/movimiento.gif).
-
-![Selector de idioma de TUPAQ, con datos sintéticos de prueba](docs/preferencias-idioma.png)
-
-![TUPAQ en inglés, con datos y portada sintéticos de prueba](docs/interfaz-ingles.png)
-
-![TUPAQ en modo claro, con audio sintético de prueba](docs/interfaz-nativa.png)
-
-![TUPAQ Tonal, con datos y portada sintéticos de prueba](docs/interfaz-oscura.png)
-
-![TUPAQ Atardecer, con datos y portada sintéticos de prueba](docs/interfaz-atardecer.png)
-
-![TUPAQ Nocturno, con datos y portada sintéticos de prueba](docs/interfaz-nocturna.png)
+[Ver las cuatro pantallas en ambos temas](docs/DISENO-25.md).
+Las capturas del repositorio usan datos sintéticos y la fuente nativa del entorno
+que las renderiza. GitHub Actions guarda también capturas por plataforma.
 
 ## Descargar y abrir
 
 [Versiones descargables](https://github.com/SRJW/TUPAQ/releases) ·
-[Instrucciones de descarga](DESCARGAR.md)
+[Cómo descargar](DESCARGAR.md)
 
-- Windows 11: abre `TUPAQ.exe` con doble clic.
-- Mac con chip Apple: abre `TUPAQ-macOS-arm64.dmg` y copia la app a Aplicaciones.
-- Mac Intel: usa `TUPAQ-macOS-x86_64.dmg`.
+- **Windows x64:** abre `TUPAQ.exe`.
+- **Mac Apple Silicon:** abre `TUPAQ-macOS-arm64.dmg` y copia TUPAQ a Aplicaciones.
+- **Mac Intel:** utiliza `TUPAQ-macOS-x86_64.dmg`.
 
-No se necesita instalar Python ni abrir una terminal. La aplicación tiene una
-ventana propia y no usa el navegador. Las descargas aparecen cuando GitHub
-termina la compilación de cada plataforma. Todavía no tienen firma de desarrollador ni
-notarización de Apple.
+Cada descarga aparece cuando su plataforma termina de compilarse y verificarse.
+Windows necesita el servicio/controlador USB de Apple que permite acceder al iPhone;
+no es necesario abrir iTunes ni 3uTools. Los paquetes todavía no llevan firma de
+Windows ni notarización de Apple.
 
-## Funciones actuales
+## Las cuatro vistas
 
-- Interfaz nativa inspirada en Apple: barra lateral, tipografía del sistema y apariencia Sistema/Claro/Oscuro en Preferencias. Sin motor web ni animaciones.
-- Detección USB automática cada cinco segundos cuando la conexión está libre. Lee la biblioteca al conectar el teléfono y al reconectarlo; no vuelve a copiar el catálogo en cada sondeo. Se puede desactivar en Preferencias. Nunca importa automáticamente.
-- Casillas persistentes por canción al ordenar o buscar, selección de visibles y contador de marcadas. Exportar y Eliminar usan las casillas; hacer clic en una fila abre sus detalles.
-- Tabla de biblioteca con celdas dibujadas bajo demanda. Cabeceras clicables para ordenar por canción, artista, álbum, formato, duración, tamaño. Duración y tamaño se ordenan numéricamente conservando la selección por canción.
-- Dos secciones en la misma página: canciones del iPhone y cola del ordenador. Importar y exportar están juntos.
-- Descargadas por defecto: usa estado local y el indicador de descarga protegida de suscripción; nube y pendientes no se presentan como canciones descargadas; las rutas ausentes se ocultan tras comprobar su carpeta USB. No fusiona por título: solo evita contar dos referencias al mismo archivo físico.
-- Buscar por canción, artista, álbum y formato/codec, con o sin punto en la extensión.
-- Eliminar: hasta 50.000 canciones marcadas por operación, divididas en lotes de hasta 100, con confirmación y vinculación al dispositivo, biblioteca e IDs leídos. Usa delete_track nativo; comprueba la desaparición de los objetivos y la conservación de IDs y metadatos de las demás canciones. No borra archivos por AFC; iOS gestiona la limpieza del audio. Función nueva pendiente de validación física.
-- Formato y tamaño: catálogo como lectura inicial, verificación de cabeceras y stat por USB para filas visibles. Se muestra — cuando no hay información; no se descarga cada audio completo para mostrarlo.
-- Errores de conexión por etapa y botón **Copiar diagnóstico**, también cuando la consulta devuelve cero resultados. Incluye versión, recuentos por tipo y presencia/tamaño del WAL, sin títulos ni credenciales ni identificadores del dispositivo.
-- Las canciones sin fila de metadatos complementarios se muestran como «Sin título» en lugar de descartarse.
+**Biblioteca:** lectura automática al conectar el iPhone, miniaturas, selección con
+casillas, búsqueda por título/artista/álbum/formato y filtros por formato, portada
+o letra. Las cabeceras ordenan por canción, artista, álbum, formato, duración y
+tamaño. Las marcas y la posición se conservan al navegar y actualizar. Exportar
+usa las casillas; Eliminar pide confirmación y comprueba el resultado.
 
-- Elegir o arrastrar MP3, WAV, M4A (AAC o ALAC) y AIFF; comprobar el códec real.
-- Miniaturas de portadas incrustadas, en la lista y en el panel de preparación.
-  Sin portada se muestra una nota musical. La miniatura acompaña el progreso de importación.
-- Leer título, artista, álbum y duración sin cambiar el original.
-- Omitir duplicados por contenido, quitar elementos y exportar CSV.
-- Consultar dispositivos USB mediante **ListDevices** del servicio local de Apple.
-  No inicia sesiones de sincronización, emparejamientos ni escrituras al iPhone.
-- **Biblioteca** se abre al detectar el iPhone; **Actualizar** permite releerla. Usa la autorización de confianza existente y AFC
-  para obtener dos lecturas consecutivas coincidentes del catálogo y su WAL.
-  Si están cambiando, repite hasta tres intentos; otros errores no se reintentan.
-  Conserva una sola copia del par coincidente. Consulta una copia local con SQLite en modo de solo lectura
-  y muestra título, artista, álbum y duración. No escribe en la biblioteca remota.
-  El usuario confirmó la lectura de título, artista, álbum y duración en su iPhone.
-- Miniaturas de la biblioteca: consulta los originales de Artwork y, si faltan, los tags incrustados mediante lecturas parciales por USB. Solo las filas visibles y con caché de hasta 96 iconos de 224 px; no descarga todo el audio ni consulta URLs. Si no hay portada accesible, muestra una nota musical.
-- **Importar al iPhone**: toma archivos del ordenador, guarda el catálogo y las
-  preferencias de biblioteca localmente, conserva la identidad existente y envía
-  un delta ATC firmado. Comprueba después las canciones nuevas, la conservación
-  de las anteriores y los bytes de los archivos. No escribe SQLite en el teléfono.
-- **Exportar selección**: copia los originales accesibles por USB a la carpeta
-  elegida, comprueba SHA-256 y evita sobrescribir archivos existentes. Los archivos
-  protegidos se copian conservando su protección; no hay descifrado ni conversión.
-- **Cancelar**: detiene la preparación antes del envío de cambios y la exportación entre lecturas, conservando archivos completos y retirando temporales. Una vez iniciado el envío de metadatos a Música, finaliza y verifica el lote actual antes de detenerse; no ofrece interrupción inmediata ni reversión.
-- **Actualizar portadas y fecha**: usa originales y registros de TUPAQ, verifica los audios y envía solo metadatos/portadas de esas canciones. No duplica filas ni vuelve a subir audio; hasta 49 canciones por lote.
-- **Completar importación pendiente**: recuperación experimental con el original y el registro local. Para una canción pendiente representada, solicita el audio sin volver a insertar metadatos; no garantiza aceptación de esa sesión por un iPhone físico. Si el estado no coincide, se detiene.
-- **Revisar importación**: vuelve a comprobar una operación cuya confirmación se
-  perdió. Una operación sin comprobar bloquea otra importación; no se reenvía sola.
-- Calcular firmas candidatas de 21 bytes con un protocolo de solicitud fijo,
-  usando una adaptación con licencia MIT de rustunes. Cuatro vectores conocidos
-  coinciden; eso no demuestra aceptación por un dispositivo real.
+**Importar:** elegir archivos o carpetas completas, arrastrar y soltar, preparar la
+cola, ver el estado por canción y el progreso real. Importa MP3, WAV, M4A con AAC
+/ALAC y AIFF. FLAC no se incluye. La cola permite quitar, vaciar y exportar CSV.
+Hay historial privado de operaciones y pausa/reanudación entre lotes o archivos.
+Cancelar espera a terminar el lote nativo que ya empezó a modificar Música.
 
-En Windows, la detección necesita el controlador/servicio de Apple. Tener ese
-controlador no requiere abrir iTunes para usar TUPAQ. En macOS se consulta
-el servicio usbmuxd del sistema. Detectar un dispositivo no confirma la confianza,
-la versión de iOS ni la compatibilidad de importación.
+**Diagnóstico:** nombre, modelo y versión de iOS cuando el iPhone los comunica;
+conexión USB, catálogo y permisos de lectura comprobados; capacidad y espacio libre
+del volumen de datos por AFC. Comprobar selección/todo lee los audios completos
+sin modificar el dispositivo. Compara SHA-256 cuando existe un recibo anterior de
+TUPAQ; sin recibo no afirma haber autenticado el archivo. Los datos desconocidos
+quedan pendientes, sin inventar velocidad USB ni estados de salud.
 
-La cola del ordenador vive en memoria y se pierde al cerrar. Las importaciones
-conservan una copia local del catálogo y un registro para comprobación posterior. Los archivos permanecen en su
-ubicación original; no se convierten ni se envían a Internet. Límite por archivo:
-256 MB. Se necesita Internet solo para obtener el programa y, si se trabaja desde
-el código fuente, instalar las dependencias.
+**Preferencias:** apariencia Claro/Oscuro/Sistema, acento naranja opcional, reducir
+transparencia/movimiento, carpeta inicial para elegir/exportar música, política de
+títulos, envío de carátulas, carátulas en copias exportadas, idioma Español/English
+y sincronización. La fuente del sistema se aplica a toda la interfaz.
 
-## Recursos de la interfaz
+La **importación automática es opcional y está desactivada inicialmente**. Solo
+se inicia después de preparar archivos con el mismo iPhone conectado y la biblioteca
+leída; el dispositivo se vuelve a comprobar antes de escribir. La actualización
+opcional detecta cambios del catálogo cada 30 segundos mediante dos consultas de
+atributos; relee la biblioteca solo cuando cambia y conserva la vista anterior.
+Se suspende durante preparación, transferencias y lecturas que compiten por USB.
 
-La interfaz usa Qt Widgets nativo y carga el componente de comunicación con iOS
-al solicitar la biblioteca. No tiene motor de navegador. La consulta ligera ListDevices
-se hace cada cinco segundos, con las lecturas suspendidas durante una transferencia.
-La biblioteca completa se lee una vez por conexión; si falla, se espera al menos
-20 segundos antes de reintentar. La tabla conserva sus filas y dibuja celdas bajo demanda.
-Se prueba el acceso a la primera y última canción de una lista sintética de
-100.000 filas.
+## Música y comprobaciones
 
-Medición orientativa en Linux, desde el código, con Qt offscreen y ventana vacía:
-78,1 MiB RSS (0.3.0-preview.1) y 0 % CPU durante una muestra de tres segundos en reposo.
-No es una medición del EXE/DMG en Windows/macOS ni del coste de cargar una
-biblioteca; ese consumo aún debe medirse en esos equipos.
+Los originales del ordenador se conservan. La numeración opcional incoherente
+(`0/12`, `9/3`) no bloquea la importación: se conserva la posición válida y se
+omite el total incoherente en los metadatos enviados. Se verifican los audios,
+metadatos, portada y resultado del catálogo según las operaciones implementadas.
 
-## Desarrollo
+Hasta **50.000 canciones por selección**, divididas en lotes nativos de hasta
+49 canciones/2 GiB para importar o 100 para eliminar. Máximo 256 MiB por archivo
+importado y 100.000 registros en el catálogo admitido. Exportar conserva su límite
+independiente de 1.000 archivos. Un fallo detiene los siguientes lotes.
 
-Python 3.11 o posterior. Los usuarios de los paquetes EXE/DMG no necesitan esto.
+La exportación normalmente conserva los bytes originales. La opción de incrustar
+carátulas completa solo las copias exportadas que no tengan portada, después de
+verificar el audio original por USB. No sobrescribe carátulas existentes ni archivos
+previos. Un `.m4p` conserva su protección: no se descifra DRM.
 
-```sh
-python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements-desktop.txt
-.venv/bin/python -m importios.native
-```
+Se conserva el catálogo antes de cada cambio. **Esa copia no incluye todos los
+audios** y no es una restauración automática. Los recibos permiten comprobar
+operaciones interrumpidas sin reenviar música a ciegas. El historial es agregado
+(fecha, operación, estado y recuentos), separado de los respaldos de recuperación.
 
-Windows tiene `windows/Abrir-TUPAQ.bat` y macOS `Abrir-TUPAQ.command`
-para ejecución desde el código. La antigua interfaz web se conserva como utilidad
-de desarrollo: `.venv/bin/python -m importios --no-browser`.
+Las letras incrustadas se detectan, se conservan y se pueden consultar. **Su aparición
+en Música del iPhone todavía no está garantizada**: falta validar el contrato nativo
+separado. [Letras](docs/LETRAS.md) · [Transferencias y límites](docs/TRANSFERENCIAS.md).
 
-## Comprobaciones y compilación
+## Validación y desarrollo
 
-```sh
-.venv/bin/python -m unittest discover -s tests -v
-QT_QPA_PLATFORM=offscreen .venv/bin/python -m importios.native --smoke-fixtures tests/fixtures
+**215 pruebas automáticas** en la revisión 25, incluidas preferencias reales,
+exportación con carátulas, diagnóstico de corrupción, cambio de teléfono y pausa
+entre transacciones. Se prepararon 10.000 archivos en la interfaz nueva. Las pruebas
+previas importaron y eliminaron 10.000 canciones en un iPhone simulado, conservando
+el audio ajeno a la selección. [Informe reproducible](docs/ESTRES.md).
+
+Los resultados simulados no sustituyen la prueba física por USB. El usuario ha
+confirmado lectura e importación con metadatos y carátula en versiones anteriores.
+GitHub prueba los ejecutables nativos de Windows y ambos Mac antes de publicarlos;
+verifica y monta los DMG. Los artefactos de compilación y capturas se conservan
+30 días en Actions. Los pushes a `main` compilan; las etiquetas `v…` publican.
+
+```bash
+python -m venv .venv
 .venv/bin/python -m pip install -r requirements-build.txt
+QT_QPA_PLATFORM=offscreen .venv/bin/python -m unittest discover -s tests -v
+.venv/bin/python -m importios.native
 .venv/bin/python scripts/build_desktop.py
 ```
 
-La suite incluye pruebas de formatos, HTTP local, descubrimiento USB simulado,
-paquetes de investigación, firmas candidatas, conexión automática y portadas remotas. La prueba nativa comprueba una
-ventana Qt real, lectura en un hilo de trabajo, los AAC/ALAC dentro de M4A, portadas, duplicados,
-archivos dañados, CSV, quitar/vaciar y las firmas. En Linux se ha probado también
-el ejecutable empaquetado. Windows y macOS se validan en sus runners de GitHub;
-no se deben dar por aprobados hasta comprobar los resultados de cada ejecución.
-
-GitHub compila en Windows x64, Mac Apple Silicon y Mac Intel, prueba cada paquete
-y verifica/monta los DMG. Cada paquete se publica de forma independiente cuando
-pasa sus comprobaciones; una plataforma fallida puede quedar sin descarga. Los pushes a `main` y las ejecuciones manuales compilan la app. Las etiquetas
-`v…` publican versiones preliminares con
-los paquetes como Assets. Las compilaciones normales guardan artefactos 30 días.
+En Windows utiliza `.venv\Scripts\python.exe` y omite `QT_QPA_PLATFORM=offscreen`
+para abrir la ventana. El nombre interno del módulo sigue siendo `importios`;
+el repositorio y la aplicación se llaman TUPAQ.
 
 ## Investigación y atribución
 
-- [Transferencias: alcance, comprobaciones y límites](docs/TRANSFERENCIAS.md).
-- [Corrección de cero canciones: código interno de MediaLibrary frente a MediaPlayer](research/LECTURA-MEDIA-TYPE.md).
-
-- [Hallazgos de las DLL aportadas y de la implementación independiente](research/IMPLEMENTACION-INDEPENDIENTE.md).
-- [Análisis inicial de 3uTools](ANALISIS-3UTOOLS.md).
-- [Avisos de terceros](third_party/README.md).
-
-Las DLL y ejecutables de Apple/3uTools no se incluyen en el proyecto ni en los
-paquetes. La firma independiente no es una llamada a sus binarios ni a sus servidores.
+[Implementación independiente](research/IMPLEMENTACION-INDEPENDIENTE.md) ·
+[Lectura de MediaLibrary](research/LECTURA-MEDIA-TYPE.md) ·
+[Análisis de 3uTools](ANALISIS-3UTOOLS.md) · [Avisos de terceros](third_party/README.md).
+No se distribuyen DLL ni ejecutables de Apple/3uTools ni archivos de fuentes
+propietarias. La firma independiente no llama a sus binarios ni servidores.

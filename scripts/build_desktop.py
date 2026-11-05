@@ -53,7 +53,9 @@ def main():
                '--name', 'TUPAQ', '--windowed',
                '--add-data', 'third_party:third_party',
                '--add-data', 'importios/assets/tupaq.png:importios/assets',
-               '--collect-submodules', 'mutagen', '--exclude-module', 'tkinter']
+               '--add-data', 'importios/assets/check-light.svg:importios/assets',
+               '--add-data', 'importios/assets/check-dark.svg:importios/assets',
+               '--hidden-import','PySide6.QtSvg','--collect-submodules', 'mutagen', '--exclude-module', 'tkinter']
     from PySide6.QtCore import QLibraryInfo
     translations=Path(QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath))
     spanish=translations/'qtbase_es.qm'

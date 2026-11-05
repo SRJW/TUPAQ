@@ -33,6 +33,7 @@ class LanguageTests(unittest.TestCase):
         while w.worker is not None and time.monotonic()<deadline:APP.processEvents();time.sleep(.005)
         self.assertIsNone(w.worker)
         original=dict(w.tracks)
+        w.table.item(0,6).setText(tr('Enviando…'))
         w.library_table.selectRow(0);w.show_track_details(track,'En el iPhone')
         w.search.setText('Biblioteca');w.navigate(1)
         w.status.setText(tr('Importando: Biblioteca: Canción'))
@@ -41,7 +42,7 @@ class LanguageTests(unittest.TestCase):
             self.assertEqual(language(),'en');self.assertEqual(w.pages.currentIndex(),1)
             self.assertEqual(w.heading.text(),'Library');self.assertEqual(w.nav_buttons[1].text(),'Settings')
             self.assertEqual(w.library_model.headerData(0,Qt.Orientation.Horizontal),'Song')
-            self.assertEqual(w.table.horizontalHeaderItem(5).text(),'Size')
+            self.assertEqual(w.table.horizontalHeaderItem(5).text(),'Size');self.assertEqual(w.table.item(0,6).text(),'Sending…')
             self.assertEqual(w.theme_choice.itemText(2),'Dark');self.assertEqual(w.mood_choice.itemText(2),'Sunset')
             self.assertEqual(w.now_title.text(),'Biblioteca');self.assertEqual(w.info_artist.text(),'Preferencias')
             self.assertEqual(w.info_fields['album'].text(),'Canción');self.assertEqual(w.search.text(),'Biblioteca')
@@ -49,7 +50,7 @@ class LanguageTests(unittest.TestCase):
             self.assertEqual(w.tracks,original);self.assertEqual(w.library_model.checked,{'song'})
             self.assertEqual(w.library_table.selectionModel().selectedRows()[0].row(),0)
             w.language_choice.setCurrentIndex(0)
-            self.assertEqual(w.heading.text(),'Biblioteca');self.assertEqual(w.status.text(),'Importando: Biblioteca: Canción')
+            self.assertEqual(w.heading.text(),'Biblioteca');self.assertEqual(w.status.text(),'Importando: Biblioteca: Canción');self.assertEqual(w.table.item(0,6).text(),'Enviando…')
             read.assert_not_called();transfer.assert_not_called()
 
     def test_progress_errors_and_cancellation_follow_current_language(self):

@@ -68,6 +68,16 @@ jobs:
           python -m pip install --force-reinstall --no-deps --no-binary=cryptography --no-cache-dir cryptography==50.0.2
       - name: Probar lectura de audio y aplicación
         run: python scripts/run_tests.py
+      - name: Renderizar vistas nativas con datos sintéticos
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python scripts/preview_desktop.py --output preview-ui
+      - uses: actions/upload-artifact@v6
+        with:
+          name: Vistas-${{ matrix.artifact }}
+          path: preview-ui
+          if-no-files-found: error
+          retention-days: 30
       - name: Crear aplicación y disco de instalación
         run: python scripts/build_desktop.py
       - name: Probar ejecutable real

@@ -126,7 +126,7 @@ def retain_export(temporary, folder, filename):
 async def export_selected(selected, folder, progress):
     folder = Path(folder).resolve()
     require(folder.is_dir() and 1 <= len(selected) <= 1000, 'export-selection')
-    result = []
+    result = [];covers_embedded=0
     async with device() as (_, afc):
         with tempfile.TemporaryDirectory(prefix='.tupaq-export-',dir=folder) as temporary:
             catalogue = Path(temporary)/'catalogue'
@@ -141,6 +141,8 @@ async def export_selected(selected, folder, progress):
                         'export-stale-selection')
                 require(bool(current.get('afc_path')), 'export-no-usb-file')
             for index, chosen in enumerate(selected):
+                from .cancellation import wait_if_paused
+                await wait_if_paused(progress)
                 checkpoint()
                 track = fresh[chosen['id']]
                 destination_name = export_name(track)
@@ -153,12 +155,19 @@ async def export_selected(selected, folder, progress):
                 _, check, check_size = await read_remote(afc,track['afc_path'])
                 require(size == check_size and digest == check == local_hash(temporary_audio), 'export-hash')
                 checkpoint()
-                result.append(str(retain_export(temporary_audio,folder,destination_name)))
+                if chosen.get('embed_artwork') and Path(track['afc_path']).suffix.casefold()!='.m4p':
+                    from .remote_artwork import cover_for_track
+                    from .export_artwork import embed
+                    picture=await cover_for_track(afc,track,assets=True)
+                    if picture and embed(temporary_audio,picture.get('cover')):covers_embedded+=1
+                retained=retain_export(temporary_audio,folder,destination_name)
+                require(local_hash(retained)==local_hash(temporary_audio),'export-hash')
+                result.append(str(retained))
                 control=CURRENT.get()
                 if control is not None:control.files=list(result)
                 temporary_audio.unlink()
                 progress((index+1)*100,len(selected)*100,'Exportada: '+track['title'])
-    return {'exported':len(result),'files':result}
+    return {'exported':len(result),'files':result,'covers_embedded':covers_embedded}
 
 
 def save_receipt(directory, receipt):
@@ -283,7 +292,7 @@ async def plan_entries(afc, before, sources, directory):
         destinations.add(destination.lower())
         entry = {'track_id':allocate_id(reserved),'album_id':albums[album],'artist_id':artists[artist],
                  'destination':destination,'source':source,'added_at':int(time.time())}
-        if source.get('has_artwork'):
+        if source.get('has_artwork') and source.get('send_artwork',True):
             from .sync.artwork import prepare
             require(before['artwork_known'],'artwork-catalogue-schema')
             picture = prepare(source['path'],directory/'artwork',source['container'])
@@ -432,6 +441,11 @@ async def import_selected(selected, backup_root, progress, expected_snapshot=Non
         source = inspect_source(chosen['path'],chosen.get('id'))
         require(source['id'] not in hashes, 'duplicate-source')
         hashes.add(source['id'])
+        if chosen.get('metadata_policy')=='filename':
+            title=Path(source['path']).stem
+            require(0<len(title)<=4096 and not any(ord(c)<32 for c in title),'metadata-text')
+            source['title']=title
+        source['send_artwork']=chosen.get('send_artwork',True)
         sources.append(source)
     require(sum(s['size'] for s in sources) <= 2*1024*1024*1024, 'import-batch-size')
     root = Path(backup_root)
@@ -442,6 +456,8 @@ async def import_selected(selected, backup_root, progress, expected_snapshot=Non
     save_receipt(directory,receipt)
     try:
         async with device() as (lockdown, afc):
+            required={t['required_device_token'] for t in selected if t.get('required_device_token') is not None}
+            require(not required or required=={getattr(lockdown,'_tupaq_device_token',None)},'bulk-device-changed')
             # The OS library lock coordinates with other desktop sync clients.
             from pymobiledevice3.services.afc import AFC_LOCK_EX, AFC_LOCK_UN
             lock = await afc.fopen('/com.apple.itunes.lock_sync','a+')
@@ -543,6 +559,8 @@ def transfer_error(error, mode):
         message='La eliminación se detuvo o no pudo verificarse. Actualiza la biblioteca y conserva el registro de la operación.'
     elif mode == 'export':
         message = 'No se completó la exportación. Los archivos ya exportados se conservan; no se modificó el iPhone.'
+    elif mode == 'diagnose':
+        message='No se completaron las comprobaciones de lectura. No se modificó el iPhone.'
     elif mode == 'repair':
         message = 'La actualización de portadas y fecha se detuvo o no pudo verificarse. Conserva el respaldo y copia el diagnóstico.'
     else:
@@ -586,6 +604,7 @@ def transfer_error(error, mode):
         'alac-profile':'El perfil ALAC de este archivo no está admitido por la importación actual.',
     }
     message = messages.get(code,message)
+    if mode=='diagnose' and code=='export-stale-selection':message='La biblioteca cambió. Actualiza la lista antes de comprobarla.'
     if isinstance(error,ProtocolError) and error.facts is not None:
         code += '\nDatos del protocolo: '+json.dumps(error.facts,sort_keys=True)
     return TransferError(message, mode+':'+code)
@@ -609,11 +628,14 @@ def run_transfer(mode, selected, destination, progress):
     token=CURRENT.set(control)
     try:
         checkpoint()
-        require(mode in ('import','export','verify','resume','repair','delete'), 'transfer-mode')
+        require(mode in ('import','export','verify','resume','repair','delete','diagnose'), 'transfer-mode')
         from .deletion import delete_selected
         from .recovery import resume_pending
         from .metadata_update import repair_imported
         bulk=mode in ('import','delete') and (len(selected)>(49 if mode=='import' else 100) or (mode=='import' and sum(Path(t['path']).stat().st_size for t in selected)>2*1024**3))
+        if mode=='diagnose':
+            from .diagnostics import check
+            return asyncio.run(check(selected,progress,destination))
         if bulk:
             from .bulk import execute
             return asyncio.run(execute(mode,selected,destination,progress))

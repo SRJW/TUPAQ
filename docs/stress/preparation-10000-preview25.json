@@ -1,0 +1,11 @@
+{
+  "tracks": 10000,
+  "prepared": 10000,
+  "seconds": 12.568,
+  "max_gui_gap_seconds": 0.325,
+  "heartbeats": 1155,
+  "qt": "6.10.2",
+  "thumbnail_count": 96,
+  "simulation": true,
+  "peak_rss_kib": 212324
+}

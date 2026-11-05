@@ -1,7 +1,7 @@
 """Show the resolved font truthfully; never label a fallback as San Francisco."""
 import unittest
 from unittest.mock import patch
-from PySide6.QtGui import QFont,QFontInfo
+from PySide6.QtGui import QFont,QFontInfo,QFontDatabase
 from test_native_connection import APP
 from importios.typography import configure
 
@@ -11,7 +11,7 @@ class TypographyTests(unittest.TestCase):
         if APP.typography_is_apple:self.assertTrue(status.startswith('San Francisco'))
         else:self.assertIn('Mori' if APP.typography_is_mori else actual,status)
         if not APP.typography_is_mori:self.assertIn('fuente del sistema',status)
-        self.assertEqual(APP.font().pixelSize(),14 if APP.typography_is_mori else 13)
+        self.assertGreater(APP.font().pointSizeF(),0);self.assertEqual(APP.font().stretch(),100);self.assertEqual(APP.font().letterSpacing(),100)
 
     def test_mac_system_alias_is_displayed_as_san_francisco(self):
         with patch('importios.typography.sys.platform','darwin'),patch('importios.typography.QFontInfo') as resolved:
@@ -48,6 +48,6 @@ class TypographyTests(unittest.TestCase):
         with patch('importios.typography.sys.platform','win32'),patch('importios.typography.QFontDatabase.addApplicationFont') as load:
             status=configure(APP,'/missing/font.otf','unavailable custom family')
             load.assert_not_called();self.assertIsNone(APP.typography_font_path)
-            self.assertIn('Mori',status)
+            self.assertIn('fuente del sistema',status);self.assertFalse(APP.typography_is_mori)
             self.assertNotEqual(APP.font().family(),'unavailable custom family')
         configure(APP)

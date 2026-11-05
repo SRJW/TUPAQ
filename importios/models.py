@@ -6,7 +6,7 @@ import math
 
 from PySide6.QtCore import QAbstractTableModel,Qt,Signal
 from PySide6.QtWidgets import QTableWidgetItem,QStyledItemDelegate,QStyleOptionViewItem,QStyle,QApplication
-from PySide6.QtGui import QPainter,QPen,QPalette,QPainterPath
+from PySide6.QtGui import QColor,QPainter,QPen,QPalette,QPainterPath
 
 SORT_ROLE = int(Qt.ItemDataRole.UserRole)+1
 LYRICS_ROLE = SORT_ROLE+1
@@ -35,8 +35,12 @@ class SortableItem(QTableWidgetItem):
         self._message=value if isinstance(value,Text) else None
         super().__init__(str(value))
 
+    def setText(self,value):
+        self._message=value if isinstance(value,Text) else None
+        super().setText(str(value))
+
     def retranslate(self):
-        if self._message is not None:self.setText(render(self._message.source))
+        if self._message is not None:super().setText(render(self._message.source))
 
     def __lt__(self, other):
         left,right = self.data(SORT_ROLE),other.data(SORT_ROLE)
@@ -66,9 +70,9 @@ class SelectionDelegate(QStyledItemDelegate):
         if not rect.isValid():return
         painter.save();painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setPen(QPen(option.palette.color(QPalette.ColorRole.Mid),1))
-        painter.setBrush(option.palette.color(QPalette.ColorRole.Highlight if option.checkState!=Qt.CheckState.Unchecked else QPalette.ColorRole.Base))
+        painter.setBrush(QColor(option.widget.property('checkAccent')) if option.widget and option.widget.property('checkAccent') and option.checkState!=Qt.CheckState.Unchecked else option.palette.color(QPalette.ColorRole.Highlight if option.checkState!=Qt.CheckState.Unchecked else QPalette.ColorRole.Base))
         painter.drawRoundedRect(rect,3,3)
-        painter.setPen(QPen(option.palette.color(QPalette.ColorRole.Text),1.7,Qt.PenStyle.SolidLine,Qt.PenCapStyle.RoundCap,Qt.PenJoinStyle.RoundJoin))
+        painter.setPen(QPen(QColor(option.widget.property('checkForeground')) if option.widget and option.widget.property('checkForeground') else option.palette.color(QPalette.ColorRole.Text),1.7,Qt.PenStyle.SolidLine,Qt.PenCapStyle.RoundCap,Qt.PenJoinStyle.RoundJoin))
         x,y,w,h=rect.x(),rect.y(),rect.width(),rect.height()
         if option.checkState==Qt.CheckState.Checked:
             path=QPainterPath();path.moveTo(x+w*.22,y+h*.52);path.lineTo(x+w*.43,y+h*.73);path.lineTo(x+w*.8,y+h*.28);painter.drawPath(path)
