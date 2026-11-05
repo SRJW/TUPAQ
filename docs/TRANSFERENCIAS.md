@@ -301,7 +301,7 @@ La referencia visual vigente es Peel: panel lateral compacto, lista central con
 búsqueda por canción/artista/álbum y un inspector derecho plegable. Los controles
 Importar/Exportar comparten Biblioteca. Se conserva una vista clara opcional.
 macOS utiliza su fuente nativa San Francisco; Preferencias identifica la familia
-resuelta. No se redistribuyen fuentes de Apple en Windows. Se admite seleccionar
+resuelta. No se redistribuyen fuentes de Apple en Windows. En esa revisión se admitía seleccionar
 un archivo local autorizado; el usuario necesita derechos de uso aplicables.
 
 Al leer la biblioteca se enumeran los nombres de cada carpeta de audio validada
@@ -427,7 +427,7 @@ Las superficies son translúcidas sobre un fondo atmosférico propio almacenado 
 caché, con tres sombras estáticas. No es desenfoque del escritorio ni incluye
 controles ficticios de reproducción. Las capturas usan datos y portada sintéticos.
 La caché de 96 portadas permite una portada mayor en el resumen sin acumular
-imágenes de toda la biblioteca. Sigue vigente Aplicar fuente global en Windows
+imágenes de toda la biblioteca. En esa revisión seguía vigente Aplicar fuente global en Windows
 y la fuente nativa del sistema en Mac.
 
 **Cancelar** aparece durante importación y exportación. Antes del primer envío
@@ -592,3 +592,11 @@ La vista previa utiliza la carátula original accesible y muestra medidas y peso
 El icono de texto y el inspector distinguen letra incrustada, registrada y en línea.
 La importación conserva las letras dentro del audio, pero el registro separado
 que usa Música del iPhone sigue pendiente de validación: [detalle](LETRAS.md).
+
+## Interfaz y tipografía fija (preview.19)
+
+Esta revisión sustituye los controles antiguos de fuentes en Windows: se usa
+PP Mori instalada; en Mac se mantiene la fuente del sistema. No se incluyen
+archivos de Mori con licencia personal. Se añaden tarjetas, estados vacíos,
+respuesta al arrastre, transiciones finitas y Reducir movimiento. El protocolo
+USB y sus comprobaciones se conservan. [Uso e instalación personal](INTERACCION.md).

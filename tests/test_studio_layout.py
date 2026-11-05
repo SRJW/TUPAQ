@@ -1,4 +1,4 @@
-"""Three-column layout keeps real library actions and selection at both sizes."""
+"""Tonal device-first layout keeps real library actions and selection at both sizes."""
 import unittest
 from PySide6.QtCore import QEvent,Qt
 from test_native_connection import APP,TRACK
@@ -12,20 +12,20 @@ class StudioLayoutTests(unittest.TestCase):
             w.library_model.checked.add('4');w.library_table.selectRow(4)
             w.search.setText('Song')
             self.assertEqual(w.mood_choice.currentIndex(),3)
-            for width,columns in ((1500,4),(1080,2)):
+            for width,columns in ((1500,3),(1080,3)):
                 w.resize(width,800);APP.processEvents()
                 self.assertEqual(w.action_columns,columns)
-                self.assertEqual(w.main_splitter.count(),2)
-                self.assertTrue(w.inspector_scroll.isVisible())
+                self.assertEqual(w.main_splitter.count(),1)
+                self.assertFalse(w.inspector_dialog.isVisible())
                 self.assertEqual(w.library_model.rowCount(),40)
                 self.assertEqual(w.library_model.checked,{'4'})
                 for value in (w.choose,w.import_phone,w.export_phone,w.delete_phone):
                     self.assertTrue(value.isVisible());self.assertGreater(value.width(),50)
             w.inspector_toggle.click();APP.processEvents()
-            self.assertFalse(w.inspector_scroll.isVisible())
+            self.assertTrue(w.inspector_dialog.isVisible())
             self.assertEqual(w.library_model.checked,{'4'})
             w.inspector_toggle.click();APP.processEvents()
-            self.assertTrue(w.inspector_scroll.isVisible())
+            self.assertFalse(w.inspector_dialog.isVisible())
             self.assertEqual(w.search.text(),'Song')
             w.show_track_details(dict(TRACK,sample_rate=96000,bit_depth=24,bit_rate=2100),'En el iPhone')
             self.assertEqual(w.info_fields['quality'].text(),'24 bits · 96 kHz')

@@ -9,7 +9,7 @@ El objetivo es importar música local a la app Música del iPhone sin usar la
 aplicación iTunes ni 3uTools.
 
 El usuario confirmó la lectura y la importación con metadatos y portada en Música del iPhone.
-La **0.3.0-preview.18** conserva la biblioteca visible mientras se actualiza después
+La **0.3.0-preview.19** conserva la biblioteca visible mientras se actualiza después
 de una importación, incluidas selección, marcas, posición de lectura y carátulas.
 Si falla la lectura, mantiene la última vista válida e indica que no está actualizada.
 La comprobación de título, artista y álbum acepta las dos representaciones
@@ -33,21 +33,19 @@ nativo requiere una parte de transferencia separada cuyo contrato no está valid
 El inspector distingue letras incrustadas, registradas en el catálogo y disponibles
 en línea; no confunde estos estados. [Alcance y límites](docs/LETRAS.md).
 
-El diseño **Estudio** sigue la nueva referencia de tres columnas: dispositivo y
-navegación a la izquierda, biblioteca compacta en el centro y carátula con
-propiedades a la derecha. Las acciones de importar y exportar están juntas;
-Detalles permite ocultar el panel y ampliar la tabla. Las cabeceras siguen
-ordenando y las casillas conservan su selección al buscar y actualizar.
+La composición **Tonal** cambia la pantalla completa: una navegación compacta,
+tarjeta protagonista del iPhone, tres acciones grandes y biblioteca a todo el
+ancho. «Detalles» abre la carátula y las propiedades en una ventana secundaria;
+la lista no pierde espacio con una tercera columna permanente. Importar y
+exportar siguen en la misma página, con casillas y cabeceras para ordenar.
 
-Preferencias → Estilo visual ofrece Estudio, Nocturno, Aurora y Atardecer.
-Estudio usa tonos neutros y acentos naranja. Las propiedades de audio muestran
-frecuencia, bits y tasa de bits únicamente cuando se conocen; el resto muestra —.
-No se añaden controles de reproducción ni edición de etiquetas al copiar el diseño.
-La barra inferior conserva progreso y Cancelar. La tabla sigue siendo virtual,
-sin motor web ni desenfoque continuo.
-Windows permite elegir cualquier familia instalada o cargar una fuente de archivo,
-ver una muestra y pulsar **Aplicar** para cambiar toda la interfaz. En Mac se usa
-siempre la fuente del sistema. Hay [propuestas concretas para continuar](docs/MEJORAS-PROPUESTAS.md).
+Preferencias → Estilo visual ofrece Tonal, Nocturno, Aurora y Atardecer.
+Tonal usa superficies suaves de color verde azulado, en claro y oscuro. Las
+propiedades de audio solo muestran datos conocidos. La barra inferior conserva
+el progreso real y Cancelar, sin controles ficticios de reproducción o edición.
+La tabla sigue siendo virtual, sin motor web ni desenfoque continuo.
+Windows usa **PP Mori instalada**, automáticamente y sin selector de fuentes.
+En Mac se usa siempre la fuente del sistema. Hay [propuestas concretas para continuar](docs/MEJORAS-PROPUESTAS.md).
 En **Preferencias → Idioma** puedes elegir **Español** o **English**. El cambio
 es inmediato, se conserva al cerrar y alcanza navegación, cabeceras, diálogos,
 ayudas y mensajes de progreso/error, sin reiniciar ni vaciar la cola. Los metadatos
@@ -55,14 +53,17 @@ de las canciones, nombres de dispositivos y códigos técnicos no se traducen.
 Los selectores nativos de archivos también dependen del idioma del sistema operativo.
 Véase [cómo transferir y recuperar](docs/TRANSFERENCIAS.md).
 
-**Tipografía:** en Windows, Preferencias permite seleccionar familias instaladas y
-archivos TTF, OTF, TTC u OTC de hasta 128 MiB. Elegir una fuente no cambia la interfaz
-hasta pulsar Aplicar. Fuente del sistema también requiere Aplicar; la elección se
-conserva entre aperturas. El archivo de una fuente cargada debe seguir disponible.
-En macOS se utiliza la fuente nativa y no se ofrecen controles para sustituirla.
-No se redistribuyen archivos de fuentes de Apple. Las capturas se generan en Linux
-con su fuente disponible, no con San Francisco.
-[Información de Apple sobre sus fuentes](https://developer.apple.com/fonts/).
+**Tipografía:** Windows utiliza PP Mori cuando está instalada, con Regular (lectura),
+Medium (controles), SemiBold (títulos) y Bold (énfasis). Se retiran los controles
+para cargar, elegir o aplicar otras fuentes. Las preferencias antiguas de fuente
+se ignoran. Mac conserva su fuente nativa. No se redistribuyen archivos de Mori
+con licencia personal ni fuentes de Apple. Si falta Mori, TUPAQ identifica
+honestamente la fuente del sistema que está usando. [Instalación personal](docs/INTERACCION.md).
+
+La revisión visual incorpora superficies tonales, tarjetas de preferencias,
+estados vacíos útiles, indicación al arrastrar archivos y transiciones breves.
+«Reducir movimiento» elimina las animaciones. La biblioteca no se desvanece al
+actualizar. [Ver animaciones con datos sintéticos](docs/movimiento.gif).
 
 ![Selector de idioma de TUPAQ, con datos sintéticos de prueba](docs/preferencias-idioma.png)
 
@@ -70,7 +71,7 @@ con su fuente disponible, no con San Francisco.
 
 ![TUPAQ en modo claro, con audio sintético de prueba](docs/interfaz-nativa.png)
 
-![TUPAQ Estudio, con datos y portada sintéticos de prueba](docs/interfaz-oscura.png)
+![TUPAQ Tonal, con datos y portada sintéticos de prueba](docs/interfaz-oscura.png)
 
 ![TUPAQ Atardecer, con datos y portada sintéticos de prueba](docs/interfaz-atardecer.png)
 

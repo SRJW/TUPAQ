@@ -16,14 +16,17 @@ def main():
     if subprocess.run(view, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         with tempfile.TemporaryDirectory() as directory:
             notes = Path(directory)/'notes.md'
-            notes.write_text('''TUPAQ 0.3.0-preview.18: estado USB claro y diagnóstico de letras de solo lectura.
+            notes.write_text('''TUPAQ 0.3.0-preview.19: interfaz tonal, interacciones cuidadas y tipografía fija.
 
-- Punto verde cuando se detecta un iPhone por USB; gris al desconectarlo, si el servicio USB falla o si se conectan varios dispositivos. El color funciona en los temas claros/oscuros y en español/inglés.
-- Las respuestas tardías de una lectura anterior ya no vuelven a mostrar conectado un dispositivo retirado, ni repueblan su biblioteca.
-- El diagnóstico compara, solo en la copia local, hasta 32 textos con hipótesis CRC32/Adler32. Devuelve únicamente recuentos; no copia letras, identificadores ni valores privados al informe.
-- Se conserva la detección y lectura de letras incrustadas. Mostrarlas dentro de Música del iPhone sigue pendiente de validar; esta versión no activa una entrega experimental de letras.
+- Composición completamente renovada: navegación compacta, tarjeta protagonista del iPhone, tres acciones grandes y biblioteca a todo el ancho. Detalles abre una ventana secundaria; se elimina la tercera columna permanente.
+- Modo Tonal verde azulado, espaciado y radios amplios, estados vacíos con acciones y preferencias organizadas en tarjetas.
+- Transiciones breves al navegar, respuesta de controles y mezcla de carátulas sin cuadros vacíos. Reducir movimiento detiene todo inmediatamente y se conserva entre aperturas. Sin animaciones decorativas continuas; la biblioteca no se desvanece al actualizar.
+- Zona de arrastre visible: los archivos van a la cola y no se importan automáticamente. Atajos habituales para buscar y abrir canciones.
+- Windows usa PP Mori instalada automáticamente: Regular, Medium, SemiBold y Bold. Se eliminan el selector de fuentes, Agregar y Aplicar. Mac conserva la fuente del sistema.
+- Mori tiene licencia personal: sus archivos no se incluyen en estos paquetes. Extrae tu Mori.zip, instala los cuatro pesos desde Windows y vuelve a abrir TUPAQ. Si falta, se usa y se identifica la fuente del sistema. Instrucciones en docs/INTERACCION.md.
+- Se conservan las funciones de música, selección, orden, importación/exportación y sus comprobaciones. Las letras dentro de Música del iPhone siguen pendientes de validar.
 
-Pruebas automatizadas y comprobación de cada paquete antes de publicarlo. Windows y Mac no necesitan Python ni abrir iTunes. Paquetes sin firma ni notarización; no se redistribuyen fuentes de Apple. Conserva catalogue-backups.
+Pruebas automatizadas y comprobación de cada paquete antes de publicarlo. No necesitas Python ni abrir iTunes. Paquetes sin firma ni notarización. No se redistribuyen fuentes de Apple ni Mori con licencia personal.
 ''', encoding='utf-8')
             created = subprocess.run(['gh','release','create',tag,'--repo',repo,'--title',
                 'TUPAQ '+tag,'--notes-file',str(notes),'--prerelease','--verify-tag'])

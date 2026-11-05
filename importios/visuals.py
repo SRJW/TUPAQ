@@ -35,6 +35,8 @@ def line_icon(kind, color='#52576d', size=22):
         dy = 4 if kind == 'upload' else -4
         p.drawLine(12,y2,8,y2+dy);p.drawLine(12,y2,16,y2+dy)
         p.drawPolyline([QPointF(4,17),QPointF(4,21),QPointF(20,21),QPointF(20,17)])
+    elif kind == 'info':
+        p.drawEllipse(QRectF(3,3,18,18));p.drawPoint(12,7);p.drawLine(12,11,12,17)
     elif kind == 'settings':
         for y,x in [(6,8),(12,16),(18,10)]:
             p.drawLine(3,y,21,y);p.setBrush(QColor(color));p.drawEllipse(QPointF(x,y),2.3,2.3);p.setBrush(Qt.BrushStyle.NoBrush)

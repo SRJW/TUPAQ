@@ -1,5 +1,34 @@
 """English UI catalogue. Spanish source messages are the fallback."""
 EN = {
+    'Tonal':'Tonal',
+
+    'Tu biblioteca por USB':'Your library by USB',
+    'Detalles de la canción':'Song details',
+    'Cerrar':'Close',
+
+    'Mori es la tipografía de TUPAQ en Windows.':'Mori is the TUPAQ typeface on Windows.',
+    'Instala PP Mori Regular, Medium, SemiBold y Bold con el instalador de fuentes de Windows y vuelve a abrir TUPAQ.':'Install PP Mori Regular, Medium, SemiBold and Bold using the Windows font installer, then reopen TUPAQ.',
+    'Mori · tipografía de Windows':'Mori · Windows typography',
+    'Mori no está instalada · {family} · fuente del sistema':'Mori is not installed · {family} · system font',
+
+    'Suelta tus canciones aquí':'Drop your songs here',
+    'Se añadirán a la cola. Tú decides cuándo importarlas.':'They will be added to the queue. You decide when to import them.',
+
+    'Apariencia e idioma':'Appearance and language',
+    'Tipografía':'Typography',
+    'Conexión':'Connection',
+    'Reducir movimiento':'Reduce motion',
+    'Transiciones breves al navegar y cambiar de carátula. Sin animaciones continuas.':'Short transitions when navigating and changing artwork. No continuous animations.',
+    'Sin coincidencias':'No matches',
+    'Prueba otro título, artista, álbum o formato.':'Try another title, artist, album or format.',
+    'Limpiar búsqueda':'Clear search',
+    'Leyendo tu biblioteca':'Reading your library',
+    'Tus canciones aparecerán aquí cuando termine la lectura.':'Your songs will appear here when reading finishes.',
+    'Sin canciones visibles':'No visible songs',
+    'Añade música del ordenador o actualiza la biblioteca del iPhone.':'Add music from your computer or refresh the iPhone library.',
+    'Tu música empieza aquí':'Your music starts here',
+    'Conecta tu iPhone por USB para ver su biblioteca. También puedes preparar canciones del ordenador.':'Connect your iPhone by USB to view its library. You can also prepare songs from your computer.',
+
     'Conectado por USB':'Connected by USB',
     'Conecta un solo iPhone':'Connect only one iPhone',
     'Servicio USB no disponible':'USB service unavailable',

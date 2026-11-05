@@ -49,51 +49,48 @@ class RefreshTests(unittest.TestCase):
         w.show_library([dict(t) for t in self.rows]);self.assertEqual(w.status.text(),message)
 
 class FontApplicationTests(unittest.TestCase):
-    def test_installed_font_is_staged_then_applied_to_buttons_labels_headers_and_dialogs(self):
-        # Exercise Windows controls on every runner, including native Mac runners.
+    def test_windows_has_fixed_font_without_picker_and_applies_it_everywhere(self):
         with patch('importios.native.sys.platform','win32'):
             w=Window(auto_connect=False);w.show();APP.processEvents()
             try:
-                current=w.font_choice.currentFont().family()
-                family=next(f for f in QFontDatabase.families() if f not in (current,w.font_choice.currentText()))
-                old=QFontInfo(w.choose.font()).family();w.font_choice.setCurrentFont(QFont(family));APP.processEvents()
-                self.assertEqual(QFontInfo(w.choose.font()).family(),old);self.assertTrue(w.apply_font_button.isEnabled())
-                w.apply_font();APP.processEvents()
-                resolved=QFontInfo(APP.font()).family()
-                self.assertEqual(APP.font().family(),family)
+                self.assertFalse(hasattr(w,'font_choice'));self.assertFalse(hasattr(w,'choose_font_button'));self.assertFalse(hasattr(w,'apply_font_button'))
+                actual=QFontInfo(APP.font()).family()
                 for widget in (w.choose,w.nav_buttons[0],w.now_title,w.library_table,w.library_table.horizontalHeader(),w.theme_choice,w.status):
-                    self.assertEqual(QFontInfo(widget.font()).family(),resolved,widget.objectName())
-                    self.assertIn(family,widget.font().families())
+                    self.assertEqual(QFontInfo(widget.font()).family(),actual,widget.objectName())
                 from PySide6.QtWidgets import QMessageBox
-                dialog=QMessageBox(w);self.assertEqual(QFontInfo(dialog.font()).family(),resolved);dialog.deleteLater()
-                self.assertFalse(w.apply_font_button.isEnabled())
-                w.reset_font();self.assertEqual(QFontInfo(w.choose.font()).family(),resolved)
-                w.apply_font();APP.processEvents()
+                dialog=QMessageBox(w);self.assertEqual(QFontInfo(dialog.font()).family(),actual);dialog.deleteLater()
+                self.assertIn('Mori',w.font_status.text())
             finally:w.close();w.deleteLater();APP.processEvents()
 
-    def test_mac_exposes_system_typography_without_custom_font_controls(self):
+    def test_mac_keeps_system_font_even_when_mori_is_available(self):
         with patch('importios.native.sys.platform','darwin'):
             w=Window(auto_connect=False)
             try:
                 self.assertFalse(hasattr(w,'font_choice'));self.assertFalse(hasattr(w,'apply_font_button'))
-                self.assertIn('fuente del sistema',w.font_status.text())
+                self.assertIn('fuente del sistema',w.font_status.text());self.assertFalse(APP.typography_is_mori)
             finally:w.close();w.deleteLater();APP.processEvents()
 
-    def test_font_file_waits_for_apply_then_updates_entire_window(self):
+    def test_real_mori_weights_when_personal_test_fonts_are_available(self):
+        import os
         from pathlib import Path
-        candidates=[Path('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'),Path('C:/Windows/Fonts/arial.ttf'),Path('/System/Library/Fonts/Supplemental/Arial.ttf')]
-        file=next((path for path in candidates if path.is_file()),None)
-        if file is None:self.skipTest('No test font file available on this runner')
-        with patch('importios.native.sys.platform','win32'):
-            w=Window(auto_connect=False)
-            try:
-                original=APP.font()
-                with patch('importios.native.QFileDialog.getOpenFileName',return_value=(str(file),'')):w.choose_font()
-                self.assertEqual(APP.font(),original);self.assertTrue(w.apply_font_button.isEnabled())
-                w.apply_font();APP.processEvents()
-                actual=QFontInfo(APP.font()).family()
-                self.assertEqual(APP.typography_font_path,str(file))
-                self.assertEqual(QFontInfo(w.library_table.horizontalHeader().font()).family(),actual)
-                self.assertEqual(QFontInfo(w.nav_buttons[1].font()).family(),actual)
-                w.reset_font();w.apply_font()
-            finally:w.close();w.deleteLater();APP.processEvents()
+        from importios.typography import configure
+        root=Path(os.environ.get('TUPAQ_TEST_MORI_DIR','/nonexistent-private-test-fonts'))
+        files=[root/f'PPMori-{weight}.ttf' for weight in ('Regular','Medium','SemiBold','Bold')]
+        if not all(file.is_file() for file in files):self.skipTest('Personal Mori files are not redistributed with tests')
+        identifiers=[QFontDatabase.addApplicationFont(str(file)) for file in files]
+        try:
+            with patch('importios.native.sys.platform','win32'):
+                w=Window(auto_connect=False);w.show();APP.processEvents()
+                try:
+                    self.assertTrue(APP.typography_is_mori);self.assertEqual(APP.font().pixelSize(),14)
+                    for weight,style in ((400,'Regular'),(500,'Medium'),(600,'SemiBold'),(700,'Bold')):
+                        font=QFont('PP Mori');font.setWeight(QFont.Weight(weight));info=QFontInfo(font)
+                        self.assertEqual(info.family(),'PP Mori');self.assertEqual(info.weight(),weight);self.assertEqual(info.styleName(),style)
+                    from PySide6.QtGui import QFontMetrics
+                    self.assertGreaterEqual(w.library_table.columnWidth(3),QFontMetrics(w.library_table.font()).horizontalAdvance('M4A · ALAC')+18)
+                    for widget in (w.choose,w.heading,w.nav_buttons[0],w.library_table,w.library_table.horizontalHeader(),w.info_artist,w.status,w.font_status):
+                        self.assertEqual(QFontInfo(widget.font()).family(),'PP Mori')
+                finally:w.close();w.deleteLater();APP.processEvents()
+        finally:
+            for identifier in identifiers:QFontDatabase.removeApplicationFont(identifier)
+            configure(APP)

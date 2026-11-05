@@ -13,7 +13,7 @@ import time
 import asyncio
 
 from PySide6.QtCore import Qt, QThread, Signal, QSize, QStandardPaths, QLockFile, QUrl, QTimer, QSettings, QPoint, QItemSelectionModel
-from PySide6.QtGui import QIcon, QPixmap, QDesktopServices, QFont, QFontInfo, QFontDatabase
+from PySide6.QtGui import QIcon, QPixmap, QDesktopServices, QShortcut, QKeySequence
 from PySide6.QtWidgets import QApplication,QFileDialog,QMainWindow,QMessageBox,QAbstractItemView,QDialog,QVBoxLayout,QScrollArea,QLabel,QPlainTextEdit
 
 from .i18n import tr, set_language, language, LANGUAGES, QMessageBox
@@ -222,24 +222,23 @@ class Window(QMainWindow):
         set_language(saved_language)
         from .typography import configure
         app=QApplication.instance()
-        font_path=QSettings().value('font_path','') if auto_connect else ''
-        font_family=QSettings().value('font_family','') if auto_connect else ''
-        try:configure(app,font_path or None,font_family or None)
-        except (OSError,ValueError):configure(app)
+        configure(app)
         self.setFont(app.font())
-        self.pending_font_path=getattr(app,'typography_font_path',None)
-        self.pending_font_family=font_family or None
-        self.font_applying=False
+        from .motion import MotionController
+        reduced=QSettings().value('reduce_motion',False,type=bool) if auto_connect else False
+        self.motion=MotionController(self,enabled=not reduced)
         from .interface import build, apply_theme
         build(self)
         self.language_choice.setCurrentIndex(self.language_choice.findData(language()))
         self.language_choice.currentIndexChanged.connect(self.change_language)
+        QShortcut(QKeySequence.StandardKey.Find,self,activated=self.focus_search)
+        QShortcut(QKeySequence.StandardKey.Open,self,activated=self.choose_files)
         self.persist_settings = auto_connect
         if self.persist_settings:
             settings = QSettings()
             choice=int(settings.value('appearance',2))
-            if settings.value('design_version','')!='studio':settings.setValue('glass_mood',3)
-            settings.setValue('design_version','studio')
+            if settings.value('design_version','')!='tonal-19':settings.setValue('glass_mood',3)
+            settings.setValue('design_version','tonal-19')
             settings.setValue('appearance',choice)
             self.theme_choice.setCurrentIndex(choice)
             self.mood_choice.blockSignals(True);self.mood_choice.setCurrentIndex(int(settings.value('glass_mood',3)));self.mood_choice.blockSignals(False)
@@ -259,6 +258,7 @@ class Window(QMainWindow):
         self.refresh_workspace()
         self.nav_buttons[0].setChecked(True)
         self.change_theme()
+        self.library_empty.refresh()
         if self.background_enabled and self.auto_read.isChecked():
             self.device_timer.start()
             QTimer.singleShot(150,self.poll_device)
@@ -287,13 +287,18 @@ class Window(QMainWindow):
         self.queue_panel.setMinimumHeight(min(210,100+44*len(self.tracks)) if self.tracks else 110)
 
     def navigate(self, number):
-        self.pages.setCurrentIndex(1 if number == 1 else 0)
+        self.motion.navigate(self.pages,1 if number == 1 else 0)
         self.nav_buttons[1 if number == 1 else 0].setChecked(True)
         self.update_buttons()
         self.schedule_artwork()
+        self.library_empty.refresh()
+
+    def focus_search(self):
+        self.navigate(0);self.search.setFocus()
 
     def resizeEvent(self,event):
         super().resizeEvent(event)
+        if hasattr(self,'drop_veil') and self.drop_veil.isVisible():self.drop_veil.reveal()
         if hasattr(self,'transfer_actions'):
             from .interface import layout_transfer_actions
             layout_transfer_actions(self)
@@ -309,6 +314,7 @@ class Window(QMainWindow):
                     self.table.item(row,column).retranslate()
         finally:self.table.setSortingEnabled(sorting)
         if hasattr(self,'preview_track'):self.request_preview(self.preview_track)
+        self.library_empty.refresh()
         if self.persist_settings:QSettings().setValue('language',language())
 
     def refresh_workspace(self):
@@ -336,6 +342,7 @@ class Window(QMainWindow):
         top_id=self.library_model.tracks[first.row()]['id'] if first.isValid() else None
         view.setUpdatesEnabled(False)
         self.library_model.replace(displayed,preserve_icons=bool(self.phone_tracks))
+        self.library_empty.refresh()
         selection=view.selectionModel()
         for identifier in selected:
             row=self.library_model.rows.get(identifier)
@@ -361,8 +368,13 @@ class Window(QMainWindow):
         from .library_fields import local_tracks
         local=local_tracks(self.phone_tracks)
         missing=sum(track.get('usb_exists') is False for track in self.phone_tracks)
+        self.device_metric.setText(tr(f'{len(local)} canciones') if self.connection_token is not None or self.phone_tracks else tr('Tu biblioteca por USB'))
         text=f'{len(local)} canciones en el iPhone'
         self.device_status.setText(tr(text if self.phone_tracks else 'Conecta tu iPhone para mostrar su música.'))
+
+    def change_motion(self,reduced):
+        self.motion.set_enabled(not reduced)
+        if self.persist_settings:QSettings().setValue('reduce_motion',bool(reduced))
 
     def change_mood(self,*ignored):
         from .interface import apply_theme
@@ -420,6 +432,7 @@ class Window(QMainWindow):
             self.artwork_attempted.clear()
             self.device_name.setText('iPhone')
             self.set_connection_status(False,'Sin conexión USB' if not devices else 'Conecta un solo iPhone')
+            self.device_status.setVisible(bool(devices))
             self.device_status.setText(tr('Conecta tu iPhone. Su biblioteca aparecerá automáticamente.' if not devices else 'Se detectó más de un dispositivo Apple. Conecta un solo iPhone para continuar.'))
             return
         token = devices[0].get('token','usb')
@@ -439,6 +452,7 @@ class Window(QMainWindow):
             self.load_library(automatic=True)
 
     def device_problem(self, message):
+        self.device_status.show()
         self.connection_generation+=1
         self.connection_token = None
         self.library_ready = False
@@ -523,8 +537,10 @@ class Window(QMainWindow):
         self.now_cover.setPixmap(QPixmap());self.now_cover.setText('♪')
         self.now_title.setText(tr('Tu música, siempre contigo.'));self.info_artist.setText(tr('Selecciona una canción para ver sus detalles.'));self.info_origin.setText(tr('TU COLECCIÓN'))
         for value in self.info_fields.values():value.setText('—')
+        for value in self.inspector_details:value.hide()
 
     def show_track_details(self,track,origin):
+        for value in self.inspector_details:value.show()
         self.now_title.setText(track.get('title') or tr('Sin título'));self.info_artist.setText(track.get('artist') or tr('Sin artista'))
         self.info_origin.setText(tr(origin.upper()))
         fmt=track.get('format_label') or (f"M4A · {track['format']}" if track.get('container')=='M4A' else track.get('format'))
@@ -539,6 +555,8 @@ class Window(QMainWindow):
                 'Disponible por USB' if track.get('afc_path') and track.get('usb_exists') is not False else 'Sin acceso USB'}
         for key,value in values.items():
             if key in self.info_fields:self.info_fields[key].setText(value)
+        if self.preview_result.get('image') is not None and self.preview_key==self.preview_identity(track):
+            self.request_preview(track);return
         image=QPixmap()
         if track.get('thumbnail'):image.loadFromData(track['thumbnail'])
         icon=self.library_model.icons.get(track.get('id'),self.default_music_icon)
@@ -546,10 +564,13 @@ class Window(QMainWindow):
         self.now_cover.setPixmap(rounded_cover(image if not image.isNull() else icon.pixmap(224,224),224))
         self.request_preview(track)
 
+    def preview_identity(self,track):
+        return ('local',track.get('id'),track.get('path')) if track.get('path') else ('phone',self.connection_token,track.get('id'),self.library_model.cover_key(track))
+
     def request_preview(self,track):
         from .lyrics import label
         self.preview_track=track
-        key=('local',track.get('id'),track.get('path')) if track.get('path') else ('phone',self.connection_token,track.get('id'),self.library_model.cover_key(track))
+        key=self.preview_identity(track)
         if key!=self.preview_key:
             self.preview_key=key;self.preview_generation+=1;self.preview_result={}
             self.cover_metadata.setText(tr('Leyendo carátula original…'));self.view_cover.setEnabled(False);self.view_lyrics.setEnabled(False)
@@ -573,8 +594,10 @@ class Window(QMainWindow):
     def render_preview(self):
         result=self.preview_result;image=result.get('image')
         if image is not None and not image.isNull():
-            ratio=self.devicePixelRatioF();pixmap=QPixmap.fromImage(image).scaled(round(224*ratio),round(224*ratio),Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation)
-            pixmap.setDevicePixelRatio(ratio);self.now_cover.setPixmap(pixmap)
+            ratio=self.devicePixelRatioF();key=f'{image.cacheKey()}:{ratio}'
+            if self.now_cover.property('previewImageKey')!=key or self.now_cover.pixmap().isNull():
+                pixmap=QPixmap.fromImage(image).scaled(round(224*ratio),round(224*ratio),Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation)
+                pixmap.setDevicePixelRatio(ratio);self.now_cover.setPixmap(pixmap);self.now_cover.setProperty('previewImageKey',key)
             self.cover_metadata.setText(f"{result['cover_width']} × {result['cover_height']} px · {byte_label(result['cover_bytes'])} · {result['cover_format']}")
         elif result:self.cover_metadata.setText(tr('Sin carátula original accesible'))
         self.view_cover.setEnabled(bool(result.get('cover')))
@@ -593,56 +616,6 @@ class Window(QMainWindow):
         dialog=QDialog(self);dialog.setWindowTitle(tr('Letra incluida en el archivo'));dialog.resize(580,640)
         layout=QVBoxLayout(dialog);notice=QLabel(tr('Conservar la letra dentro del archivo no garantiza que Música del iPhone la muestre.'));notice.setWordWrap(True);layout.addWidget(notice)
         editor=QPlainTextEdit();editor.setReadOnly(True);editor.setPlainText(text);layout.addWidget(editor);dialog.exec()
-
-    def stage_font(self,*ignored):
-        if sys.platform=='darwin' or self.font_applying:return
-        family=self.font_choice.currentFont().family()
-        identifier=getattr(QApplication.instance(),'typography_font_id',None)
-        loaded=QFontDatabase.applicationFontFamilies(identifier) if identifier is not None else []
-        self.pending_font_path=getattr(QApplication.instance(),'typography_font_path',None) if family in loaded else None
-        self.pending_font_family=family
-        self.update_font_preview()
-
-    def update_font_preview(self):
-        from .typography import css_family
-        family=self.pending_font_family or QFontInfo(QFontDatabase.systemFont(QFontDatabase.SystemFont.GeneralFont)).family()
-        self.font_preview.setStyleSheet(f'font-family:"{css_family(family)}";font-size:18px;')
-        self.font_pending.setText(tr('Archivo: '+Path(self.pending_font_path).name if self.pending_font_path else f'Por aplicar: {family}'))
-        self.apply_font_button.setEnabled(True)
-
-    def choose_font(self):
-        if sys.platform=='darwin':return
-        path,_=QFileDialog.getOpenFileName(self,tr('Elegir archivo de fuente'),'', tr('Fuentes (*.ttf *.otf *.ttc *.otc)'))
-        if path:
-            self.pending_font_path=path;self.pending_font_family=None;self.update_font_preview()
-
-    def reset_font(self):
-        if sys.platform=='darwin':return
-        self.pending_font_path=None;self.pending_font_family=None
-        self.font_choice.blockSignals(True);self.font_choice.setCurrentFont(QFontDatabase.systemFont(QFontDatabase.SystemFont.GeneralFont));self.font_choice.blockSignals(False)
-        self.update_font_preview()
-
-    def apply_font(self):
-        if sys.platform=='darwin':return
-        from .typography import configure
-        self.font_applying=True
-        try:
-            status=configure(QApplication.instance(),self.pending_font_path,self.pending_font_family)
-            app=QApplication.instance();self.setFont(app.font())
-            from .interface import apply_theme
-            apply_theme(self)
-            self.font_status.setText(tr(status))
-            self.font_choice.blockSignals(True);self.font_choice.setCurrentFont(app.font());self.font_choice.blockSignals(False)
-            self.pending_font_family=app.font().family();self.pending_font_path=app.typography_font_path
-            self.font_preview.setStyleSheet('font-size:18px;');self.font_pending.setText(tr('Aplicada a toda la interfaz'))
-            self.apply_font_button.setEnabled(False)
-            if self.persist_settings:
-                settings=QSettings();settings.setValue('font_family',self.pending_font_family)
-                if self.pending_font_path:settings.setValue('font_path',self.pending_font_path)
-                else:settings.remove('font_path')
-        except (OSError,ValueError):
-            QMessageBox.warning(self,tr('No se pudo aplicar'),tr('Elige una fuente instalada o un archivo TTF, OTF o colección admitida de hasta 128 MiB.'))
-        finally:self.font_applying=False
 
     def artwork_finished(self):
         worker = self.thumbnail_worker
@@ -858,6 +831,7 @@ class Window(QMainWindow):
         self.copy_diagnostic.setEnabled(False)
         if not self.phone_tracks and (not automatic or (not self.tracks and self.pages.currentIndex() == 0)):
             self.navigate(0)
+        self.device_status.show()
         self.device_status.setText(tr('Actualizando biblioteca… Puedes seguir viendo tus canciones.' if self.phone_tracks else 'Leyendo la biblioteca del iPhone…'))
         self.library_worker = LibraryReader(self)
         self.library_worker.connection_generation=self.connection_generation
@@ -866,6 +840,7 @@ class Window(QMainWindow):
         self.library_worker.name.connect(self.accept_library_name)
         self.library_worker.finished.connect(self.library_finished)
         self.update_buttons()
+        self.library_empty.refresh()
         self.library_worker.start()
 
     def show_library(self, tracks, diagnostic=''):
@@ -878,6 +853,7 @@ class Window(QMainWindow):
         from .library_fields import local_tracks
         self.library_model.checked.intersection_update(t['id'] for t in local_tracks(tracks))
         self.filter_library()
+        self.device_status.setVisible(not bool(tracks))
         self.last_diagnostic = self.transfer_diagnostic or diagnostic or format_diagnostics({'tracks_returned': len(tracks)})
         self.copy_diagnostic.setEnabled(True)
         self.library_ready = True
@@ -889,6 +865,7 @@ class Window(QMainWindow):
         self.schedule_artwork()
 
     def library_problem(self, message):
+        self.device_status.show()
         self.library_ready = False
         self.retry_library_at = time.monotonic()+20
         self.show_library_error(message)
@@ -906,6 +883,7 @@ class Window(QMainWindow):
             worker.deleteLater()
         self.library_button.setEnabled(True)
         self.update_buttons()
+        self.library_empty.refresh()
         self.schedule_artwork()
 
     def add_paths(self, paths):
@@ -1008,10 +986,15 @@ class Window(QMainWindow):
                 QMessageBox.warning(self, tr('No se pudo guardar'), tr('Elige una carpeta donde tengas permiso para escribir.'))
 
     def dragEnterEvent(self, event):
-        if self.worker is None and event.mimeData().hasUrls():
-            event.acceptProposedAction()
+        if self.worker is None and self.transfer_worker is None and any(url.isLocalFile() for url in event.mimeData().urls()):
+            self.drop_veil.reveal();event.acceptProposedAction()
+        else:event.ignore()
+
+    def dragLeaveEvent(self,event):
+        self.drop_veil.hide();event.accept()
 
     def dropEvent(self, event):
+        self.drop_veil.hide()
         paths = [url.toLocalFile() for url in event.mimeData().urls() if url.isLocalFile()]
         self.add_paths(paths)
         event.acceptProposedAction()
@@ -1031,6 +1014,7 @@ class Window(QMainWindow):
             QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
             event.ignore()
             return
+        self.motion.set_enabled(False)
         self.closing=True;self.preview_pending=None;self.preview_generation+=1
         self.after_artwork = None
         self.device_timer.stop()
