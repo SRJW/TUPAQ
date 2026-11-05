@@ -13,13 +13,19 @@ eliminación, los recibos y la comprobación final del catálogo y de los audios
 | Importar 1.000 y eliminar las mismas 1.000 | Completada; original no seleccionado intacto | 9,453 s en total |
 | Importar 10.000 | 10.000 comprobadas, 205 lotes | 167,289 s |
 | Eliminar esas 10.000 | 10.000 comprobadas, 100 lotes | 58,200 s |
+| Importar y eliminar 1.000 archivos mezclados | MP3, WAV, AIFF, M4A ALAC y AAC; 200 portadas | 13,379 s en total |
 | Preparar 10.000 archivos en la interfaz | 10.000 filas; sin errores de lectura | 8,819 s |
 
 Estos tiempos corresponden a **archivos de prueba diminutos y almacenamiento
 local**, no representan la velocidad de un cable USB ni la de música real.
 [Resultado de 1.000](stress/transfers-1000.json),
 [resultado de 10.000](stress/transfers-10000.json) y
-[resultado de interfaz](stress/preparation-10000.json).
+[resultado de interfaz](stress/preparation-10000.json) y
+[resultado de formatos mezclados](stress/transfers-mixed-1000.json).
+
+El lote mixto usa 200 originales de cada perfil, incluidos 200 AAC con portada.
+Completó 21 lotes de importación y 10 de eliminación; el protocolo comprueba
+también sus assets de portada. La canción previa y su audio se conservaron.
 
 La prueba de 10.000 conservó exactamente la canción previa, su audio y el cierre
 de todos los manejadores del simulador. Las copias y los recibos ocuparon
@@ -98,6 +104,7 @@ Desde la raíz del repositorio, con las dependencias de desarrollo instaladas:
 
 ```bash
 .venv/bin/python scripts/stress_transfers.py --tracks 10000 --report /tmp/transfers.json
+.venv/bin/python scripts/stress_transfers.py --tracks 1000 --mixed --report /tmp/mixed.json
 QT_QPA_PLATFORM=offscreen .venv/bin/python scripts/stress_preparation.py --tracks 10000 --report /tmp/preparation.json
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m unittest discover -s tests -v
 ```
