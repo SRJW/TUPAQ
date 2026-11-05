@@ -251,6 +251,7 @@ class TransferTests(unittest.TestCase):
                 source=inspect_source(FIXTURES/name)
                 self.assertEqual(source['audio_format'],code)
                 self.assertGreater(source['samples'],0)
+                if 'year' in source:self.assertIs(type(source['year']),int)
 
     def test_delta_import_preserves_original_and_checks_each_audio_byte(self):
         phone=Phone();original=phone.files['/iTunes_Control/Music/F00/AAAA.mp3']

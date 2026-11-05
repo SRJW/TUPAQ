@@ -944,4 +944,43 @@ EN = {'Biblioteca': 'Library',
                                                              'match.',
  '{filename}: {message}': '{filename}: {message}',
  '{message} No se ha escrito en la biblioteca del teléfono.': '{message} The phone library has not been written '
-                                                              'to.'}
+                                                              'to.',
+ 'Los metadatos leídos del iPhone no coinciden con los enviados. La canción puede estar ya importada. Conserva el respaldo y usa Revisar operación pendiente en Preferencias.': 'The '
+                                                                                                                                                                                'metadata '
+                                                                                                                                                                                'read '
+                                                                                                                                                                                'from '
+                                                                                                                                                                                'the '
+                                                                                                                                                                                'iPhone '
+                                                                                                                                                                                'does '
+                                                                                                                                                                                'not '
+                                                                                                                                                                                'match '
+                                                                                                                                                                                'what '
+                                                                                                                                                                                'was '
+                                                                                                                                                                                'sent. '
+                                                                                                                                                                                'The '
+                                                                                                                                                                                'song '
+                                                                                                                                                                                'may '
+                                                                                                                                                                                'already '
+                                                                                                                                                                                'be '
+                                                                                                                                                                                'imported. '
+                                                                                                                                                                                'Keep '
+                                                                                                                                                                                'the '
+                                                                                                                                                                                'backup '
+                                                                                                                                                                                'and '
+                                                                                                                                                                                'use '
+                                                                                                                                                                                'Check '
+                                                                                                                                                                                'pending '
+                                                                                                                                                                                'operation '
+                                                                                                                                                                                'in '
+                                                                                                                                                                                'Settings.',
+ 'Audios comprobados. {count} canciones conservan metadatos pendientes de revisión.': 'Audio verified. Metadata '
+                                                                                      'review pending for {count} '
+                                                                                      'songs.',
+ 'Esperando la actualización de metadatos de Música…': 'Waiting for Music metadata to update…',
+ 'Estudio': 'Studio',
+ 'PROPIEDADES DE AUDIO': 'AUDIO PROPERTIES',
+ 'Calidad': 'Quality',
+ 'Tasa de bits': 'Bitrate',
+ 'Género': 'Genre',
+ 'Año': 'Year',
+ 'Estilo visual': 'Visual style'}

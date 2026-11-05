@@ -1,6 +1,7 @@
 """Native desktop interface for local preparation and USB audio transfers."""
 import argparse
 import csv
+import json
 from contextlib import closing
 import plistlib
 from pathlib import Path
@@ -180,6 +181,7 @@ class Window(QMainWindow):
         self.library_worker = None
         self.transfer_worker = None
         self.transfer_outcome = None
+        self.transfer_diagnostic = ''
         self.progress_track_id = None
         self.backup_root = Path(QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppLocalDataLocation))/'catalogue-backups'
         self.background_enabled = auto_connect
@@ -212,11 +214,12 @@ class Window(QMainWindow):
         self.persist_settings = auto_connect
         if self.persist_settings:
             settings = QSettings()
-            choice=int(settings.value('appearance',2)) if settings.value('design_version','')=='glass' else 2
-            settings.setValue('design_version','glass')
+            choice=int(settings.value('appearance',2))
+            if settings.value('design_version','')!='studio':settings.setValue('glass_mood',3)
+            settings.setValue('design_version','studio')
             settings.setValue('appearance',choice)
             self.theme_choice.setCurrentIndex(choice)
-            self.mood_choice.blockSignals(True);self.mood_choice.setCurrentIndex(int(settings.value('glass_mood',1)));self.mood_choice.blockSignals(False)
+            self.mood_choice.blockSignals(True);self.mood_choice.setCurrentIndex(int(settings.value('glass_mood',3)));self.mood_choice.blockSignals(False)
             self.auto_read.setChecked(settings.value('automatic_library',True,type=bool))
         self.theme_choice.currentIndexChanged.connect(self.change_theme)
         self.auto_read.toggled.connect(self.change_auto_read)
@@ -265,6 +268,12 @@ class Window(QMainWindow):
         self.nav_buttons[1 if number == 1 else 0].setChecked(True)
         self.update_buttons()
         self.schedule_artwork()
+
+    def resizeEvent(self,event):
+        super().resizeEvent(event)
+        if hasattr(self,'transfer_actions'):
+            from .interface import layout_transfer_actions
+            layout_transfer_actions(self)
 
     def change_language(self, *ignored):
         code=self.language_choice.currentData()
@@ -495,7 +504,13 @@ class Window(QMainWindow):
         self.now_title.setText(track.get('title') or tr('Sin título'));self.info_artist.setText(track.get('artist') or tr('Sin artista'))
         self.info_origin.setText(tr(origin.upper()))
         fmt=track.get('format_label') or (f"M4A · {track['format']}" if track.get('container')=='M4A' else track.get('format'))
+        rate=track.get('sample_rate');bits=track.get('bit_depth');bitrate=track.get('bit_rate')
+        quality=[]
+        if type(bits) in (int,float) and 0<bits<=64:quality.append(f'{bits:g} bits')
+        if type(rate) in (int,float) and 1000<=rate<=768000:quality.append(f'{rate/1000:g} kHz')
         values={'album':track.get('album') or tr('Sin álbum'),'format':fmt or '—','duration':duration_label(track.get('duration')),
+                'quality':' · '.join(quality) or '—','bitrate':f'{bitrate:g} kbps' if type(bitrate) in (int,float) and 0<bitrate<10**7 else '—',
+                'genre':track.get('genre') or '—','year':str(track.get('year') or '—'),
                 'size':byte_label(track.get('size')),'availability':'Original del ordenador' if track.get('path') else
                 'Disponible por USB' if track.get('afc_path') and track.get('usb_exists') is not False else 'Sin acceso USB'}
         for key,value in values.items():
@@ -504,7 +519,7 @@ class Window(QMainWindow):
         if track.get('thumbnail'):image.loadFromData(track['thumbnail'])
         icon=self.library_model.icons.get(track.get('id'),self.default_music_icon)
         from .visuals import rounded_cover
-        self.now_cover.setPixmap(rounded_cover(image if not image.isNull() else icon.pixmap(210,210),210))
+        self.now_cover.setPixmap(rounded_cover(image if not image.isNull() else icon.pixmap(224,224),224))
 
     def stage_font(self,*ignored):
         if sys.platform=='darwin' or self.font_applying:return
@@ -627,6 +642,7 @@ class Window(QMainWindow):
             self.show_library_error('No se pudo preparar la carpeta local de datos de TUPAQ.\nDiagnóstico: transfer:local-folder')
             return
         self.transfer_outcome = None
+        self.transfer_diagnostic = ''
         self.activity_message=''
         self.progress_track_id = None
         self.transfer_worker = TransferWorker(mode,selected,destination,self.backup_root.parent/'transfer.lock',self)
@@ -666,6 +682,7 @@ class Window(QMainWindow):
             self.show_track_details(track,'Importando')
 
     def transfer_problem(self, message):
+        self.transfer_diagnostic=message
         self.show_library_error(message)
         self.status.setText(tr('Transferencia detenida. Consulta el diagnóstico antes de repetirla.'))
         self.activity_message=self.status.text()
@@ -689,6 +706,11 @@ class Window(QMainWindow):
             self.status.setText(tr(f'{count} canciones importadas y comprobadas. Ya importadas: {skipped}. Copia del catálogo en Ver respaldo.'))
 
         if result.get('cancel_deferred'):self.status.setText(tr('El lote ya enviado se completó y verificó. La solicitud de cancelación llegó después de iniciar los cambios en Música.'))
+        if result.get('metadata_unverified') and 'imported' in result:
+            self.status.setText(tr(f"Audios comprobados. {result['metadata_unverified']} canciones conservan metadatos pendientes de revisión."))
+        if result.get('metadata_unverified'):
+            self.transfer_diagnostic=f'TUPAQ {VERSION}\nDiagnóstico: metadata:unverified\nDatos del protocolo: '+json.dumps(result.get('metadata_diagnostics',[]),sort_keys=True)
+            self.last_diagnostic=self.transfer_diagnostic;self.copy_diagnostic.setEnabled(True)
         self.activity_message=self.status.text()
 
     def transfer_finished(self):
@@ -769,7 +791,7 @@ class Window(QMainWindow):
         self.library_model.checked.intersection_update(t['id'] for t in local_tracks(tracks))
         self.filter_library()
         self.update_album_shortcuts()
-        self.last_diagnostic = diagnostic or format_diagnostics({'tracks_returned': len(tracks)})
+        self.last_diagnostic = self.transfer_diagnostic or diagnostic or format_diagnostics({'tracks_returned': len(tracks)})
         self.copy_diagnostic.setEnabled(True)
         self.library_ready = True
         self.retry_library_at = 0

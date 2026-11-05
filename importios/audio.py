@@ -54,6 +54,7 @@ def inspect_audio(path, filename):
 
     with open(path, 'rb') as stream:
         digest = hashlib.file_digest(stream, 'sha256').hexdigest()
+    year=tag('TDRC','TYER','\xa9day')[:4]
     return {
         'id': digest,
         'filename': name,
@@ -64,7 +65,11 @@ def inspect_audio(path, filename):
         'container': 'M4A' if isinstance(audio, MP4) else fmt,
         'duration': round(audio.info.length, 2),
         'sample_rate': getattr(audio.info, 'sample_rate', None),
-        'bit_depth': getattr(audio.info, 'bits_per_sample', None),
+        'bit_depth':getattr(audio.info,'bits_per_sample',None) if fmt in ('ALAC','WAV','AIFF') else None,
+        'channels':getattr(audio.info,'channels',None),
+        'bit_rate':getattr(audio.info,'bitrate',0)/1000 if getattr(audio.info,'bitrate',0) else None,
+        'genre':tag('TCON','\xa9gen'),
+        **({'year':int(year)} if len(year)==4 and year.isdigit() and 0<int(year)<=9999 else {}),
         'size': Path(path).stat().st_size,
         'has_artwork': bool(tags.get('covr')) or any(str(key).startswith('APIC') for key in tags),
     }

@@ -22,14 +22,15 @@ def note_failure(receipt,error):
     receipt['last_error_code']=safe_code(error)
 
 
-async def reconcile(root,afc,current,identity,progress=lambda *args:None,exclude=None):
+async def reconcile(root,afc,current,identity,progress=lambda *args:None,exclude=None,recheck_metadata=False):
     from .transfers import read_remote,missing,save_receipt,check_empty_staging
     from .sync.artwork import verify as verify_artwork
-    result={'verified':0,'retired':0,'removed':0,'metadata_unverified':0,'reconciled':0,'source_ids':[],'unresolved':[],'foreign':0}
+    result={'verified':0,'retired':0,'removed':0,'metadata_unverified':0,'metadata_diagnostics':[],
+            'reconciled':0,'source_ids':[],'unresolved':[],'foreign':0}
     for journal in sorted(Path(root).glob('*/journal.json')):
         if exclude is not None and journal.parent==exclude:continue
         record=json.loads(journal.read_text(encoding='utf-8'));phase=record.get('phase')
-        if phase in TERMINAL:continue
+        if phase in TERMINAL and not (recheck_metadata and phase=='observed-present' and record.get('metadata_verified') is False):continue
         if phase=='preflight':
             # The durable staging phase is written before the first remote write.
             record.update(phase='before-write-failed',reconciliation='interrupted-preflight')
@@ -53,7 +54,7 @@ async def reconcile(root,afc,current,identity,progress=lambda *args:None,exclude
                             require(await missing(afc,path),'pending-staging-files-remain')
                     record.update(phase='before-write-failed',reconciliation='unannounced-empty-staging-and-unchanged-catalogue')
                     save_receipt(journal.parent,record);result['reconciled']+=1;continue
-            require(phase in ('staging','metadata-announced','resuming-audio','verifying'),'pending-stage-uncertain')
+            require(phase in ('staging','metadata-announced','resuming-audio','verifying','observed-present'),'pending-stage-uncertain')
             if record.get('operation')=='delete':
                 from .deletion import verify_deleted
                 from .sync.catalogue import snapshot
@@ -91,7 +92,12 @@ async def reconcile(root,afc,current,identity,progress=lambda *args:None,exclude
             try:
                 verify_owned_entries(current,entries)
                 await verify_artwork(afc,current,entries)
-            except Exception:metadata=False
+            except Exception as error:
+                metadata=False
+                detail={'code':safe_code(error)}
+                if isinstance(error,ProtocolError) and str(error)=='verify-new-metadata' and isinstance(error.facts,dict):
+                    detail.update(entry_index=error.facts['entry_index'],metadata_fields=error.facts['metadata_fields'])
+                result['metadata_diagnostics'].append(detail)
             record.update(phase='observed-present',reconciliation='owned-audio-verified-now',
                           observed_anchor=current['anchor'],metadata_verified=metadata)
             save_receipt(journal.parent,record)

@@ -11,7 +11,7 @@ import json
 import tempfile
 
 from .phone_paths import media_path
-from .sync.catalogue import snapshot, verify_originals, verify_before_after
+from .sync.catalogue import snapshot, verify_originals, verify_before_after, metadata_differences
 from .sync.protocol import require, library_identity, handshake
 from .sync.source import inspect_source
 
@@ -49,7 +49,7 @@ def classify(before, current, entries):
         owned_items.add(item_id)
         require(item_id not in before['originals'], 'recovery-original-target')
         track = current['tracks'].get(item_id)
-        require(track is not None and all(track[k] == entry['source'][k] for k in ('title','artist','album')),
+        require(track is not None and not metadata_differences(track,entry['source']),
                 'recovery-owned-metadata')
         require(current['groups'].get(wire) == (entry['album_id'],entry['artist_id']), 'recovery-owned-groups')
         if track.get('afc_path') == entry['destination']:

@@ -178,6 +178,22 @@ async def capture(afc, directory):
     return snapshot(directory/'1'/'MediaLibrary.sqlitedb')
 
 
+async def verified_import_catalogue(afc,directory,before,entries,receipt,progress):
+    """Allow bounded catalogue settling, never resend or bypass another failure."""
+    for attempt in range(3):
+        name='after' if attempt==0 else f'after-metadata-recheck-{attempt}'
+        after=await capture(afc,directory/name)
+        try:
+            verify_before_after(before,after,entries)
+        except ProtocolError as error:
+            if str(error)!='verify-new-metadata' or attempt==2:raise
+            progress(90,100,'Esperando la actualización de metadatos de Música…')
+            await asyncio.sleep(.5*(attempt+1))
+        else:
+            receipt['verified_catalogue']=name+'/1/MediaLibrary.sqlitedb'
+            return after
+
+
 async def preferences(afc, directory, before):
     identity = None
     for name in ('iTunesPrefs','iTunesPrefs.plist'):
@@ -474,7 +490,7 @@ async def import_selected(selected, backup_root, progress, expected_snapshot=Non
                 if not sources:
                     receipt.update(phase='completed',database=before['database'],primary=before['primary'])
                     save_receipt(directory,receipt)
-                    return {'imported':0,'already_imported':len(already),'source_ids':list(hashes),'backup':str(directory),'reconciled':reconciliation['reconciled'],'metadata_unverified':reconciliation['metadata_unverified']}
+                    return {'imported':0,'already_imported':len(already),'source_ids':list(hashes),'backup':str(directory),'reconciled':reconciliation['reconciled'],'metadata_unverified':reconciliation['metadata_unverified'],'metadata_diagnostics':reconciliation['metadata_diagnostics']}
                 await check_empty_staging(afc)
                 checkpoint()
                 progress(0,100,'Preparando el envío de canciones…')
@@ -485,8 +501,7 @@ async def import_selected(selected, backup_root, progress, expected_snapshot=Non
                 async with Atc(connection) as channel:
                     await transact(afc,channel,before,identity,voice,entries,receipt,directory,progress)
                 progress(90,100,'Comprobando las canciones en la biblioteca…')
-                after = await capture(afc,directory/'after')
-                verify_before_after(before,after,entries)
+                after = await verified_import_catalogue(afc,directory,before,entries,receipt,progress)
                 from .sync.artwork import verify as verify_artwork
                 await verify_artwork(afc,after,entries)
                 for entry in entries:
@@ -495,7 +510,7 @@ async def import_selected(selected, backup_root, progress, expected_snapshot=Non
                 receipt['phase'] = 'completed'
                 save_receipt(directory,receipt)
                 progress(100,100,'Importación comprobada en el catálogo.')
-                return {'imported':len(entries),'already_imported':len(already),'source_ids':list(hashes),'backup':str(directory),'reconciled':reconciliation['reconciled'],'metadata_unverified':reconciliation['metadata_unverified']}
+                return {'imported':len(entries),'already_imported':len(already),'source_ids':list(hashes),'backup':str(directory),'reconciled':reconciliation['reconciled'],'metadata_unverified':reconciliation['metadata_unverified'],'metadata_diagnostics':reconciliation['metadata_diagnostics']}
             finally:
                 if locked:
                     with suppress(Exception):
@@ -526,6 +541,7 @@ def transfer_error(error, mode):
     else:
         message = 'La importación se detuvo o no pudo verificarse. Revisa el diagnóstico y el respaldo del catálogo antes de repetirla.'
     messages = {
+        'verify-new-metadata':'Los metadatos leídos del iPhone no coinciden con los enviados. La canción puede estar ya importada. Conserva el respaldo y usa Revisar operación pendiente en Preferencias.',
         'catalogue:changing':'Música sigue actualizando su catálogo y no se pudo obtener una lectura estable. Conserva los registros y vuelve a actualizar la biblioteca.',
         'delete-stale-selection':'La biblioteca o el dispositivo cambió. Actualiza la lista y vuelve a marcar las canciones.',
         'delete-selection-limit':'Marca entre 1 y 100 canciones para eliminarlas.',
@@ -569,7 +585,7 @@ async def verify_pending(backup_root, progress):
             current=await capture(afc,directory/'catalogue')
             prefs=directory/'preferences';prefs.mkdir()
             identity,_=await preferences(afc,prefs,current)
-            result=await reconcile(backup_root,afc,current,identity,progress)
+            result=await reconcile(backup_root,afc,current,identity,progress,recheck_metadata=True)
             ensure_resolved(result)
     return result
 

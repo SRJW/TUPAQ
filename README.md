@@ -9,18 +9,29 @@ El objetivo es importar música local a la app Música del iPhone sin usar la
 aplicación iTunes ni 3uTools.
 
 El usuario confirmó la lectura y la importación con metadatos y portada en Música del iPhone.
-La **0.3.0-preview.15** conserva la biblioteca visible mientras se actualiza después
+La **0.3.0-preview.16** conserva la biblioteca visible mientras se actualiza después
 de una importación, incluidas selección, marcas, posición de lectura y carátulas.
 Si falla la lectura, mantiene la última vista válida e indica que no está actualizada.
+La comprobación de título, artista y álbum acepta las dos representaciones
+Unicode equivalentes de los acentos. Si los metadatos aún no coinciden, realiza
+hasta tres lecturas finales sin reenviar la música; conserva las observaciones
+y sigue rechazando las diferencias reales. El diagnóstico identifica los campos
+afectados sin incluir sus valores. Revisar operación pendiente permite comprobar
+un envío anterior sin volver a insertar canciones.
 La identidad **Encuentro** está integrada en la barra lateral, barra inferior,
 ventana y aplicación, con iconos nativos ICO para Windows e ICNS para Mac.
-Los botones usan naranja y se conservan los tres ambientes de cristal.
-El diseño toma la composición de las referencias de Apple Music: portada grande,
-información y acciones a su derecha, paneles translúcidos, sombras y barra inferior
-integrada. Preferencias ofrece Nocturno, Aurora y Atardecer. El fondo atmosférico
-se calcula al cambiar tamaño o estilo; no utiliza desenfoque continuo ni motor web.
-Incluye Cancelar y correcciones para confirmaciones rápidas e importaciones sucesivas,
-sin eliminar registros ni omitir comprobaciones. Estas correcciones requieren prueba física.
+El diseño **Estudio** sigue la nueva referencia de tres columnas: dispositivo y
+navegación a la izquierda, biblioteca compacta en el centro y carátula con
+propiedades a la derecha. Las acciones de importar y exportar están juntas;
+Detalles permite ocultar el panel y ampliar la tabla. Las cabeceras siguen
+ordenando y las casillas conservan su selección al buscar y actualizar.
+
+Preferencias → Estilo visual ofrece Estudio, Nocturno, Aurora y Atardecer.
+Estudio usa tonos neutros y acentos naranja. Las propiedades de audio muestran
+frecuencia, bits y tasa de bits únicamente cuando se conocen; el resto muestra —.
+No se añaden controles de reproducción ni edición de etiquetas al copiar el diseño.
+La barra inferior conserva progreso y Cancelar. La tabla sigue siendo virtual,
+sin motor web ni desenfoque continuo.
 Windows permite elegir cualquier familia instalada o cargar una fuente de archivo,
 ver una muestra y pulsar **Aplicar** para cambiar toda la interfaz. En Mac se usa
 siempre la fuente del sistema. Hay [propuestas concretas para continuar](docs/MEJORAS-PROPUESTAS.md).
@@ -46,7 +57,7 @@ con su fuente disponible, no con San Francisco.
 
 ![TUPAQ en modo claro, con audio sintético de prueba](docs/interfaz-nativa.png)
 
-![TUPAQ Aurora, con datos y portada sintéticos de prueba](docs/interfaz-oscura.png)
+![TUPAQ Estudio, con datos y portada sintéticos de prueba](docs/interfaz-oscura.png)
 
 ![TUPAQ Atardecer, con datos y portada sintéticos de prueba](docs/interfaz-atardecer.png)
 
@@ -159,7 +170,7 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m importios.native --smoke-fixtures 
 .venv/bin/python scripts/build_desktop.py
 ```
 
-La suite contiene 146 pruebas de formatos, HTTP local, descubrimiento USB simulado,
+La suite contiene 154 pruebas de formatos, HTTP local, descubrimiento USB simulado,
 paquetes de investigación, firmas candidatas, conexión automática y portadas remotas. La prueba nativa comprueba una
 ventana Qt real, lectura en un hilo de trabajo, los AAC/ALAC dentro de M4A, portadas, duplicados,
 archivos dañados, CSV, quitar/vaciar y las firmas. En Linux se ha probado también

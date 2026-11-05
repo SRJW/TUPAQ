@@ -22,9 +22,9 @@ def button(text,kind=None,handler=None):
 
 def build(window):
     root=Atmosphere();window.scene=root;window.setCentralWidget(root)
-    shell_layout=QVBoxLayout(root);shell_layout.setContentsMargins(14,14,14,14);shell_layout.setSpacing(12)
-    outer=QHBoxLayout();outer.setContentsMargins(0,0,0,0);outer.setSpacing(14);shell_layout.addLayout(outer,1)
-    sidebar=QFrame();sidebar.setObjectName('sidebar');sidebar.setFixedWidth(238)
+    shell_layout=QVBoxLayout(root);window.shell_layout=shell_layout;shell_layout.setContentsMargins(14,14,14,14);shell_layout.setSpacing(12)
+    outer=QHBoxLayout();window.top_layout=outer;outer.setContentsMargins(0,0,0,0);outer.setSpacing(14);shell_layout.addLayout(outer,1)
+    sidebar=QFrame();sidebar.setObjectName('sidebar');sidebar.setFixedWidth(224)
     side=QVBoxLayout(sidebar);side.setContentsMargins(14,18,14,16);side.setSpacing(6)
     brand_card=QFrame();brand_card.setObjectName('brandCard');brand_row=QHBoxLayout(brand_card);brand_row.setContentsMargins(10,10,10,10)
     mark=QLabel();mark.setPixmap(app_icon().pixmap(40,40));brand_row.addWidget(mark)
@@ -44,11 +44,11 @@ def build(window):
     window.device_name=QLabel(tr('iPhone'));window.device_name.setObjectName('deviceName');window.device_name.setWordWrap(True);window.device_name.setTextFormat(Qt.TextFormat.PlainText)
     window.connection_badge=QLabel(tr('Sin conexión USB'));window.connection_badge.setObjectName('muted');window.connection_badge.setWordWrap(True)
     window.device_button=button('Comprobar USB','phone',window.check_device)
-    device_layout.addWidget(window.device_name);device_layout.addWidget(window.connection_badge);device_layout.addWidget(window.device_button);side.addWidget(card)
+    device_layout.addWidget(window.device_name);device_layout.addWidget(window.connection_badge);device_layout.addWidget(window.device_button);side.addWidget(card);side.removeWidget(card);side.insertWidget(2,card)
     privacy=QLabel(tr('Música local · conexión por USB'));privacy.setObjectName('muted');privacy.setWordWrap(True);side.addWidget(privacy)
     outer.addWidget(sidebar)
     window.pages=QStackedWidget();outer.addWidget(window.pages,1)
-    workspace=QWidget();workspace.setObjectName('workspace');layout=QVBoxLayout(workspace);layout.setContentsMargins(22,18,22,16);layout.setSpacing(12)
+    workspace=QWidget();workspace.setObjectName('workspace');layout=QVBoxLayout(workspace);layout.setContentsMargins(16,16,16,12);layout.setSpacing(10)
     window.local_tools=QWidget();toolbar=QHBoxLayout(window.local_tools);toolbar.setContentsMargins(0,0,0,0);toolbar.setSpacing(7)
     window.heading=QLabel(tr('Biblioteca'));window.heading.setObjectName('title');toolbar.addWidget(window.heading);toolbar.addStretch()
     window.choose=button('Añadir canciones','plus',window.choose_files)
@@ -68,7 +68,7 @@ def build(window):
     window.device_status=QLabel(tr('Conecta tu iPhone para mostrar su música.'));window.device_status.setObjectName('muted')
     window.device_status.setWordWrap(True);window.device_status.setTextFormat(Qt.TextFormat.PlainText);window.device_status.setMaximumHeight(74);layout.addWidget(window.device_status)
     window.main_splitter=QSplitter(Qt.Orientation.Horizontal)
-    center=QWidget();center_layout=QVBoxLayout(center);center_layout.setContentsMargins(0,0,0,0);center_layout.setSpacing(8)
+    center=QWidget();center.setMinimumWidth(360);center_layout=QVBoxLayout(center);center_layout.setContentsMargins(0,0,0,0);center_layout.setSpacing(8)
     window.search=QLineEdit();window.search.setPlaceholderText(tr('Buscar canción, artista, álbum o formato (.m4a, .mp3…)'));window.search.setClearButtonEnabled(True);center_layout.addWidget(window.search)
     collection_header=QHBoxLayout();window.library_heading=QLabel(tr('En el iPhone'));window.library_heading.setObjectName('section')
     collection_header.addWidget(window.library_heading,1)
@@ -89,25 +89,26 @@ def build(window):
     window.queue_panel.setMaximumHeight(250);splitter.addWidget(window.queue_panel);splitter.setStretchFactor(0,3);splitter.setStretchFactor(1,1)
     center_layout.addWidget(splitter,1);window.main_splitter.addWidget(center)
     window.inspector=QFrame();window.inspector.setObjectName('hero')
-    hero_layout=QHBoxLayout(window.inspector);hero_layout.setContentsMargins(26,26,26,26);hero_layout.setSpacing(32)
-    window.now_cover=QLabel('♪');window.now_cover.setFixedSize(210,210);window.now_cover.setObjectName('cover');window.now_cover.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    hero_layout.addWidget(window.now_cover)
-    hero_text=QVBoxLayout();hero_text.setSpacing(10)
-    window.info_origin=QLabel(tr('TU COLECCIÓN'));window.info_origin.setObjectName('section');hero_text.addWidget(window.info_origin)
-    window.now_title=QLabel(tr('Tu música, siempre contigo.'));window.now_title.setObjectName('inspectorTitle');window.now_title.setWordWrap(True);window.now_title.setTextFormat(Qt.TextFormat.PlainText);hero_text.addWidget(window.now_title)
-    window.info_artist=QLabel(tr('Selecciona una canción para ver sus detalles.'));window.info_artist.setObjectName('muted');window.info_artist.setWordWrap(True);window.info_artist.setTextFormat(Qt.TextFormat.PlainText);hero_text.addWidget(window.info_artist)
-    window.info_fields={};details=QHBoxLayout();details.setSpacing(12)
-    for key in ('album','format','duration','size'):
-        value=QLabel('—');value.setTextFormat(Qt.TextFormat.PlainText);value.setObjectName('metadata');value.setWordWrap(True)
-        details.addWidget(value);window.info_fields[key]=value
-    details.addStretch();hero_text.addLayout(details)
-    description=QLabel(tr('Lleva tus canciones a Música y conserva tus originales en el ordenador.'));description.setObjectName('heroDescription');description.setWordWrap(True);hero_text.addWidget(description)
-    actions=QHBoxLayout();actions.setSpacing(10)
-    for value in (window.import_phone,window.export_phone,window.choose,window.delete_phone):actions.addWidget(value)
-    actions.addStretch();hero_text.addSpacing(8);hero_text.addLayout(actions);hero_layout.addLayout(hero_text,1)
-    center_layout.insertWidget(1,window.inspector)
-    window.main_splitter.setStretchFactor(0,1)
-    window.inspector_toggle.hide();layout.addWidget(window.main_splitter,1)
+    hero_layout=QVBoxLayout(window.inspector);hero_layout.setContentsMargins(16,18,16,18);hero_layout.setSpacing(12)
+    window.info_origin=QLabel(tr('TU COLECCIÓN'));window.info_origin.setObjectName('section');hero_layout.addWidget(window.info_origin)
+    window.now_title=QLabel(tr('Tu música, siempre contigo.'));window.now_title.setObjectName('inspectorTitle');window.now_title.setWordWrap(True);window.now_title.setTextFormat(Qt.TextFormat.PlainText);hero_layout.addWidget(window.now_title)
+    window.info_artist=QLabel(tr('Selecciona una canción para ver sus detalles.'));window.info_artist.setObjectName('muted');window.info_artist.setWordWrap(True);window.info_artist.setTextFormat(Qt.TextFormat.PlainText);hero_layout.addWidget(window.info_artist)
+    window.now_cover=QLabel('♪');window.now_cover.setFixedSize(224,224);window.now_cover.setObjectName('cover');window.now_cover.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    hero_layout.addWidget(window.now_cover,0,Qt.AlignmentFlag.AlignHCenter)
+    properties_title=QLabel(tr('PROPIEDADES DE AUDIO'));properties_title.setObjectName('section');hero_layout.addSpacing(10);hero_layout.addWidget(properties_title)
+    properties=QFrame();properties.setObjectName('propertiesCard');details=QGridLayout(properties);details.setContentsMargins(12,12,12,12);details.setHorizontalSpacing(12);details.setVerticalSpacing(12)
+    window.info_fields={}
+    for row,(key,label) in enumerate((('album','Álbum'),('format','Formato'),('duration','Duración'),('size','Tamaño'),('quality','Calidad'),('bitrate','Tasa de bits'),('genre','Género'),('year','Año'))):
+        caption=QLabel(tr(label));caption.setObjectName('muted');details.addWidget(caption,row,0,Qt.AlignmentFlag.AlignTop)
+        value=QLabel('—');value.setTextFormat(Qt.TextFormat.PlainText);value.setObjectName('metadata');value.setWordWrap(True);value.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTop);value.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        details.addWidget(value,row,1);window.info_fields[key]=value
+    details.setColumnStretch(1,1);hero_layout.addWidget(properties)
+    description=QLabel(tr('Lleva tus canciones a Música y conserva tus originales en el ordenador.'));description.setObjectName('heroDescription');description.setWordWrap(True);hero_layout.addWidget(description);hero_layout.addStretch()
+    window.inspector_scroll=QScrollArea();window.inspector_scroll.setObjectName('inspector');window.inspector_scroll.setWidgetResizable(True);window.inspector_scroll.setFrameShape(QFrame.Shape.NoFrame);window.inspector_scroll.setMinimumWidth(258);window.inspector_scroll.setMaximumWidth(360);window.inspector_scroll.setWidget(window.inspector)
+    window.main_splitter.addWidget(window.inspector_scroll);window.main_splitter.setStretchFactor(0,1);window.main_splitter.setStretchFactor(1,0);window.main_splitter.setSizes([800,280]);window.main_splitter.setChildrenCollapsible(False)
+    window.transfer_actions=QGridLayout();window.transfer_actions.setContentsMargins(0,0,0,0);window.transfer_actions.setSpacing(8)
+    center_layout.insertLayout(0,window.transfer_actions);layout_transfer_actions(window)
+    window.inspector_toggle.toggled.connect(window.inspector_scroll.setVisible);layout.addWidget(window.main_splitter,1)
     activity=QFrame();activity.setObjectName('activityBar');activity_layout=QHBoxLayout(activity);activity_layout.setContentsMargins(16,12,16,12);activity_layout.setSpacing(12)
     activity_icon=QLabel();activity_icon.setPixmap(app_icon().pixmap(25,25));activity_layout.addWidget(activity_icon)
     window.status=QLabel(tr('Sin canciones para importar.'));window.status.setObjectName('muted');window.status.setWordWrap(True);window.status.setTextFormat(Qt.TextFormat.PlainText);activity_layout.addWidget(window.status,1)
@@ -122,11 +123,11 @@ def build(window):
     for table in (window.table,window.library_table):
         table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows);table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers);table.verticalHeader().hide();table.setShowGrid(False);table.setAlternatingRowColors(False)
-        table.setIconSize(QSize(30,30));table.verticalHeader().setDefaultSectionSize(44);table.setWordWrap(False)
+        table.setIconSize(QSize(30,30));table.verticalHeader().setDefaultSectionSize(48);table.setWordWrap(False)
         table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive);table.horizontalHeader().setSectionResizeMode(0,QHeaderView.ResizeMode.Stretch)
         table.horizontalHeader().setSectionsClickable(True);table.setSortingEnabled(True)
-    for section,width in [(1,180),(2,180),(3,110),(4,70),(5,78)]:window.library_table.setColumnWidth(section,width)
-    for section,width in [(1,180),(2,180),(3,110),(4,70),(5,78)]:window.table.setColumnWidth(section,width)
+    for section,width in [(1,130),(2,120),(3,95),(4,64),(5,76)]:window.library_table.setColumnWidth(section,width)
+    for section,width in [(1,130),(2,120),(3,95),(4,64),(5,76)]:window.table.setColumnWidth(section,width)
     window.library_table.sortByColumn(0,Qt.SortOrder.AscendingOrder);window.table.sortItems(0,Qt.SortOrder.AscendingOrder)
     window.library_table.selectionModel().selectionChanged.connect(window.library_selection_changed)
     window.table.itemSelectionChanged.connect(window.local_selection_changed)
@@ -139,8 +140,8 @@ def build(window):
     settings_card=QFrame();settings_card.setObjectName('tableCard');grid=QGridLayout(settings_card);grid.setContentsMargins(20,20,20,20);grid.setSpacing(18)
     grid.addWidget(QLabel(tr('Apariencia')),0,0)
     window.theme_choice=QComboBox();window.theme_choice.addItems(['Sistema','Claro','Oscuro']);window.theme_choice.setCurrentIndex(2);grid.addWidget(window.theme_choice,0,1)
-    window.mood_choice=QComboBox();window.mood_choice.addItems(['Nocturno','Aurora','Atardecer']);window.mood_choice.setCurrentIndex(1)
-    grid.addWidget(QLabel(tr('Ambiente de cristal')),8,0);grid.addWidget(window.mood_choice,8,1)
+    window.mood_choice=QComboBox();window.mood_choice.addItems(['Nocturno','Aurora','Atardecer','Estudio']);window.mood_choice.setCurrentIndex(3)
+    grid.addWidget(QLabel(tr('Estilo visual')),8,0);grid.addWidget(window.mood_choice,8,1)
     window.mood_choice.currentIndexChanged.connect(window.change_mood)
     window.language_choice=QComboBox()
     from .i18n import LANGUAGES
@@ -200,6 +201,14 @@ def build(window):
     window.setWindowIcon(app_icon())
 
 
+def layout_transfer_actions(window):
+    columns=4 if window.width()>=1340 else 2
+    if getattr(window,'action_columns',None)==columns:return
+    window.action_columns=columns
+    for index,value in enumerate((window.choose,window.import_phone,window.export_phone,window.delete_phone)):
+        window.transfer_actions.removeWidget(value);window.transfer_actions.addWidget(value,index//columns,index%columns)
+
+
 def apply_theme(window):
     selection=window.theme_choice.currentIndex()
     dark=selection==2 or selection==0 and QApplication.styleHints().colorScheme()==Qt.ColorScheme.Dark
@@ -209,9 +218,15 @@ def apply_theme(window):
        {'bg':'#f6f7fb','side':'#eaeef5','card':'#ffffff','text':'#222633','muted':'#626c7d','border':'#d9deea',
         'button':'#ffffff','hover':'#edf0f6','selected':'#e2e7f2','blue':'#B8430A','accent':'#B8430A',
         'top':'#e1eaf4','bottom':'#efe7f1','hero':'#ffffff','heroEnd':'#edf2fa'})
+    studio=window.mood_choice.currentIndex()==3
+    if studio:
+        c.update(bg='#101113' if dark else '#f5f5f7',side='#363739' if dark else '#e4e4e7',
+                 card='#1d1f22' if dark else '#ffffff',border='#303236' if dark else '#d4d4d8',
+                 button='#242629' if dark else '#e7e7eb',hover='#303237' if dark else '#dddde2',
+                 selected='#32353a' if dark else '#dddde3')
     palette=QPalette()
     for role,key in [(QPalette.ColorRole.Window,'bg'),(QPalette.ColorRole.WindowText,'text'),(QPalette.ColorRole.Base,'bg'),
-                     (QPalette.ColorRole.Text,'text'),(QPalette.ColorRole.Button,'button'),(QPalette.ColorRole.ButtonText,'text'),
+                     (QPalette.ColorRole.AlternateBase,'card'),(QPalette.ColorRole.Text,'text'),(QPalette.ColorRole.Button,'button'),(QPalette.ColorRole.ButtonText,'text'),
                      (QPalette.ColorRole.Mid,'muted'),(QPalette.ColorRole.Dark,'muted'),
                      (QPalette.ColorRole.Shadow,'border'),(QPalette.ColorRole.Light,'hover'),
                      (QPalette.ColorRole.Highlight,'selected'),(QPalette.ColorRole.HighlightedText,'text')]:palette.setColor(role,QColor(c[key]))
@@ -223,23 +238,31 @@ def apply_theme(window):
     line='rgba(255,255,255,38)' if dark else 'rgba(255,255,255,200)'
     header='#351821' if dark and warm else '#172638' if dark else '#edf2f8'
     selected='rgba(255,255,255,40)' if dark else 'rgba(35,63,103,25)'
+    if studio:
+        glass=c['bg'];soft=c['card'];line=c['border'];header=c['bg'];selected=c['selected']
+    window.shell_layout.setContentsMargins(*((0,0,0,0) if studio else (14,14,14,14)))
+    window.shell_layout.setSpacing(0 if studio else 12);window.top_layout.setSpacing(0 if studio else 14)
+    radius=0 if studio else 22
+    for widget in (window.inspector,window.status.parentWidget(),window.nav_buttons[0].parentWidget()):
+        if widget.graphicsEffect():widget.graphicsEffect().setEnabled(not studio)
     from .typography import css_family
     family=css_family(QApplication.instance().font().family())
     window.setStyleSheet(f'''
         QWidget {{color:{c['text']};font-family:"{family}";font-size:13px;}}
         QWidget#shell {{background:transparent;}}
         QStackedWidget {{background:transparent;}}
-        QFrame#sidebar {{background:{glass};border:1px solid {line};border-radius:22px;}}
-        QWidget#workspace {{background:{glass};border:1px solid {line};border-radius:22px;}}
+        QFrame#sidebar {{background:{c['side'] if studio else glass};border:1px solid {line};border-radius:{radius}px;}}
+        QWidget#workspace {{background:{glass};border:1px solid {line};border-radius:{radius}px;}}
         QScrollArea#settingsScroll {{background:transparent;border:0;}}
         QScrollArea#settingsScroll > QWidget {{background:transparent;}}
-        QWidget#settingsPage {{background:{glass};border:1px solid {line};border-radius:22px;}}
-        QFrame#hero {{background:{soft};border:1px solid {line};border-radius:20px;}}
+        QWidget#settingsPage {{background:{glass};border:1px solid {line};border-radius:{radius}px;}}
+        QFrame#hero {{background:{glass};border:0;border-radius:0;}}
+        QFrame#propertiesCard {{background:{soft};border:1px solid {line};border-radius:12px;}}
         QFrame#activityBar {{background:{glass};border:1px solid {line};border-radius:18px;}}
         QFrame#brandCard {{border:0;background:transparent;}}
         QLabel#brand {{font-size:16px;font-weight:600;}}
         QLabel#title {{font-size:18px;font-weight:600;}}
-        QLabel#inspectorTitle {{font-size:34px;font-weight:650;}}
+        QLabel#inspectorTitle {{font-size:19px;font-weight:650;}}
         QLabel#heroDescription {{color:{c['muted']};font-size:13px;}}
         QLabel#metadata {{color:{c['muted']};font-size:12px;}}
         QLabel#section {{font-size:12px;font-weight:600;color:{c['muted']};}}
@@ -256,8 +279,10 @@ def apply_theme(window):
         QPushButton#nav {{background:transparent;border:0;text-align:left;border-radius:8px;padding:8px 10px;}}
         QPushButton#nav:checked {{background:{selected};font-weight:600;}}
 
-        QTableWidget,QTableView {{background:rgba(0,0,0,22);border:1px solid {line};border-radius:15px;selection-background-color:{selected};selection-color:{c['text']};outline:0;}}
-        QTableWidget::item,QTableView::item {{padding:7px;border-bottom:1px solid rgba(150,160,180,18);}}
+        QTableWidget,QTableView {{background:{c['bg'] if studio else 'rgba(0,0,0,22)'};border:1px solid {line};border-radius:15px;selection-background-color:{selected};selection-color:{c['text']};outline:0;}}
+        QTableWidget::item,QTableView::item {{padding:7px;background:{c['card'] if studio else 'transparent'};border-bottom:{4 if studio else 1}px solid {c['bg'] if studio else 'rgba(150,160,180,18)'};}}
+        QTableWidget::item:selected,QTableView::item:selected {{background:{selected};}}
+        QTableWidget::item:hover,QTableView::item:hover {{background:{c['hover']};}}
         QHeaderView {{background:{header};border:0;}}
         QHeaderView::section {{background:{header};color:{c['muted']};padding:8px 5px;border:0;border-bottom:1px solid {c['border']};font-size:12px;font-weight:500;}}
         QLineEdit {{background:{selected};border:1px solid {line};border-radius:13px;padding:8px 12px;}}

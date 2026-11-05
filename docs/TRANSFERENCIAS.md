@@ -109,7 +109,7 @@ catálogo puede dejar una operación pendiente. No se reintenta automáticamente
 
 ## Validación disponible
 
-Las 146 pruebas incluyen replay de importación de los cinco perfiles base,
+Las 154 pruebas incluyen replay de importación de los cinco perfiles base,
 originales conservados, exportación byte por byte, nombres existentes,
 rechazo por cambio de ancla, identidad sin configurar, manifest desconocido,
 audio permanente alterado, interrupción después de aplicar cambios, verificación
@@ -514,3 +514,73 @@ La paleta de referencia combina naranja, marfil y ciruela. Los botones usan un
 naranja más oscuro para conservar el contraste con texto blanco; se mantienen
 los ambientes Nocturno, Aurora y Atardecer y los ajustes guardados. El cambio
 no modifica canciones, carátulas ni las comprobaciones de importación/exportación.
+
+
+## Verificación de metadatos (preview.16)
+
+verify-new-metadata significa que la canción se encontró por su ID y ruta, pero
+el título, artista o álbum leído no coincidió. No demuestra por sí solo que el
+audio esté ausente ni que esté comprobado: el hash permanente se valida después.
+El usuario confirmó que la canción aparece en Música, pero no se dispone de su
+archivo ni de las diferencias exactas para atribuir su caso a una causa única.
+
+Se reprodujo un falso fallo con cadenas visualmente idénticas en NFC/NFD. La
+comparación de canciones propias ahora usa equivalencia Unicode NFC; no modifica
+los metadatos enviados, los originales del ordenador ni el audio. No recorta
+espacios, cambia mayúsculas, elimina acentos ni usa equivalencia de compatibilidad
+NFKC. Se aplica también al reconocimiento de metadatos en recuperación y a la
+actualización de portadas y fecha. Las demás comprobaciones permanecen vigentes.
+
+Solo ante verify-new-metadata, la importación puede repetir la captura final
+hasta tres veces, con esperas de 0,5 y 1 segundo. Cada lectura vuelve a comprobar
+identidad, canciones anteriores, ancla y entradas propias; otro error se propaga
+inmediatamente. No vuelve a abrir una sesión de envío ni reenvía metadatos o audio.
+Conserva after y after-metadata-recheck-1/2; verified_catalogue en el registro
+identifica la captura que pasó. También siguen siendo obligatorias las
+comprobaciones de fecha, portada, tamaño y SHA-256 del audio.
+
+Si persiste una diferencia, el diagnóstico añade entry_index y metadata_fields
+con title, artist o album, sin títulos, artistas, álbumes, rutas ni IDs privados.
+El registro sigue pendiente. Preferencias → Mostrar opciones avanzadas de
+recuperación → Revisar operación pendiente vuelve a comprobar el envío existente
+sin escribir en el teléfono. Las coincidencias de audio ya registradas impiden
+reenviar el mismo archivo; si todavía hay metadatos sin verificar, la interfaz
+lo indica expresamente. No borres catalogue-backups para forzar otro envío.
+
+Las pruebas reproducen NFC/NFD en ambas direcciones, rechazan cambios de texto,
+mayúsculas, espacios y acentos, conservan el rechazo de audio corrupto y anclas
+alteradas, comprueban la relectura sin reenvío y la revisión de una operación
+anterior sin duplicar la canción. Se validan en simulación, no con USB físico.
+
+
+### Revisión y diagnóstico conservado
+
+Revisar operación pendiente vuelve a examinar también los envíos observados
+con metadatos sin verificar. Comprueba de nuevo identidad, audio y metadatos sin
+reenviar nada. Los campos que todavía difieren se incluyen en metadata_diagnostics
+y en Copiar diagnóstico. Ese diagnóstico se conserva durante la actualización
+posterior de la biblioteca, hasta iniciar otra transferencia.
+
+## Diseño Estudio (preview.16)
+
+La nueva referencia se adapta a tres columnas: dispositivo/navegación, biblioteca
+y panel de detalles con carátula y propiedades. Detalles muestra u oculta el panel;
+la tabla mantiene sus seis columnas ordenables y casillas. Las acciones centrales
+pasan de una fila a dos en ventanas pequeñas. La cola del ordenador sigue en la
+misma página y se controla con Cola. La barra inferior muestra operaciones reales
+y Cancelar. Los datos de metadatos son de solo lectura.
+
+Estudio es el estilo inicial de esta revisión, con fondo neutro y acento naranja.
+Se conservan apariencia, fuente e idioma; los otros tres estilos siguen disponibles.
+Las sombras se desactivan en Estudio y las filas se pintan bajo demanda.
+
+El panel incorpora frecuencia, bits, tasa de bits y metadatos locales disponibles.
+Las cabeceras de audio se leen dentro del presupuesto existente; no se descargan
+archivos completos para mostrar propiedades. En MP3/AAC no se presenta una
+profundidad de bits de PCM como si fuera precisión original. Los valores ausentes
+se muestran como —; no se atribuye una calidad Hi-Res desconocida.
+
+Las pruebas de interfaz comprueban tamaños de ventana, acciones, apertura/cierre
+del panel y conservación de selección. Las propiedades de audio se contrastan
+con los formatos reales de los archivos de prueba. Las capturas usan datos y
+portadas sintéticos, sin conexión con la biblioteca privada del usuario.

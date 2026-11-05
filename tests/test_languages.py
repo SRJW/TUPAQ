@@ -67,6 +67,15 @@ class LanguageTests(unittest.TestCase):
         w.language_choice.setCurrentIndex(0)
         self.assertIn('La importación se detuvo',w.device_status.text())
         self.assertEqual(w.status.text(),'Exportación cancelada. Se conservaron 2 archivos completos.')
+        details=[{'code':'verify-new-metadata','entry_index':1,'metadata_fields':['album']}]
+        w.transfer_result({'imported':0,'already_imported':1,'metadata_unverified':1,'metadata_diagnostics':details})
+        self.assertIn('metadatos pendientes de revisión',w.status.text())
+        w.language_choice.setCurrentIndex(1)
+        self.assertEqual(w.status.text(),'Audio verified. Metadata review pending for 1 song.')
+        diagnostic=w.last_diagnostic
+        w.show_library([],diagnostic='library counts')
+        self.assertEqual(w.last_diagnostic,diagnostic)
+        self.assertIn('"metadata_fields": ["album"]',diagnostic)
 
     def test_choice_is_saved_and_restored_and_invalid_saved_value_falls_back(self):
         data={'automatic_library':False}

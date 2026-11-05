@@ -50,13 +50,21 @@ async def audio_details(afc,track):
                     if wave and chunk[:4]==b'fmt ' and 16<=length<=4096:
                         fmt=await read(offset+8,16);encoding,channels,rate,byte_rate=struct.unpack_from('<HHII',fmt)
                         if encoding not in (1,3) or not 0<channels<=32 or rate<=0:byte_rate=None
+                        if byte_rate:
+                            result.update(sample_rate=rate,channels=channels,bit_rate=byte_rate*8/1000)
+                            bits=struct.unpack_from('<H',fmt,14)[0]
+                            if 0<bits<=64:result['bit_depth']=bits
                     if wave and chunk[:4]==b'data':data_size=length
                     if wave and byte_rate and data_size is not None:seconds=data_size/byte_rate;break
                     if aiff and chunk[:4]==b'COMM' and length>=18:
                         comm=await read(offset+8,18);frames=struct.unpack_from('>I',comm,2)[0]
                         exponent=struct.unpack_from('>H',comm,8)[0];mantissa=struct.unpack_from('>Q',comm,10)[0]
                         rate=math.ldexp(mantissa,(exponent&0x7fff)-16383-63)
-                        if rate>0 and not exponent&0x8000:seconds=frames/rate
+                        if rate>0 and not exponent&0x8000:
+                            seconds=frames/rate;result['sample_rate']=rate
+                            channels,bits=struct.unpack_from('>H',comm,0)[0],struct.unpack_from('>H',comm,6)[0]
+                            if 0<channels<=32:result['channels']=channels
+                            if 0<bits<=64:result['bit_depth']=bits
                         break
                     offset+=8+length+(length&1)
         elif header[:4]==b'fLaC':
@@ -64,7 +72,9 @@ async def audio_details(afc,track):
             info=await read(4,38)
             if info[0]&127==0 and int.from_bytes(info[1:4],'big')==34:
                 timing=int.from_bytes(info[14:22],'big');rate=(timing>>44)&0xfffff
-                if rate:seconds=(timing&0xfffffffff)/rate
+                if rate:
+                    seconds=(timing&0xfffffffff)/rate
+                    result.update(sample_rate=rate,channels=((timing>>41)&7)+1,bit_depth=((timing>>36)&31)+1)
         elif len(header)>=8 and header[4:8]==b'ftyp':
             label='M4A';offset=0;ftyp=b''
             for _ in range(1024):
@@ -79,6 +89,9 @@ async def audio_details(afc,track):
                         audio=MP4(io.BytesIO(ftyp+await read(offset,length)))
                         codec=getattr(audio.info,'codec','')
                         seconds=getattr(audio.info,'length',None)
+                        result.update(sample_rate=getattr(audio.info,'sample_rate',None),channels=getattr(audio.info,'channels',None))
+                        if getattr(audio.info,'bitrate',0):result['bit_rate']=audio.info.bitrate/1000
+                        if codec=='alac' and getattr(audio.info,'bits_per_sample',0):result['bit_depth']=audio.info.bits_per_sample
                         label='M4A · ALAC' if codec=='alac' else 'M4A · AAC' if codec.startswith('mp4a') else 'M4P · protegido' if codec in ('drms','enca') else 'M4A'
                     break
                 offset+=length
@@ -90,6 +103,7 @@ async def audio_details(afc,track):
                 frames=await read(offset,min(65536,size-offset))
                 info=MPEGInfo(HeaderStream(frames,size-offset),offset=0)
                 label='MP3';seconds=info.length
+                result.update(sample_rate=info.sample_rate,channels=info.channels,bit_rate=info.bitrate/1000)
     except Exception:
         pass
     finally:

@@ -9,7 +9,7 @@ import time
 import uuid
 
 from .sync.protocol import require
-from .sync.catalogue import verify_before_after
+from .sync.catalogue import verify_before_after,metadata_differences
 from .sync.artwork import prepare,verify as verify_artwork
 from .recovery import TERMINAL,saved_identity,bind_sources,check_audio
 
@@ -50,7 +50,7 @@ async def repair_imported(root, selected, progress):
                         if wire in seen or (requested and original['source']['id'] not in requested):continue
                         item=before['wire_to_item'].get(wire);track=before['tracks'].get(item)
                         if not track or track.get('afc_path')!=original['destination']:continue
-                        require(all(track[key]==original['source'][key] for key in ('title','artist','album')),'metadata-owned-track-changed')
+                        require(not metadata_differences(track,original['source']),'metadata-owned-track-changed')
                         require(saved_identity(saved)==identity,'metadata-library-identity')
                         seen.add(wire);entries.append(deepcopy(original))
                 require(1<=len(entries)<=49,'metadata-selection-limit')

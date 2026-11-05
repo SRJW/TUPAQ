@@ -2,9 +2,17 @@
 from contextlib import closing
 from pathlib import Path
 import sqlite3
+import unicodedata
 
 from ..library import read_catalogue
-from .protocol import require
+from .protocol import ProtocolError,require
+
+
+def metadata_differences(track, source):
+    """Canonical Unicode equality only; never trim, casefold or lose accents."""
+    def same(left,right):
+        return isinstance(left,str) and isinstance(right,str) and unicodedata.normalize('NFC',left)==unicodedata.normalize('NFC',right)
+    return [key for key in ('title','artist','album') if not same(track.get(key),source.get(key))]
 
 
 def cache_id(token):
@@ -103,11 +111,14 @@ def verify_before_after(before, after, entries):
 
 
 def verify_owned_entries(after,entries):
-    for entry in entries:
+    for index,entry in enumerate(entries):
         item_id = after['wire_to_item'].get(str(entry['track_id']))
         track = after['tracks'].get(item_id)
         require(track is not None and track.get('afc_path') == entry['destination'], 'verify-new-item')
-        require(all(track[k] == entry['source'][k] for k in ('title','artist','album')), 'verify-new-metadata')
+        differences=metadata_differences(track,entry['source'])
+        if differences:
+            raise ProtocolError('verify-new-metadata',{'entry_index':index+1,
+                'metadata_fields':differences,'comparison':'unicode-nfc'})
         if entry.get('added_at') and after['dates_known']:
             value=after['dates'].get(item_id)
             require(type(value) in (int,float) and value>0 and
