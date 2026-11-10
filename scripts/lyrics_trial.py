@@ -66,7 +66,8 @@ def ttml_from_lrc(text,duration_ms):
     if any(a[0]>=b[0] for a,b in zip(records,records[1:])):
         raise ValueError('Las marcas deben avanzar en el tiempo sin repetirse.')
     ET.register_namespace('',NS);ET.register_namespace('ttp',TTP)
-    root=ET.Element('{'+NS+'}tt',{'{http://www.w3.org/XML/1998/namespace}lang':'en','{'+TTP+'}timeBase':'media'})
+    root=ET.Element('{'+NS+'}tt',{'{http://www.w3.org/XML/1998/namespace}lang':'en',
+        '{http://www.w3.org/XML/1998/namespace}space':'preserve','{'+TTP+'}timeBase':'media'})
     def clock(ms):return f'{ms//3600000:02d}:{ms//60000%60:02d}:{ms//1000%60:02d}.{ms%1000:03d}'
     body=ET.SubElement(root,'{'+NS+'}body',{'dur':clock(duration_ms)});group=ET.SubElement(body,'{'+NS+'}div');count=0
     for index,(start,words) in enumerate(records):
@@ -74,7 +75,10 @@ def ttml_from_lrc(text,duration_ms):
         if not words.strip():continue
         if end<=start:raise ValueError('La última línea no tiene duración dentro del audio.')
         paragraph=ET.SubElement(group,'{'+NS+'}p',{'begin':clock(start),'end':clock(end)})
-        paragraph.text=words;count+=1
+        # Readers that ignore TTML times may still flatten XML text nodes.
+        # Real newlines prevent the last/first words of adjacent cues merging.
+        # This fixes that text fallback; it does not enable iPhone karaoke.
+        paragraph.text=words;paragraph.tail='\n';count+=1
     payload=ET.tostring(root,encoding='utf-8',xml_declaration=True).decode('utf-8')
     if len(payload.encode('utf-8'))>MAX_TEXT:raise ValueError('La letra TTML supera el límite de 256 KB.')
     ET.fromstring(payload)
@@ -128,7 +132,7 @@ def main():
     try:
         if args.check_report:
             root.update();args.check_report.write_text('ttml-trial-ready',encoding='ascii');return
-        source=filedialog.askopenfilename(parent=root,title='TUPAQ: elige el M4A original con letra LRC',filetypes=[('Audio M4A','*.m4a')])
+        source=filedialog.askopenfilename(parent=root,title='TUPAQ: prueba de formato TTML, sin karaoke validado',filetypes=[('Audio M4A','*.m4a')])
         if not source:return
         path=Path(source)
         target=filedialog.asksaveasfilename(parent=root,title='Guardar copia de prueba TTML',initialdir=str(path.parent),
@@ -140,7 +144,7 @@ def main():
             message=str(error) if isinstance(error,ValueError) else 'No se pudo crear la copia. Comprueba el archivo y la carpeta de destino.'
             messagebox.showerror('TUPAQ: copia no creada',message,parent=root);return
         messagebox.showinfo('TUPAQ: copia de prueba creada',
-            f"Se guardó la copia con {result['lines']} líneas TTML.\n\nEl original, el audio y la carátula se conservan.\n\nImporta esta copia con TUPAQ preview.30 y comprueba su letra en Música del iPhone.\nEs una prueba: el karaoke todavía no está validado.\n\n"+str(target),parent=root)
+            f"Se guardó la copia con {result['lines']} líneas TTML y separadores de texto.\n\nEl original, el audio y la carátula se conservan.\n\nLa prueba anterior en Música no activó el karaoke. Esta corrección solo añade saltos entre líneas; no afirma que Música interprete los tiempos.\n\n"+str(target),parent=root)
     finally:root.destroy()
 
 

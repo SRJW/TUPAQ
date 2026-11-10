@@ -1,5 +1,14 @@
 # Crear la prueba TTML en Windows
 
+**Resultado de la primera prueba física, reportado por el usuario:** Música mostró
+texto sin sincronizar y sin separaciones entre las líneas. Este método no ha
+activado karaoke. La herramienta no debe anunciarse como solución para karaoke.
+
+La revisión `Crear-prueba-TTML-v2.exe` añade saltos literales entre los párrafos y
+`xml:space="preserve"`. La prueba de regresión comprueba que aplanar los nodos XML
+conserva las separaciones. Esto corrige la copia generada; no prueba cómo la
+representará Música ni resuelve la entrega de tiempos al reproductor.
+
 Si el visor del chat no descarga el M4A o ZIP, se puede generar la copia localmente
 con `Crear-prueba-TTML.exe`, publicado como archivo adicional de preview.30.
 La herramienta contiene código genérico; no contiene música, letras de canciones,

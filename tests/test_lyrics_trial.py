@@ -53,3 +53,11 @@ class LyricsTrialTests(unittest.TestCase):
             audio=MP4(source);audio.tags.pop('\xa9lyr',None);audio.save()
             with self.assertRaisesRegex(ValueError,'no tiene letra'):create_trial(source,target)
             self.assertFalse(target.exists())
+
+    def test_xml_flattening_preserves_line_boundaries_without_claiming_timing(self):
+        text='[00:00.10] Primera línea\n[00:00.50] Segunda línea\n[00:00.90]'
+        payload,count=ttml_from_lrc(text,1000);root=ET.fromstring(payload)
+        self.assertEqual(count,2)
+        self.assertEqual(''.join(root.itertext()),'Primera línea\nSegunda línea\n')
+        self.assertEqual(root.attrib['{http://www.w3.org/XML/1998/namespace}space'],'preserve')
+        # This is an XML/text regression check, not a Music renderer test.
