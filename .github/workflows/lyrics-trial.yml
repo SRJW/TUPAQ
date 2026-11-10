@@ -1,0 +1,43 @@
+name: Crear herramienta de prueba TTML
+on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/lyrics_trial.py
+      - tests/test_lyrics_trial.py
+      - .github/workflows/lyrics-trial.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Instalar herramientas
+        run: python -m pip install mutagen==1.47.0 pyinstaller==6.16.0
+      - name: Probar conversión local y conservación de audio
+        run: python -m unittest discover -s tests -p test_lyrics_trial.py -v
+      - name: Crear ejecutable sin instalación
+        run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name Crear-prueba-TTML --icon importios/assets/tupaq.ico scripts/lyrics_trial.py
+      - name: Comprobar ejecutable y diálogos nativos
+        shell: pwsh
+        run: |
+          $trial = Start-Process -FilePath dist/Crear-prueba-TTML.exe -ArgumentList '--check-report', 'ttml-ready.txt' -PassThru -Wait
+          if ($trial.ExitCode -ne 0) { throw 'No se pudo abrir la herramienta nativa' }
+          if ((Get-Content ttml-ready.txt -Raw) -ne 'ttml-trial-ready') { throw 'Falta la comprobación del ejecutable' }
+      - uses: actions/upload-artifact@v6
+        with:
+          name: Crear-prueba-TTML-Windows
+          path: dist/Crear-prueba-TTML.exe
+          if-no-files-found: error
+      - name: Publicar herramienta genérica, sin archivos de música
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload v0.3.0-preview.30 dist/Crear-prueba-TTML.exe --repo "$env:GITHUB_REPOSITORY"
