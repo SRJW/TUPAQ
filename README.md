@@ -8,8 +8,9 @@ Aplicación nativa, con ventana propia, sin navegador ni necesidad de instalar P
 
 La **0.3.0-preview.30** implementa el envío USB de letras de texto incrustadas en
 canciones nuevas, con comprobación del texto y checksum registrados en el catálogo.
-La ruta procede del análisis estático de AMPDevicesAgent; la visualización en un
-iPhone físico está pendiente de confirmación. **No se afirma soporte de karaoke**.
+La ruta procede del análisis estático de AMPDevicesAgent; el usuario ha confirmado
+la visualización de la letra de texto en Música de su iPhone con preview.30.
+**No se afirma soporte de karaoke**: el LRC del ejemplo se muestra como texto.
 [Implementación, pruebas y límites](docs/LETRAS-INVESTIGACION.md).
 
 Desde la 0.3.0-preview.25, TUPAQ adopta las referencias claras y oscuras: navegación lateral,

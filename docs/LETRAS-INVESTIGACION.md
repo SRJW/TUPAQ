@@ -1,6 +1,6 @@
 # Letras dentro de Música — investigación del 10 de noviembre de 2026
 
-Estado: preview.30 implementa la entrega nativa de **letras de texto** con canciones nuevas. Se habilita la parte 8 únicamente para entradas propias con un recurso preparado y checksum válido. Las pruebas con teléfono simulado pasan; falta confirmar la visualización en Música del iPhone físico. **El karaoke no está implementado ni validado.**
+Estado: preview.30 implementa la entrega nativa de **letras de texto** con canciones nuevas. Se habilita la parte 8 únicamente para entradas propias con un recurso preparado y checksum válido. Las 245 pruebas pasan y los tres paquetes nativos se publicaron correctamente. El usuario confirmó que una canción importada con preview.30 muestra la letra en Música de su iPhone, con las marcas LRC como texto. Es una confirmación reportada por el usuario; no se presenta como acceso directo de este entorno al dispositivo. **El karaoke no está implementado ni validado.**
 
 ## AMPDevicesAgent moderno: ruta USB identificada
 
@@ -34,13 +34,17 @@ Pruebas: MP3 USLT, M4A AAC/ALAC ©lyr, acentos, emojis y CRLF exactos, con y sin
 
 ## Letras sincronizadas: resultado y límite actual
 
-El usuario confirma que sus archivos contienen tiempos incrustados y que tiene un ejemplo que muestra resaltado sincronizado en Música del iPhone, sin utilizar la letra en línea. Es la referencia positiva que debe contrastarse. Para comprobar el formato concreto hace falta una canción de muestra: puede ser SYLT, LRC almacenado como texto o TTML, y no son intercambiables. Deben compararse sus etiquetas y el registro correspondiente en iOS para distinguir el recurso del archivo de uno de catálogo descargado previamente.
+El usuario aportó un M4A ALAC de ejemplo. Se examinó su estructura sin ejecutarlo ni modificarlo: contiene 57 marcas LRC en `©lyr`, ordenadas, entre 16,31 y 273,66 segundos, y una única pista de audio ALAC. No contiene tiempos por palabra ni una pista de texto temporizado independiente. Su letra mide 2.477 bytes UTF-8. No se publica el audio ni el texto de la canción en el repositorio.
+
+La captura de Música muestra las marcas LRC literalmente. Después, el usuario probó preview.30 y confirmó: aparece la letra, pero los tiempos siguen siendo texto. Esto verifica el caso de letra de texto; no demuestra karaoke ni interpretación de esos tiempos por Música. También se probó el archivo real completo contra el receptor simulado: audio, portada y letra exacta se verificaron y el hash del original permaneció igual.
+
+Se preparó una **copia privada de experimento**, separada del original y del repositorio, con la letra convertida a TTML estándar por líneas. Conserva 55 líneas no vacías y los límites derivados de los 57 marcadores; no inventa tiempos por palabra. Su título y álbum indican que es una prueba. Se comprobó la igualdad de todos los bytes `mdat` del audio, de la carátula y del archivo original sin modificar. El recurso preparado para el envío coincide con el TTML de la copia. Esto solo comprueba la conversión y preparación local: la interpretación y el resaltado en Música **siguen pendientes**. No se cambia un flag de disponibilidad de iOS para fingir ese resultado ni se omite la verificación si iOS devuelve otro contenido.
 
 El ejecutable sí contiene la propiedad `ttml` en la serialización del objeto Lyrics (RVA `32f78c`, clave en `9ac9f8`). **No se ignora esa pista ni se presenta como prueba de karaoke USB**: el lector local encontrado construye el objeto en `331823`; el constructor `32f0f8` inicializa los flags TTML a cero en `32f16a`. El emisor USB `32f4f8` transmite el CFString, sin los flags de esa serialización de objeto. El metadato enviado en `472304` contiene el checksum; no se encontró en esta cadena un anuncio de tiempos o una activación de karaoke.
 
 El esquema iOS de referencia distingue texto `lyrics` de `time_synced_lyrics_available` y de las disponibilidades del catálogo Apple. Marcar a mano esos indicadores no entrega los recursos con tiempos y no se implementa. Tampoco se envía XML o timestamps como si su mera presencia garantizase que Música los interprete.
 
-Pendiente: inspeccionar los tiempos de un original real del usuario y encontrar/contrastar una ruta receptora de iOS para ese recurso; después verificar tanto su registro temporal como el resaltado durante la reproducción en Música. No hay todavía evidencia suficiente para prometer que el flujo de texto encontrado resuelva karaoke.
+Pendiente: comprobar en el iPhone la copia TTML y encontrar/contrastar una ruta receptora de iOS para ese recurso; después verificar tanto su registro temporal como el resaltado durante la reproducción en Música. No hay todavía evidencia suficiente para prometer que el flujo de texto encontrado resuelva karaoke.
 
 El usuario confirma que tiene canciones con letras visibles importadas previamente con Música y Finder en su Mac. Son una referencia positiva: el objetivo es reproducir ese registro, además de conservar las etiquetas del archivo.
 
@@ -98,7 +102,7 @@ La implementación publicada de rustunes también se volvió a consultar en HEAD
 
 - Formato, codificación, ruta y confirmación de texto: identificados en el nuevo AMPDevicesAgent de Windows, sin asumir el formato de la rama de nube antigua.
 - Contraste con host moderno: realizado; no hace falta otro binario del Mac para implementar el envío de texto.
-- Lectura de texto/checksum tras el envío: implementada y probada en simulación. Confirmación visual en iPhone físico: pendiente.
+- Lectura de texto/checksum tras el envío: implementada y probada en simulación. Confirmación visual de letra de texto en iPhone físico: reportada por el usuario con preview.30.
 - Karaoke: investigación abierta, sin afirmar compatibilidad a partir del registro de texto.
 
 No se edita `MediaLibrary.sqlitedb` en el teléfono ni se declara una parte sin preparar su contenido. La preview.30 es una implementación candidata para validación en dispositivo; no presenta como realizadas pruebas físicas inexistentes. Los originales siguen transfiriéndose sin modificar sus etiquetas.
