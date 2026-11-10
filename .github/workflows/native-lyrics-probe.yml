@@ -8,9 +8,12 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: native-lyrics-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   parser:
-    runs-on: macos-15
+    runs-on: macos-15-intel
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v5
