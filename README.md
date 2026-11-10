@@ -95,7 +95,9 @@ operaciones interrumpidas sin reenviar música a ciegas. El historial es agregad
 
 Las letras incrustadas se detectan, se conservan y se pueden consultar. **Su aparición
 en Música del iPhone todavía no está garantizada**: falta validar el contrato nativo
-separado. [Letras](docs/LETRAS.md) · [Transferencias y límites](docs/TRANSFERENCIAS.md).
+separado. Se recuperó el cálculo de checksum del host y se preparó su contraste
+de solo lectura; la entrega USB todavía está pendiente.
+[Avances de investigación](docs/LETRAS-INVESTIGACION.md) · [Letras](docs/LETRAS.md) · [Transferencias y límites](docs/TRANSFERENCIAS.md).
 
 ## Validación y desarrollo
 

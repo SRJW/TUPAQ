@@ -64,7 +64,7 @@ def _checksum_probe(db):
     import zlib
     columns={row[1] for row in db.execute('PRAGMA table_info(lyrics)')}
     if not {'checksum','lyrics'}<=columns:return {'schema_available':False}
-    counts={name:0 for name in ('crc32_utf8','adler32_utf8','crc32_utf16le','crc32_utf16be')}
+    counts={name:0 for name in ('crc32_utf8','adler32_utf8','crc32_utf16le','crc32_utf16be','md5_fold_utf16be')}
     checked=0;scanned=0
     rows=db.execute("SELECT checksum,lyrics FROM lyrics WHERE typeof(checksum)='integer' AND checksum!=0 AND typeof(lyrics)='text' AND length(lyrics) BETWEEN 1 AND 65536 LIMIT 33")
     for checksum,text in rows:
@@ -73,11 +73,13 @@ def _checksum_probe(db):
         if not -2**31<=checksum<=2**32-1:continue
         if not text.strip():continue
         checked+=1;expected=checksum&0xffffffff
+        from .sync.lyrics import host_checksum
         for name,value in (
             ('crc32_utf8',zlib.crc32(text.encode('utf-8'))),
             ('adler32_utf8',zlib.adler32(text.encode('utf-8'))),
             ('crc32_utf16le',zlib.crc32(text.encode('utf-16le'))),
-            ('crc32_utf16be',zlib.crc32(text.encode('utf-16be')))):
+            ('crc32_utf16be',zlib.crc32(text.encode('utf-16be'))),
+            ('md5_fold_utf16be',host_checksum(text))):
             counts[name]+=int(value==expected)
     return {'schema_available':True,'samples_checked':checked,'sample_limit':32,
             'more_samples_available':scanned>32,'algorithm_matches':counts,'usb_contract_verified':False}
