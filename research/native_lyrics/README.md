@@ -36,3 +36,36 @@ con sus tiempos, no se justifica seguir cambiando ese formato para corregir la
 entrega por USB. Si no reconoce tiempos o falta el parser, el informe delimita
 exactamente lo que sigue sin comprobarse. No se modifican flags de disponibilidad
 para simular un resultado.
+
+## Resultados observados el 10 de noviembre de 2026
+
+La sonda se ejecutó en dos runners sin cuenta de Apple Music:
+
+- [ARM, macOS 15.8.2 (24H232)](https://github.com/SRJW/TUPAQ/actions/runs/42910344371), commit `55695cd`.
+- [Intel, macOS 15.7.9 (24G830)](https://github.com/SRJW/TUPAQ/actions/runs/42910804979), commit `5db2a75`.
+
+En ambos, el framework cargó, el parser estuvo disponible y devolvió:
+
+| Muestra sintética | Parseo | Tipo opaco observado | Intervalos devueltos |
+| --- | --- | --- | --- |
+| Salida del generador Line v3 | Aceptada | 1 | 1–3 y 3–5 segundos |
+| TTML genérico v1 | Aceptada | 0 | 1–3 y 3–5 segundos |
+| Line con unidades en segundos | Aceptada | 1 | 1–3 y 3–5 segundos |
+| Word, una palabra por línea | Aceptada | 2 | 1–3 y 3–5 segundos |
+| XML malformado | Rechazada | 0 | Ninguno |
+
+Estos valores son observaciones, no nombres oficiales del enum. La prueba usa
+texto sintético, **no el audio ni la letra real del usuario**. Contrasta el
+generador usado para la copia v3, sin afirmar que se ejecutó esa copia privada
+completa en los runners públicos.
+
+Decisión: no generar una v4 por cambiar etiquetas, separadores o unidades. El
+generador Line produce tiempos que reconoce el parser de Apple en estos Macs;
+el ensayo físico de v3 continúa siendo negativo. La investigación siguiente debe
+identificar el recurso y la ruta receptora que alimentan `MPModelLyrics.TTML`,
+distintos de comprobar el registro de `lyrics` de biblioteca. Hace falta observar
+esa ruta antes de implementar otro envío. Ni una suscripción ni un indicador
+`hasTimeSyncedLyrics` sustituyen esa evidencia.
+
+No se publicó una nueva versión de la aplicación por estos resultados: no hay
+todavía un cambio de importación que permita anunciar karaoke funcional.

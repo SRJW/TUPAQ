@@ -119,6 +119,26 @@ Tampoco se distribuyeron binarios de Apple.
 
 ## Comprobación contra un catálogo existente
 
+### Separación de formato y entrega: parser real de Apple
+
+El 10 de noviembre se ejecutó una sonda independiente en macOS ARM 15.8.2 e Intel
+15.7.9, sin cuenta ni suscripción de Apple Music. `MSVLyricsTTMLParser` reconoció
+los intervalos sintéticos exactos de la salida del generador Line v3 en ambos;
+también aceptó los casos genérico, segundos y Word. El control XML malformado se
+rechazó. Se conservan [procedimiento, límites y enlaces públicos a resultados](../research/native_lyrics/README.md#resultados-observados-el-10-de-noviembre-de-2026).
+
+Esto comprueba el parser del Mac y el generador con texto sintético, no el
+renderizador del iPhone ni el archivo privado completo. Unido al resultado físico
+negativo de v3, justifica investigar la entrega/registro de recursos temporizados
+en vez de pedir otra conversión de etiquetas al usuario. Su objetivo sigue siendo
+Música del iPhone con archivos propios y **sin suscripción activa**. No se afirma
+que contratarla haga funcionar estas letras personalizadas.
+
+Sigue pendiente identificar una entrada receptora que alimente el campo TTML del
+reproductor desde una importación local. Registrar texto/checksum de biblioteca,
+aceptar XML en un parser o activar un flag no demuestra esa entrada. La aplicación
+no se ha modificado para anunciar un karaoke que todavía no se ha validado.
+
 Se añadió `md5_fold_utf16be` al sondeo de lectura `lyrics_checksum_probe`. Compara hasta 32 filas que ya contienen texto y checksum no nulo en la copia local del catálogo. Incluye checksums guardados como enteros negativos de 32 bits. El informe devuelve únicamente cantidades y coincidencias: no devuelve letras, títulos, identificadores ni valores de checksum. No modifica el catálogo ni lee todos los archivos de audio.
 
 Una coincidencia en las canciones del usuario importadas con Finder permitiría contrastar este cálculo antiguo con su biblioteca actual. Aunque coincidieran todas, `usb_contract_verified` sigue siendo falso: eso por sí solo no determina cómo se entrega el recurso.
