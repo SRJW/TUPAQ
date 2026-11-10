@@ -10,7 +10,7 @@ Los respaldos no son una cola que se deba vaciar. Contienen el catálogo previo 
 
 ## Carátulas
 
-Miniatura y detalles consultan primero los metadatos del archivo mediante lecturas acotadas. Una imagen incrustada gana a cualquier imagen mayor del catálogo. Si el archivo se pudo leer sin encontrar carátula, no se sustituye por una imagen de álbum. Si el audio no es accesible, solo se admite un enlace de catálogo a esa canción; las colisiones ambiguas se descartan. El resolvedor incluye el espacio de nombres de origen/tipo cuando existe en el esquema. Al recibir una previsualización sin imagen, se limpia la imagen anterior.
+Miniatura y detalles consultan primero los metadatos del archivo mediante lecturas acotadas. Una imagen incrustada gana a cualquier imagen mayor del catálogo. Si el archivo se pudo leer sin encontrar carátula, no se sustituye por una imagen de álbum. Si el audio no es accesible, solo se admite un enlace de catálogo a esa canción; las colisiones ambiguas se descartan. La preview.28 corrige la comparación de tipos de esta revisión: origen y variante califican el token; el tipo de la canción puede diferir del tipo del original. Véase CORRECCIONES-28.md. Al recibir una previsualización sin imagen, se limpia la imagen anterior.
 
 La opción explícita de completar una carátula al exportar sigue consultando el catálogo; solo actúa en la copia local y mantiene sus verificaciones.
 

@@ -36,22 +36,50 @@ def prepare(path,directory,container):
     return {'path':str(destination),'id':digest,'size':len(data),'checksum':len(data)+(17 if container=='M4A' else 1)}
 
 
+def originals(db):
+    """Exact local-cache candidates, independent of the display cover policy.
+
+    Source 300's decimal token is the announced cache ID. artwork_type 1/6
+    describes track/album use; matching it to artwork_token's type is invalid.
+    See rustunes docs/04, sections 10.3-10.4. Only original variant 0 is used.
+    """
+    from .catalogue import cache_id
+    from ..remote_artwork import original_path
+    columns={row[1] for row in db.execute('PRAGMA table_info(artwork)')}
+    if not {'artwork_token','artwork_source_type','artwork_variant_type','relative_path'} <= columns:return {}
+    rows=db.execute('SELECT artwork_token,relative_path FROM artwork WHERE artwork_source_type=300 AND artwork_variant_type=0 LIMIT 200001').fetchall()
+    if len(rows)>200000:return {}
+    result={}
+    for token,relative in rows:
+        identifier=cache_id(token);path=original_path(relative)
+        if identifier is not None and path:
+            result.setdefault(identifier,set()).add(path)
+    return {key:sorted(paths) for key,paths in result.items()}
+
+
 async def verify(afc,after,entries):
     from ..transfers import read_remote
-    for entry in entries:
+    from .protocol import ProtocolError
+    for index,entry in enumerate(entries):
         picture=entry.get('artwork')
         if not picture:continue
         wire=str(entry['track_id'])
         require(after['artwork_tracks'].get(wire)==picture['cache_id'],'verify-artwork-registration')
-        track=after['tracks'][after['wire_to_item'][wire]]
-        matched=False
-        for path in track.get('artwork_paths',[]):
+        # Never use best_artwork_token or album previews to verify our upload.
+        paths=after.get('artwork_originals',{}).get(picture['cache_id'],[])
+        matched=False;readable=0;different=0
+        for path in paths if len(paths)==1 else []:
             try:
                 _,digest,size=await read_remote(afc,path,limit=5*1024**2)
+                readable+=1
                 if (digest,size)==(picture['id'],picture['size']):matched=True;break
+                different+=1
             except Exception:
                 continue
-        require(matched,'verify-artwork-original')
+        if not matched:
+            raise ProtocolError('verify-artwork-original',{'entry_index':index+1,
+                'path_candidates':len(paths),'readable_candidates':readable,'different_candidates':different,
+                'lookup':'local-cache-original'})
 
 
 def allocate_cache_id(reserved):

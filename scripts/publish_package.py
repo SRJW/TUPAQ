@@ -16,18 +16,19 @@ def main():
     if subprocess.run(view, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         with tempfile.TemporaryDirectory() as directory:
             notes = Path(directory)/'notes.md'
-            notes.write_text('''TUPAQ 0.3.0-preview.27: importación, carátulas y controles pulidos.
+            notes.write_text('''TUPAQ 0.3.0-preview.28: carátulas verificadas correctamente y desplegables sin marco antiguo.
 
-- Eliminado M4P de los filtros, la biblioteca gestionable y la exportación. No se eliminan archivos del iPhone.
-- Corregida la creación de la carpeta de carátulas con la API real de pymobiledevice3: makedirs, sin la llamada inexistente mkdir. El fallo podía dejar los metadatos anunciados sin entregar el audio.
-- Al reintentar con los mismos originales, se intenta completar una única operación antigua detenida por AttributeError en esa fase. Se conservan los respaldos y se vuelven a comprobar identidad, catálogo, ancla y archivos. Las operaciones ajenas, ambiguas o modificadas permanecen bloqueadas para revisión.
-- La carátula incrustada en el archivo prevalece en miniaturas y detalles. Un archivo leído sin imagen no hereda la de otro álbum; los enlaces ambiguos de la caché se rechazan.
-- Desplegables, listas emergentes, menús, casillas, diálogos y barras de desplazamiento con controles coherentes en claro y oscuro. Fuente del sistema resuelta también en el estilo de la interfaz.
-- 224 pruebas automáticas: reproducción de la operación pendiente, reintento sin duplicados, importaciones repetidas sin carpeta de carátulas, bloqueo ante cambios del catálogo y navegación por teclado.
+- Corregida una regresión: iOS puede usar tipo 1 para el token de la canción y tipo 6 para su imagen. Ya no se exige una igualdad incorrecta entre ambos tipos.
+- La carátula transferida se verifica por su identificador de caché local exacto y sus bytes, independientemente de la portada preferida para mostrar. Una imagen corrupta sigue sin aceptarse.
+- Las operaciones afectadas por el fallo anterior pueden comprobarse mediante lectura sin reenviar ni duplicar canciones. Se conservan los respaldos.
+- Ventana desplegable sin borde nativo rectangular y con máscara redondeada; comprobación adicional de HWND y teclado en Windows real.
+- Retiradas las explicaciones sobre la fuente. Windows y Mac continúan usando su fuente del sistema.
+- «Comprobar todo» se aclara como «Comprobar lectura de audios»: es opcional, solo lee, puede tardar y no se ejecuta al importar.
+- 231 pruebas aprobadas en desarrollo; documentación de alternativas de importación en docs/CORRECCIONES-28.md.
 
-Las pruebas usan un teléfono simulado con la interfaz del SDK instalado. Falta confirmar estos cambios por USB en el iPhone físico. No borres catalogue-backups: conserva el registro necesario para comprobar una transferencia interrumpida. Para recuperar el caso descrito, vuelve a seleccionar los mismos originales y pulsa Importar.
+Para un envío ya realizado con preview.27, actualiza y usa Revisar operación pendiente, o vuelve a seleccionar los mismos originales: se comprueba el resultado antes de reenviar. Conserva catalogue-backups. Una copia de catálogo no sustituye una copia de los audios. La prueba por USB en el iPhone físico sigue pendiente.
 
-MP3, WAV, M4A (AAC/ALAC) y AIFF; sin FLAC. Windows necesita el servicio/controlador USB de Apple. Paquetes sin firma ni notarización. No se distribuyen fuentes ni DLL de Apple o 3uTools.
+MP3, WAV, M4A (AAC/ALAC) y AIFF; sin M4P ni FLAC. Windows necesita el servicio/controlador USB de Apple. Paquetes sin firma ni notarización. No se distribuyen fuentes ni DLL de Apple o 3uTools.
 ''', encoding='utf-8')
             created = subprocess.run(['gh','release','create',tag,'--repo',repo,'--title',
                 'TUPAQ '+tag,'--notes-file',str(notes),'--prerelease','--verify-tag'])

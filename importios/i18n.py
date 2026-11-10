@@ -1,7 +1,8 @@
 """Explicit UI messages; song/device metadata is never translated implicitly."""
 import re
 from string import Formatter
-from PySide6.QtCore import QLibraryInfo, QTranslator
+from PySide6.QtCore import QLibraryInfo, QTranslator, Qt, QEvent, QRectF
+from PySide6.QtGui import QPainterPath, QRegion
 from PySide6 import QtWidgets
 from .translations import EN
 
@@ -104,9 +105,27 @@ class QComboBox(Localized, QtWidgets.QComboBox):
 
     def showPopup(self):
         popup=self.view().window()
+        if getattr(self,'_popup',None) is not popup:
+            self._popup=popup
+            popup.setWindowFlags(popup.windowFlags() | Qt.WindowType.FramelessWindowHint | Qt.WindowType.NoDropShadowWindowHint)
+            popup.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+            popup.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+            popup.setLineWidth(0)
+            popup.installEventFilter(self)
         popup.setObjectName('comboPopup')
         popup.setPalette(self.palette())
         super().showPopup()
+        self._round_popup(popup)
+
+    @staticmethod
+    def _round_popup(popup):
+        path=QPainterPath();path.addRoundedRect(QRectF(popup.rect()),10,10)
+        popup.setMask(QRegion(path.toFillPolygon().toPolygon()))
+
+    def eventFilter(self,watched,event):
+        if watched is getattr(self,'_popup',None) and event.type() in (QEvent.Type.Resize,QEvent.Type.Show):
+            self._round_popup(watched)
+        return super().eventFilter(watched,event)
 
     def addItems(self, values):
         for value in values:

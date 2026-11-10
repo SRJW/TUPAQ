@@ -68,6 +68,11 @@ jobs:
           python -m pip install --force-reinstall --no-deps --no-binary=cryptography --no-cache-dir cryptography==50.0.2
       - name: Probar lectura de audio y aplicación
         run: python scripts/run_tests.py
+      - name: Comprobar desplegables Win32 sin marco antiguo
+        if: runner.os == 'Windows'
+        env:
+          QT_QPA_PLATFORM: windows
+        run: python scripts/check_native_popup.py --output preview-ui/native-popups
       - name: Renderizar vistas nativas con datos sintéticos
         env:
           QT_QPA_PLATFORM: offscreen

@@ -528,11 +528,17 @@ async def import_selected(selected, backup_root, progress, expected_snapshot=Non
                     await transact(afc,channel,before,identity,voice,entries,receipt,directory,progress)
                 progress(90,100,'Comprobando las canciones en la biblioteca…')
                 after = await verified_import_catalogue(afc,directory,before,entries,receipt,progress)
-                from .sync.artwork import verify as verify_artwork
-                await verify_artwork(afc,after,entries)
                 for entry in entries:
                     _, digest, size = await read_remote(afc,entry['destination'])
                     require(size == entry['source']['size'] and digest == entry['source']['id'], 'verify-permanent-audio')
+                receipt['audio_verified']=True
+                save_receipt(directory,receipt)
+                from .sync.artwork import verify as verify_artwork
+                try:
+                    await verify_artwork(afc,after,entries)
+                except ProtocolError as error:
+                    error.facts={**(error.facts or {}),'audio_verified':True}
+                    raise
                 receipt['phase'] = 'completed'
                 save_receipt(directory,receipt)
                 progress(100,100,'Importación comprobada en el catálogo.')
@@ -630,6 +636,8 @@ def transfer_error(error, mode):
     }
     message = messages.get(code,message)
     if mode=='diagnose' and code=='export-stale-selection':message='La biblioteca cambió. Actualiza la lista antes de comprobarla.'
+    if mode=='import' and code in ('verify-artwork-original','verify-artwork-registration') and isinstance(getattr(error,'facts',None),dict) and error.facts.get('audio_verified') is True:
+        message='El audio y los metadatos están verificados en el iPhone, pero no se pudo confirmar la carátula. Conserva el registro y usa Revisar operación pendiente antes de repetir el envío.'
     if isinstance(error,ProtocolError) and error.facts is not None:
         code += '\nDatos del protocolo: '+json.dumps(error.facts,sort_keys=True)
     return TransferError(message, mode+':'+code)

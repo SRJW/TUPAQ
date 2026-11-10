@@ -36,8 +36,9 @@ def catalogue_artwork(db):
         columns={row[1] for row in db.execute(f'PRAGMA table_info({table})')}
         if not {'entity_pid','entity_type',token,'artwork_variant_type'} <= columns:return []
         joins=[f'a.artwork_token=t.{token}','a.artwork_variant_type=t.artwork_variant_type']
-        # A token alone is not globally unique across source/type namespaces.
-        for column in ('artwork_source_type','artwork_type'):
+        # Tokens are qualified by source and variant, not entity artwork_type.
+        # iOS can bind a track token typed 1 to an original typed 6.
+        for column in ('artwork_source_type',):
             if column in columns and column in artwork_columns:joins.append(f'a.{column}=t.{column}')
         return db.execute(f"SELECT t.entity_pid,t.entity_type,t.artwork_variant_type,a.relative_path FROM {table} t JOIN artwork a ON {' AND '.join(joins)} WHERE t.entity_type IN(0,4) ORDER BY t.artwork_variant_type LIMIT 200001").fetchall()
     preferred=query('best_artwork_token','available_artwork_token')

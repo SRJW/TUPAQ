@@ -79,6 +79,8 @@ def snapshot(path):
             for pid,token in db.execute('SELECT entity_pid,artwork_token FROM artwork_token WHERE artwork_source_type=300 AND entity_type=0'):
                 wire = item_to_wire.get(str(pid))
                 if wire is not None and cache_id(token) is not None:artwork_tracks[wire]=cache_id(token)
+        from .artwork import originals as artwork_originals
+        original_artwork=artwork_originals(db)
         dates_known = 'date_added' in item_columns
         dates = {str(pid):value for pid,value in db.execute('SELECT item_pid,date_added FROM item')} if dates_known else {}
         if {'item_pid','is_placeholder','is_library_added','has_non_purgeable_asset','is_supported_type'} <= state_columns and 'remote_location_id' in item_columns:
@@ -88,7 +90,7 @@ def snapshot(path):
     return {'database':database,'primary':primary,'anchor':anchor,'ids':ids,'originals':originals,
             'wire_to_item':wire_to_item,'tracks':{t['id']:t for t in tracks},'artists':artist_groups,'albums':albums,
             'groups':groups,'states':states,'artwork_ids':artwork_ids,'artwork_known':artwork_known,
-            'artwork_tokens':artwork_tokens,'artwork_tracks':artwork_tracks,'dates':dates,'dates_known':dates_known}
+            'artwork_tokens':artwork_tokens,'artwork_tracks':artwork_tracks,'artwork_originals':original_artwork,'dates':dates,'dates_known':dates_known}
 
 
 def verify_originals(before, after):

@@ -1,5 +1,8 @@
 """English UI catalogue. Spanish source messages are the fallback."""
 EN = {
+    'Comprobar lectura de audios':'Check audio readability',
+    'Comprobación opcional: lee los audios completos y puede tardar. No modifica el iPhone y no es necesaria para importar.':'Optional check: reads complete audio files and may take time. Does not modify your iPhone and is not required to import.',
+
     'Operación cancelada antes de enviar cambios a Música.':'Operation cancelled before sending changes to Music.',
     'Esta acción elimina las canciones del iPhone. Conserva los audios que quieras guardar en el ordenador. La copia del catálogo no permite recuperar por sí sola los audios.':'This deletes songs from your iPhone. Keep any audio you want to save on your computer. The catalogue copy alone cannot restore audio files.',
     '{count} archivos adicionales no se pudieron preparar.':'{count} additional files could not be prepared.',

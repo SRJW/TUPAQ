@@ -331,7 +331,7 @@ class Window(QMainWindow):
         size=sum(t.get('size',0) for t in self.tracks.values() if isinstance(t.get('size'),int))
         self.queue_summary.setText(tr(f'{len(self.tracks)} canciones · {byte_label(size)}'))
         self.diagnostic_refresh.setEnabled(not phone_busy);self.diagnostic_run.setEnabled(not phone_busy and (self.usb_connected or bool(self.phone_tracks)))
-        self.diagnostic_run.setText(tr('Comprobar selección' if selected else 'Comprobar todo'))
+        self.diagnostic_run.setText(tr('Comprobar selección' if selected else 'Comprobar lectura de audios'))
         self.update_diagnostics()
 
     def navigate(self, number):

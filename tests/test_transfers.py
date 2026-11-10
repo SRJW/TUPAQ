@@ -165,7 +165,7 @@ class Phone:
             db.execute('INSERT INTO artwork VALUES(?,300,6,0,?)',(str(cache),relative))
             for entity,kind in [(pid,0),(album,4)]:
                 db.execute('DELETE FROM artwork_token WHERE entity_pid=? AND entity_type=? AND artwork_source_type=300',(entity,kind))
-                db.execute('INSERT INTO artwork_token VALUES(?,?,?,300,6,0)',(entity,kind,str(cache)))
+                db.execute('INSERT INTO artwork_token VALUES(?,?,?,300,?,0)',(entity,kind,str(cache),1 if kind==0 else 6))
             db.commit();self.files[PREF+'MediaLibrary.sqlitedb']=db.serialize()
 
 

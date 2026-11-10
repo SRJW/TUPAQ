@@ -130,11 +130,11 @@ class Regressions26(unittest.TestCase):
         with closing(sqlite3.connect(':memory:')) as db:
             db.executescript('''CREATE TABLE artwork_token(entity_pid,entity_type,artwork_token,artwork_source_type,artwork_type,artwork_variant_type);
                 CREATE TABLE artwork(artwork_token,artwork_source_type,artwork_type,artwork_variant_type,relative_path);
-                INSERT INTO artwork_token VALUES(1,0,'same',1,5,1);''')
+                INSERT INTO artwork_token VALUES(1,0,'same',1,1,1);''')
             db.executemany('INSERT INTO artwork VALUES(?,?,?,?,?)',[
-                ('same',1,7,1,'aa/'+'a'*38),('same',1,5,1,RELATIVE)])
+                ('same',500,6,1,'aa/'+'a'*38),('same',1,6,1,RELATIVE)])
             self.assertEqual(catalogue_artwork(db)[('1',0)],original_path(RELATIVE))
-            db.execute('INSERT INTO artwork VALUES(?,?,?,?,?)',('same',1,5,1,'cc/'+'b'*38))
+            db.execute('INSERT INTO artwork VALUES(?,?,?,?,?)',('same',1,6,1,'cc/'+'b'*38))
             self.assertNotIn(('1',0),catalogue_artwork(db))
 
     def test_modern_popup_preserves_keyboard_selection_in_both_themes(self):

@@ -59,7 +59,7 @@ class FontApplicationTests(unittest.TestCase):
                     self.assertEqual(QFontInfo(widget.font()).family(),actual,widget.objectName())
                 from PySide6.QtWidgets import QMessageBox
                 dialog=QMessageBox(w);self.assertEqual(QFontInfo(dialog.font()).family(),actual);dialog.deleteLater()
-                self.assertIn('fuente del sistema',w.font_status.text());self.assertFalse(APP.typography_is_mori)
+                self.assertFalse(hasattr(w,'font_status'));self.assertFalse(APP.typography_is_mori)
             finally:w.close();w.deleteLater();APP.processEvents()
 
     def test_mac_keeps_system_font_even_when_mori_is_available(self):
@@ -67,7 +67,7 @@ class FontApplicationTests(unittest.TestCase):
             w=Window(auto_connect=False)
             try:
                 self.assertFalse(hasattr(w,'font_choice'));self.assertFalse(hasattr(w,'apply_font_button'))
-                self.assertIn('fuente del sistema',w.font_status.text());self.assertFalse(APP.typography_is_mori)
+                self.assertFalse(hasattr(w,'font_status'));self.assertFalse(APP.typography_is_mori)
             finally:w.close();w.deleteLater();APP.processEvents()
 
     def test_available_custom_fonts_cannot_override_the_native_system_font(self):
