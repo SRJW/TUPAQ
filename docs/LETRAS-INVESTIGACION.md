@@ -1,6 +1,6 @@
 # Letras dentro de Música — investigación del 10 de noviembre de 2026
 
-Estado: preview.29 implementa la entrega nativa de **letras de texto** con canciones nuevas. Se habilita la parte 8 únicamente para entradas propias con un recurso preparado y checksum válido. Las pruebas con teléfono simulado pasan; falta confirmar la visualización en Música del iPhone físico. **El karaoke no está implementado ni validado.**
+Estado: preview.30 implementa la entrega nativa de **letras de texto** con canciones nuevas. Se habilita la parte 8 únicamente para entradas propias con un recurso preparado y checksum válido. Las pruebas con teléfono simulado pasan; falta confirmar la visualización en Música del iPhone físico. **El karaoke no está implementado ni validado.**
 
 ## AMPDevicesAgent moderno: ruta USB identificada
 
@@ -18,7 +18,7 @@ El código público de CoreFoundation se contrastó para la codificación: `CFSt
 
 `scripts/inspect_amp_lyrics.py RUTA/AMPDevicesAgent.exe` reproduce las comprobaciones de instrucciones y rechaza otra versión. Requiere `pefile` solo para investigación. No se distribuye ningún ejecutable, DLL ni desensamblado de Apple.
 
-## Comportamiento de preview.29
+## Comportamiento de preview.30
 
 Se leen USLT o ©lyr de los originales. Para un archivo que solo lleva SYLT se puede entregar su texto, pero eso **no convierte sus tiempos en karaoke**. Los bytes originales, incluidos todos sus tiempos, no se modifican. Preferencias → Metadatos permite desactivar el envío adicional de letras; la opción está activa por defecto.
 
@@ -34,7 +34,7 @@ Pruebas: MP3 USLT, M4A AAC/ALAC ©lyr, acentos, emojis y CRLF exactos, con y sin
 
 ## Letras sincronizadas: resultado y límite actual
 
-El usuario confirma que sus archivos contienen tiempos incrustados. Para comprobar el formato concreto hace falta una canción de muestra: puede ser SYLT, LRC almacenado como texto o TTML, y no son intercambiables.
+El usuario confirma que sus archivos contienen tiempos incrustados y que tiene un ejemplo que muestra resaltado sincronizado en Música del iPhone, sin utilizar la letra en línea. Es la referencia positiva que debe contrastarse. Para comprobar el formato concreto hace falta una canción de muestra: puede ser SYLT, LRC almacenado como texto o TTML, y no son intercambiables. Deben compararse sus etiquetas y el registro correspondiente en iOS para distinguir el recurso del archivo de uno de catálogo descargado previamente.
 
 El ejecutable sí contiene la propiedad `ttml` en la serialización del objeto Lyrics (RVA `32f78c`, clave en `9ac9f8`). **No se ignora esa pista ni se presenta como prueba de karaoke USB**: el lector local encontrado construye el objeto en `331823`; el constructor `32f0f8` inicializa los flags TTML a cero en `32f16a`. El emisor USB `32f4f8` transmite el CFString, sin los flags de esa serialización de objeto. El metadato enviado en `472304` contiene el checksum; no se encontró en esta cadena un anuncio de tiempos o una activación de karaoke.
 
@@ -101,4 +101,4 @@ La implementación publicada de rustunes también se volvió a consultar en HEAD
 - Lectura de texto/checksum tras el envío: implementada y probada en simulación. Confirmación visual en iPhone físico: pendiente.
 - Karaoke: investigación abierta, sin afirmar compatibilidad a partir del registro de texto.
 
-No se edita `MediaLibrary.sqlitedb` en el teléfono ni se declara una parte sin preparar su contenido. La preview.29 es una implementación candidata para validación en dispositivo; no presenta como realizadas pruebas físicas inexistentes. Los originales siguen transfiriéndose sin modificar sus etiquetas.
+No se edita `MediaLibrary.sqlitedb` en el teléfono ni se declara una parte sin preparar su contenido. La preview.30 es una implementación candidata para validación en dispositivo; no presenta como realizadas pruebas físicas inexistentes. Los originales siguen transfiriéndose sin modificar sus etiquetas.

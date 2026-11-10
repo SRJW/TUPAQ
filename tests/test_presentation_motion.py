@@ -1,6 +1,6 @@
 """Motion stays finite, can be disabled, and never resets the music library."""
 import unittest
-from PySide6.QtCore import QAbstractAnimation,QVariantAnimation,QEvent,Qt
+from PySide6.QtCore import QAbstractAnimation,QVariantAnimation,QEvent,Qt,QElapsedTimer
 from PySide6.QtGui import QPixmap,QColor
 from PySide6.QtTest import QTest
 from test_native_connection import APP,TRACK
@@ -14,14 +14,24 @@ class PresentationTests(unittest.TestCase):
         self.w.tracks.clear();self.w.close();self.w.deleteLater();APP.sendPostedEvents(None,QEvent.Type.DeferredDelete);APP.processEvents()
     def running(self):
         return [a for a in self.w.findChildren(QVariantAnimation) if a.property('tupaqMotion') and a.state()==QAbstractAnimation.State.Running]
+    def wait_for_motion(self):
+        # The first unified-animation tick can be delayed on a busy native
+        # runner. Wait for natural completion, without forcing time/finish.
+        # The production transition still has its 180 ms duration.
+        timer=QElapsedTimer();timer.start()
+        while (self.w.motion.overlay.isVisible() or self.running()) and timer.elapsed()<2000:
+            QTest.qWait(10)
+        self.assertFalse(self.w.motion.overlay.isVisible())
+        self.assertFalse(self.running())
 
     def test_navigation_finishes_and_retains_selection_and_search(self):
         w=self.w;w.show_library([dict(TRACK,id='a'),dict(TRACK,id='b')]);w.library_model.checked.add('a');w.search.setText('Prueba')
         w.navigate(1)
         self.assertEqual(w.pages.currentIndex(),1);self.assertTrue(w.motion.overlay.isVisible())
-        QTest.qWait(240)
+        self.assertEqual(w.motion.overlay.transition.duration(),180)
+        self.wait_for_motion()
         self.assertFalse(w.motion.overlay.isVisible());self.assertTrue(w.motion.overlay.image.isNull());self.assertFalse(self.running())
-        w.navigate(0);QTest.qWait(240)
+        w.navigate(0);self.wait_for_motion()
         self.assertEqual(w.library_model.checked,{'a'});self.assertEqual(w.search.text(),'Prueba');self.assertEqual(w.library_model.rowCount(),2)
         w.show_library([dict(TRACK,id='a'),dict(TRACK,id='b')])
         self.assertFalse(w.motion.overlay.isVisible());self.assertFalse(self.running())

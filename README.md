@@ -6,7 +6,7 @@ Gestiona por USB la música del iPhone desde Windows o macOS: importa canciones
 del ordenador, exporta originales y elimina canciones seleccionadas de Música.
 Aplicación nativa, con ventana propia, sin navegador ni necesidad de instalar Python.
 
-La **0.3.0-preview.29** implementa el envío USB de letras de texto incrustadas en
+La **0.3.0-preview.30** implementa el envío USB de letras de texto incrustadas en
 canciones nuevas, con comprobación del texto y checksum registrados en el catálogo.
 La ruta procede del análisis estático de AMPDevicesAgent; la visualización en un
 iPhone físico está pendiente de confirmación. **No se afirma soporte de karaoke**.
