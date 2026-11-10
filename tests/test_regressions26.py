@@ -144,6 +144,7 @@ class Regressions26(unittest.TestCase):
             for theme in (1,2):
                 window.theme_choice.setCurrentIndex(theme);APP.processEvents()
                 combo=window.format_filter
+                self.assertNotIn('M4P',[combo.itemText(i) for i in range(combo.count())])
                 self.assertIsInstance(combo.view(),QListView)
                 combo.setCurrentIndex(0);combo.setFocus();combo.showPopup();APP.processEvents()
                 self.assertTrue(combo.view().isVisible())

@@ -16,8 +16,9 @@ def main():
     if subprocess.run(view, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         with tempfile.TemporaryDirectory() as directory:
             notes = Path(directory)/'notes.md'
-            notes.write_text('''TUPAQ 0.3.0-preview.26: importación, carátulas y controles pulidos.
+            notes.write_text('''TUPAQ 0.3.0-preview.27: importación, carátulas y controles pulidos.
 
+- Eliminado M4P de los filtros, la biblioteca gestionable y la exportación. No se eliminan archivos del iPhone.
 - Corregida la creación de la carpeta de carátulas con la API real de pymobiledevice3: makedirs, sin la llamada inexistente mkdir. El fallo podía dejar los metadatos anunciados sin entregar el audio.
 - Al reintentar con los mismos originales, se intenta completar una única operación antigua detenida por AttributeError en esa fase. Se conservan los respaldos y se vuelven a comprobar identidad, catálogo, ancla y archivos. Las operaciones ajenas, ambiguas o modificadas permanecen bloqueadas para revisión.
 - La carátula incrustada en el archivo prevalece en miniaturas y detalles. Un archivo leído sin imagen no hereda la de otro álbum; los enlaces ambiguos de la caché se rechazan.

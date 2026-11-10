@@ -6,7 +6,7 @@ Gestiona por USB la música del iPhone desde Windows o macOS: importa canciones
 del ordenador, exporta originales y elimina canciones seleccionadas de Música.
 Aplicación nativa, con ventana propia, sin navegador ni necesidad de instalar Python.
 
-La **0.3.0-preview.26** corrige las importaciones interrumpidas por `AttributeError`,
+La **0.3.0-preview.27** corrige las importaciones interrumpidas por `AttributeError`,
 la prioridad de las carátulas y el estilo de los controles.
 [Detalles de la corrección y recuperación](docs/CORRECCIONES-26.md).
 
@@ -85,7 +85,7 @@ independiente de 1.000 archivos. Un fallo detiene los siguientes lotes.
 La exportación normalmente conserva los bytes originales. La opción de incrustar
 carátulas completa solo las copias exportadas que no tengan portada, después de
 verificar el audio original por USB. No sobrescribe carátulas existentes ni archivos
-previos. Un `.m4p` conserva su protección: no se descifra DRM.
+previos. Solo se importan y exportan MP3, WAV, M4A (AAC/ALAC) y AIFF.
 
 Se conserva el catálogo antes de cada cambio. **Esa copia no incluye todos los
 audios** y no es una restauración automática. Los recibos permiten comprobar

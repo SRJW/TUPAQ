@@ -22,6 +22,8 @@ def local_tracks(tracks):
         if local is False or (local is None and not track.get('afc_path')):
             continue
         path = track.get('afc_path')
+        from .audio import EXTENSIONS
+        if path and PurePosixPath(path).suffix.casefold() not in EXTENSIONS:continue
         if path and path in paths:
             continue
         if path:paths.add(path)

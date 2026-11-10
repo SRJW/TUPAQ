@@ -431,20 +431,24 @@ class TransferTests(unittest.TestCase):
             self.assertEqual(sum(r['phase']=='observed-present' for r in records),1)
             self.assertGreater(len(phone.sent),previous)
 
-    def test_export_keeps_a_protected_original_unchanged(self):
+    def test_unrequested_m4p_format_is_excluded_without_touching_its_audio(self):
+        from importios.library_fields import local_tracks
         phone=Phone()
         with closing(sqlite3.connect(':memory:')) as db:
             db.deserialize(phone.files[PREF+'MediaLibrary.sqlitedb'])
             db.execute("UPDATE item_extra SET location='AAAA.m4p'")
             db.commit();phone.files[PREF+'MediaLibrary.sqlitedb']=db.serialize()
-        phone.files['/iTunes_Control/Music/F00/AAAA.m4p']=b'protected-original-test-data'
+        path='/iTunes_Control/Music/F00/AAAA.m4p'
+        phone.files[path]=b'protected-original-test-data'
+        before=dict(phone.files)
         with tempfile.TemporaryDirectory() as temporary:
             track=self.tracks(phone,temporary)[0]
-            result=self.call(phone,'export',[track],temporary)
-            exported=Path(result['files'][0])
-            self.assertEqual(exported.suffix,'.m4p')
-            self.assertEqual(exported.read_bytes(),b'protected-original-test-data')
+            self.assertEqual(local_tracks([track]),[])
+            with self.assertRaises(TransferError) as caught:self.call(phone,'export',[track],temporary)
+            self.assertIn('export-format',caught.exception.diagnostic)
+            self.assertEqual(phone.files,before)
             self.assertFalse(phone.writes)
+            self.assertFalse(list(Path(temporary).glob('*.m4p')))
 
     def test_private_identities_parse_without_accepting_unconfigured_preferences(self):
         self.assertEqual(library_identity(preferences()),(0x1234,0xab))

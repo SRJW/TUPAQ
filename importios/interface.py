@@ -101,7 +101,7 @@ def build(window):
     window.device_status=text_label('Conecta tu iPhone para mostrar su música.','muted',True);window.device_status.setMaximumHeight(64);window.device_status.hide();layout.addWidget(window.device_status)
     window.search=QLineEdit();window.search.setPlaceholderText(tr('Buscar canción, artista, álbum o formato (.m4a, .mp3…)'));window.search.setClearButtonEnabled(True);window.search.setMinimumHeight(38)
     search_row=QHBoxLayout();search_row.setSpacing(10);search_row.addWidget(window.search,1)
-    window.format_filter=QComboBox();window.format_filter.addItems(['Todos los formatos','M4A','MP3','AAC','ALAC','WAV','AIFF','M4P']);search_row.addWidget(window.format_filter)
+    window.format_filter=QComboBox();window.format_filter.addItems(['Todos los formatos','M4A','MP3','AAC','ALAC','WAV','AIFF']);search_row.addWidget(window.format_filter)
     window.content_filter=QComboBox();window.content_filter.addItems(['Toda la música','Con carátula','Con letra']);search_row.addWidget(window.content_filter);layout.addLayout(search_row)
     window.main_splitter=QSplitter(Qt.Orientation.Vertical)
     window.library_panel=QFrame();window.library_panel.setObjectName('libraryCard');phone_layout=QVBoxLayout(window.library_panel);phone_layout.setContentsMargins(0,0,0,0);phone_layout.setSpacing(0)

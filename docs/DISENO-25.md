@@ -37,7 +37,7 @@ ciegas canciones ya importadas con el mismo hash.
 quita la portada ya incrustada en el original. Incrustar carátulas al exportar
 completa únicamente copias locales sin portada, con JPEG/PNG disponibles de hasta
 20 MiB. Se conserva una portada existente y se verifica el audio antes de modificar
-la copia; el iPhone permanece intacto. Los `.m4p` no se modifican ni descifran.
+la copia; el iPhone permanece intacto.
 
 **Importación automática** está desactivada inicialmente. La cola solo se envía
 si continúa conectado el mismo teléfono, existe una lectura válida y coincide

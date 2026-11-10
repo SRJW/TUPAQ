@@ -61,9 +61,8 @@ por ese servicio. Se aceptan rutas del catálogo dentro de Music/Fnn, Purchases
 o Downloads, con comprobaciones de ruta y extensión. No se recorre el sistema
 de archivos privado. Los paquetes HLS no se reconstruyen como M4A.
 
-Un original `.m4p` accesible puede copiarse como tal: conserva su protección.
-No se descifra DRM ni se promete reproducir ese original fuera de los equipos
-autorizados. La exportación no envía operaciones ATC ni modifica el iPhone.
+M4P no es un formato admitido y no se muestra entre las canciones gestionables.
+La exportación no envía operaciones ATC ni modifica el iPhone.
 
 ## Copia del catálogo y operaciones pendientes
 

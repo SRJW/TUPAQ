@@ -126,6 +126,8 @@ def retain_export(temporary, folder, filename):
 async def export_selected(selected, folder, progress):
     folder = Path(folder).resolve()
     require(folder.is_dir() and 1 <= len(selected) <= 1000, 'export-selection')
+    from .audio import EXTENSIONS
+    require(all(PurePosixPath(t.get('afc_path') or '').suffix.casefold() in EXTENSIONS for t in selected),'export-format')
     result = [];covers_embedded=0
     async with device() as (_, afc):
         with tempfile.TemporaryDirectory(prefix='.tupaq-export-',dir=folder) as temporary:
@@ -140,6 +142,7 @@ async def export_selected(selected, folder, progress):
                 require(current is not None and all(current.get(k) == chosen.get(k) for k in ('title','artist','afc_path')),
                         'export-stale-selection')
                 require(bool(current.get('afc_path')), 'export-no-usb-file')
+                require(PurePosixPath(current['afc_path']).suffix.casefold() in EXTENSIONS,'export-format')
             for index, chosen in enumerate(selected):
                 from .cancellation import wait_if_paused
                 await wait_if_paused(progress)
@@ -155,7 +158,7 @@ async def export_selected(selected, folder, progress):
                 _, check, check_size = await read_remote(afc,track['afc_path'])
                 require(size == check_size and digest == check == local_hash(temporary_audio), 'export-hash')
                 checkpoint()
-                if chosen.get('embed_artwork') and Path(track['afc_path']).suffix.casefold()!='.m4p':
+                if chosen.get('embed_artwork'):
                     from .remote_artwork import cover_for_track
                     from .export_artwork import embed
                     picture=await cover_for_track(afc,track,assets=True,catalogue_only=True)
