@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
     tags: ['v*']
+    paths-ignore:
+      - scripts/lyrics_trial.py
+      - tests/test_lyrics_trial.py
+      - .github/workflows/lyrics-trial.yml
+      - docs/PRUEBA-TTML.md
   workflow_dispatch:
 
 permissions:

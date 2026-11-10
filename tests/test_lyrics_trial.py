@@ -2,7 +2,7 @@
 from pathlib import Path
 import tempfile,unittest,xml.etree.ElementTree as ET
 from mutagen.mp4 import MP4
-from scripts.lyrics_trial import create_trial,media_hash,ttml_from_lrc,NS
+from scripts.lyrics_trial import create_trial,media_hash,ttml_from_lrc,NS,ITUNES
 
 FIXTURES=Path(__file__).parent/'fixtures'
 
@@ -21,7 +21,7 @@ class LyricsTrialTests(unittest.TestCase):
             self.assertEqual(result,{'lines':2,'audio_unchanged':True,'original_unchanged':True,'karaoke_verified':False})
             for key,value in old.tags.items():
                 if key not in ('\xa9lyr','\xa9nam','\xa9alb'):self.assertEqual(copy.tags.get(key),value)
-            self.assertIn('[Prueba TTML]',copy.tags['\xa9nam'][0]);self.assertIn('[Prueba TUPAQ]',copy.tags['\xa9alb'][0])
+            self.assertIn('[Prueba TTML v3]',copy.tags['\xa9nam'][0]);self.assertIn('[Prueba TUPAQ v3]',copy.tags['\xa9alb'][0])
             tree=ET.fromstring(copy.tags['\xa9lyr'][0]);lines=tree.findall('.//{'+NS+'}p')
             self.assertEqual([line.text for line in lines],['Prueba café & <texto>','Otra línea'])
             self.assertEqual([(line.attrib['begin'],line.attrib['end']) for line in lines],
@@ -61,3 +61,13 @@ class LyricsTrialTests(unittest.TestCase):
         self.assertEqual(''.join(root.itertext()),'Primera línea\nSegunda línea\n')
         self.assertEqual(root.attrib['{http://www.w3.org/XML/1998/namespace}space'],'preserve')
         # This is an XML/text regression check, not a Music renderer test.
+
+    def test_apple_line_profile_has_unique_keys_and_no_invented_word_timing(self):
+        payload,count=ttml_from_lrc('[00:00.10] A\n[00:00.40] B\n[00:00.80]',1000)
+        tree=ET.fromstring(payload)
+        self.assertEqual(tree.attrib['{'+ITUNES+'}timing'],'Line')
+        self.assertIsNotNone(tree.find('{'+NS+'}head/{'+NS+'}metadata'))
+        lines=tree.findall('.//{'+NS+'}p')
+        self.assertEqual([p.attrib['{'+ITUNES+'}key'] for p in lines],['L1','L2'])
+        self.assertEqual([p.attrib['begin'] for p in lines],['00:00:00.100','00:00:00.400'])
+        self.assertFalse(tree.findall('.//{'+NS+'}span'))

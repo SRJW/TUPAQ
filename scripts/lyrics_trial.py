@@ -18,6 +18,7 @@ MAX_FILE=256*1024*1024
 MAX_TEXT=256*1024
 NS='http://www.w3.org/ns/ttml'
 TTP='http://www.w3.org/ns/ttml#parameter'
+ITUNES='http://music.apple.com/lyric-ttml-internal'
 
 
 def full_hash(path):
@@ -65,16 +66,19 @@ def ttml_from_lrc(text,duration_ms):
     if not records or not any(words.strip() for _,words in records):raise ValueError('No hay líneas de letra para convertir.')
     if any(a[0]>=b[0] for a,b in zip(records,records[1:])):
         raise ValueError('Las marcas deben avanzar en el tiempo sin repetirse.')
-    ET.register_namespace('',NS);ET.register_namespace('ttp',TTP)
+    ET.register_namespace('',NS);ET.register_namespace('ttp',TTP);ET.register_namespace('itunes',ITUNES)
     root=ET.Element('{'+NS+'}tt',{'{http://www.w3.org/XML/1998/namespace}lang':'en',
-        '{http://www.w3.org/XML/1998/namespace}space':'preserve','{'+TTP+'}timeBase':'media'})
+        '{http://www.w3.org/XML/1998/namespace}space':'preserve','{'+TTP+'}timeBase':'media',
+        '{'+ITUNES+'}timing':'Line'})
+    ET.SubElement(ET.SubElement(root,'{'+NS+'}head'),'{'+NS+'}metadata')
     def clock(ms):return f'{ms//3600000:02d}:{ms//60000%60:02d}:{ms//1000%60:02d}.{ms%1000:03d}'
     body=ET.SubElement(root,'{'+NS+'}body',{'dur':clock(duration_ms)});group=ET.SubElement(body,'{'+NS+'}div');count=0
     for index,(start,words) in enumerate(records):
         end=records[index+1][0] if index+1<len(records) else duration_ms
         if not words.strip():continue
         if end<=start:raise ValueError('La última línea no tiene duración dentro del audio.')
-        paragraph=ET.SubElement(group,'{'+NS+'}p',{'begin':clock(start),'end':clock(end)})
+        paragraph=ET.SubElement(group,'{'+NS+'}p',{'begin':clock(start),'end':clock(end),
+            '{'+ITUNES+'}key':f'L{count+1}'})
         # Readers that ignore TTML times may still flatten XML text nodes.
         # Real newlines prevent the last/first words of adjacent cues merging.
         # This fixes that text fallback; it does not enable iPhone karaoke.
@@ -101,8 +105,8 @@ def create_trial(source,target):
     with tempfile.TemporaryDirectory(prefix='tupaq-ttml-',dir=target.parent) as temporary:
         copy=Path(temporary)/'trial.m4a';shutil.copyfile(source,copy)
         prepared=MP4(copy);prepared.tags['\xa9lyr']=[payload]
-        prepared.tags['\xa9nam']=[str(audio.tags.get('\xa9nam',[source.stem])[0])+' [Prueba TTML]']
-        prepared.tags['\xa9alb']=[str(audio.tags.get('\xa9alb',['Sin álbum'])[0])+' [Prueba TUPAQ]']
+        prepared.tags['\xa9nam']=[str(audio.tags.get('\xa9nam',[source.stem])[0])+' [Prueba TTML v3]']
+        prepared.tags['\xa9alb']=[str(audio.tags.get('\xa9alb',['Sin álbum'])[0])+' [Prueba TUPAQ v3]']
         prepared.save();checked=MP4(copy)
         if checked.tags['\xa9lyr']!=[payload] or media_hash(copy)!=original_media:
             raise ValueError('La copia no superó la comprobación de audio y letra.')
@@ -136,7 +140,7 @@ def main():
         if not source:return
         path=Path(source)
         target=filedialog.asksaveasfilename(parent=root,title='Guardar copia de prueba TTML',initialdir=str(path.parent),
-            initialfile=path.stem+' [Prueba TTML].m4a',defaultextension='.m4a',filetypes=[('Audio M4A','*.m4a')])
+            initialfile=path.stem+' [Prueba TTML v3].m4a',defaultextension='.m4a',filetypes=[('Audio M4A','*.m4a')])
         if not target:return
         try:
             result=create_trial(source,target)
@@ -144,7 +148,7 @@ def main():
             message=str(error) if isinstance(error,ValueError) else 'No se pudo crear la copia. Comprueba el archivo y la carpeta de destino.'
             messagebox.showerror('TUPAQ: copia no creada',message,parent=root);return
         messagebox.showinfo('TUPAQ: copia de prueba creada',
-            f"Se guardó la copia con {result['lines']} líneas TTML y separadores de texto.\n\nEl original, el audio y la carátula se conservan.\n\nLa prueba anterior en Música no activó el karaoke. Esta corrección solo añade saltos entre líneas; no afirma que Música interprete los tiempos.\n\n"+str(target),parent=root)
+            f"Se guardó la copia con {result['lines']} líneas y el perfil TTML Line.\n\nEl original, el audio y la carátula se conservan.\n\nLa primera prueba no activó karaoke. Esta variante añade el modo Line y los identificadores de línea usados en el perfil de Apple Music. Su interpretación en Música del iPhone todavía no está comprobada.\n\nImporta la copia con TUPAQ y selecciona la canción que termina en [Prueba TTML v3].\n\n"+str(target),parent=root)
     finally:root.destroy()
 
 

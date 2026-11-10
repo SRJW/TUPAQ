@@ -25,19 +25,19 @@ jobs:
       - name: Probar conversión local y conservación de audio
         run: python -m unittest discover -s tests -p test_lyrics_trial.py -v
       - name: Crear ejecutable sin instalación
-        run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name Crear-prueba-TTML-v2 --icon importios/assets/tupaq.ico scripts/lyrics_trial.py
+        run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name Crear-prueba-TTML-v3 --icon importios/assets/tupaq.ico scripts/lyrics_trial.py
       - name: Comprobar ejecutable y diálogos nativos
         shell: pwsh
         run: |
-          $trial = Start-Process -FilePath dist/Crear-prueba-TTML-v2.exe -ArgumentList '--check-report', 'ttml-ready.txt' -PassThru -Wait
+          $trial = Start-Process -FilePath dist/Crear-prueba-TTML-v3.exe -ArgumentList '--check-report', 'ttml-ready.txt' -PassThru -Wait
           if ($trial.ExitCode -ne 0) { throw 'No se pudo abrir la herramienta nativa' }
           if ((Get-Content ttml-ready.txt -Raw) -ne 'ttml-trial-ready') { throw 'Falta la comprobación del ejecutable' }
       - uses: actions/upload-artifact@v6
         with:
-          name: Crear-prueba-TTML-v2-Windows
-          path: dist/Crear-prueba-TTML-v2.exe
+          name: Crear-prueba-TTML-v3-Windows
+          path: dist/Crear-prueba-TTML-v3.exe
           if-no-files-found: error
       - name: Publicar herramienta genérica, sin archivos de música
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload v0.3.0-preview.30 dist/Crear-prueba-TTML-v2.exe --repo "$env:GITHUB_REPOSITORY"
+        run: gh release upload v0.3.0-preview.30 dist/Crear-prueba-TTML-v3.exe --repo "$env:GITHUB_REPOSITORY"
