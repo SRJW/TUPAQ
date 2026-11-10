@@ -95,6 +95,18 @@ class QComboBox(Localized, QtWidgets.QComboBox):
     def __init__(self, *args, **kwargs):
         self._item_messages = {}
         super().__init__(*args, **kwargs)
+        view=QtWidgets.QListView(self)
+        view.setUniformItemSizes(True)
+        view.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+        view.setSpacing(2)
+        self.setView(view)
+        self.setMaxVisibleItems(12)
+
+    def showPopup(self):
+        popup=self.view().window()
+        popup.setObjectName('comboPopup')
+        popup.setPalette(self.palette())
+        super().showPopup()
 
     def addItems(self, values):
         for value in values:

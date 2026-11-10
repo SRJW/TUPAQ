@@ -346,10 +346,11 @@ def apply_theme(window):
     window.scene.set_scene(dark,3)
     if getattr(window.scene,'reduced',False)!=reduced:window.scene.reduced=reduced;window.scene.cache=None;window.scene.update()
     from .typography import css_family
-    app=QApplication.instance();family=css_family(app.font().family());base=app.font().pointSizeF()
+    app=QApplication.instance();family=css_family(getattr(app,'typography_family',app.font().family()));base=app.font().pointSizeF()
     material=lambda color:'rgba('+','.join(str(v) for v in QColor(color).getRgb()[:3])+',238)'
     panel_bg=c['card'] if reduced else f"qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 {material(c['card'])},stop:1 {material(c['cardEnd'])})"
     check=(Path(__file__).with_name('assets')/('check-dark.svg' if dark else 'check-light.svg')).as_posix()
+    chevron=(Path(__file__).with_name('assets')/('chevron-dark.svg' if dark else 'chevron-light.svg')).as_posix()
     window.setStyleSheet(f'''
         QWidget {{color:{c['text']};font-family:"{family}";font-size:{base}pt;}}
         QWidget#shell,QStackedWidget {{background:transparent;}}
@@ -401,7 +402,22 @@ def apply_theme(window):
         QHeaderView::section {{background:{c['card']};color:{c['muted']};padding:8px 6px;border:0;border-bottom:1px solid {c['border']};font-size:{base-.5}pt;font-weight:600;}}
         QLineEdit,QComboBox {{background:{c['button']};border:1px solid {c['border']};border-radius:9px;padding:7px 11px;selection-background-color:{c['selected']};}}
         QLineEdit:focus,QComboBox:focus {{border:1px solid {c['orange']};}}
-        QComboBox QAbstractItemView {{background:{c['card']};color:{c['text']};selection-background-color:{c['selected']};}}
+        QComboBox {{padding-right:30px;min-height:22px;}}
+        QComboBox::drop-down {{subcontrol-origin:padding;subcontrol-position:top right;width:28px;border:0;background:transparent;}}
+        QComboBox::down-arrow {{image:url("{chevron}");width:16px;height:16px;}}
+        QFrame#comboPopup {{background:{c['card']};border:0;border-radius:9px;}}
+        QComboBox QAbstractItemView {{background:{c['card']};color:{c['text']};border:1px solid {c['border']};border-radius:9px;padding:5px;outline:0;selection-background-color:{c['selected']};selection-color:{c['text']};}}
+        QComboBox QAbstractItemView::item {{min-height:30px;padding:3px 10px;border-radius:6px;}}
+        QComboBox QAbstractItemView::item:hover {{background:{c['hover']};}}
+        QComboBox QAbstractItemView::item:selected {{background:{c['selected']};color:{c['text']};}}
+        QDialog,QMessageBox {{background:{c['bg']};}}
+        QMenu {{background:{c['card']};border:1px solid {c['border']};border-radius:9px;padding:5px;}}
+        QMenu::item {{padding:7px 18px;border-radius:6px;}}
+        QMenu::item:selected {{background:{c['selected']};}}
+        QToolTip {{background:{c['card']};color:{c['text']};border:1px solid {c['border']};padding:6px;border-radius:6px;}}
+        QPlainTextEdit {{background:{c['card']};color:{c['text']};border:1px solid {c['border']};border-radius:9px;padding:8px;}}
+        QTableView::indicator,QTableWidget::indicator {{width:15px;height:15px;border:1px solid {c['muted']};border-radius:4px;background:{c['card']};}}
+        QTableView::indicator:checked,QTableWidget::indicator:checked {{background:{c['orange']};border-color:{c['orange']};image:url("{check}");}}
         QCheckBox {{spacing:8px;padding:4px 0;}}
         QCheckBox::indicator {{width:16px;height:16px;border:1px solid {c['muted']};border-radius:4px;background:{c['card']};}}
         QCheckBox::indicator:checked {{background:{c['orange']};border-color:{c['orange']};image:url("{check}");}}
@@ -422,6 +438,10 @@ def apply_theme(window):
         QScrollBar::handle:vertical {{background:{c['border']};min-height:28px;border-radius:5px;}}
         QScrollBar::add-line:vertical,QScrollBar::sub-line:vertical {{height:0;}}
         QScrollBar::add-page:vertical,QScrollBar::sub-page:vertical {{background:transparent;}}
+        QScrollBar:horizontal {{background:transparent;height:10px;margin:0;}}
+        QScrollBar::handle:horizontal {{background:{c['border']};min-width:28px;border-radius:5px;}}
+        QScrollBar::add-line:horizontal,QScrollBar::sub-line:horizontal {{width:0;}}
+        QScrollBar::add-page:horizontal,QScrollBar::sub-page:horizontal {{background:transparent;}}
         QSplitter::handle {{background:{c['border']};height:1px;width:1px;}}
     ''')
     for value in window.findChildren(QPushButton):

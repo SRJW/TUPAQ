@@ -16,21 +16,17 @@ def main():
     if subprocess.run(view, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         with tempfile.TemporaryDirectory() as directory:
             notes = Path(directory)/'notes.md'
-            notes.write_text('''TUPAQ 0.3.0-preview.25: nuevo diseño claro/oscuro y tipografía del sistema.
+            notes.write_text('''TUPAQ 0.3.0-preview.26: importación, carátulas y controles pulidos.
 
-- Cuatro vistas: Biblioteca, Importar, Diagnóstico y Preferencias. Superficies marfil o verde profundo, navegación horizontal de icono y texto, acentos naranjas y selección verde azulado.
-- Windows y Mac usan siempre la fuente de su sistema. Se elimina la selección de Mori y cualquier selector de fuentes; tamaños en puntos, letras sin comprimir y controles calculados con métricas reales.
-- Archivos y carpetas completas, cola con estado por canción, progreso real, pausa segura entre lotes/archivos e historial privado agregado.
-- Filtros por formato, carátula o letra; selección persistente y acciones de importar, exportar y eliminar.
-- Preferencias funcionales: carpeta inicial, política de títulos, envío de carátulas, completar carátulas en copias exportadas, idioma, acento, reducir transparencia/movimiento e importación automática opcional (desactivada inicialmente y vinculada al mismo iPhone).
-- Actualización opcional al detectar cambios: sondeo de atributos DB/WAL cada 30 segundos, sin vaciar la vista ni competir con transferencias.
-- Diagnóstico de conexión, catálogo, volumen de datos y lectura completa; compara hashes cuando existen recibos propios y muestra pendiente cuando no hay evidencia. No inventa salud del dispositivo ni velocidad USB.
-- Formatos: MP3, WAV, M4A (AAC/ALAC) y AIFF. FLAC no se incluye.
-- 215 pruebas automáticas aprobadas en desarrollo y 10.000 archivos preparados con la interfaz nueva. Las simulaciones no sustituyen una prueba USB con el iPhone físico.
+- Corregida la creación de la carpeta de carátulas con la API real de pymobiledevice3: makedirs, sin la llamada inexistente mkdir. El fallo podía dejar los metadatos anunciados sin entregar el audio.
+- Al reintentar con los mismos originales, se intenta completar una única operación antigua detenida por AttributeError en esa fase. Se conservan los respaldos y se vuelven a comprobar identidad, catálogo, ancla y archivos. Las operaciones ajenas, ambiguas o modificadas permanecen bloqueadas para revisión.
+- La carátula incrustada en el archivo prevalece en miniaturas y detalles. Un archivo leído sin imagen no hereda la de otro álbum; los enlaces ambiguos de la caché se rechazan.
+- Desplegables, listas emergentes, menús, casillas, diálogos y barras de desplazamiento con controles coherentes en claro y oscuro. Fuente del sistema resuelta también en el estilo de la interfaz.
+- 224 pruebas automáticas: reproducción de la operación pendiente, reintento sin duplicados, importaciones repetidas sin carpeta de carátulas, bloqueo ante cambios del catálogo y navegación por teclado.
 
-Galería y alcance: docs/DISENO-25.md. Se conservan los límites y comprobaciones de las transferencias nativas. Las letras dentro de Música del iPhone siguen pendientes de validar. Los originales del ordenador se conservan; la copia del catálogo no sustituye una copia de sus audios.
+Las pruebas usan un teléfono simulado con la interfaz del SDK instalado. Falta confirmar estos cambios por USB en el iPhone físico. No borres catalogue-backups: conserva el registro necesario para comprobar una transferencia interrumpida. Para recuperar el caso descrito, vuelve a seleccionar los mismos originales y pulsa Importar.
 
-No necesitas Python ni abrir iTunes. Windows necesita el servicio/controlador USB de Apple. Paquetes sin firma ni notarización. No se distribuyen fuentes de Apple ni Mori, ni DLL de Apple/3uTools.
+MP3, WAV, M4A (AAC/ALAC) y AIFF; sin FLAC. Windows necesita el servicio/controlador USB de Apple. Paquetes sin firma ni notarización. No se distribuyen fuentes ni DLL de Apple o 3uTools.
 ''', encoding='utf-8')
             created = subprocess.run(['gh','release','create',tag,'--repo',repo,'--title',
                 'TUPAQ '+tag,'--notes-file',str(notes),'--prerelease','--verify-tag'])

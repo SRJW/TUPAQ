@@ -6,7 +6,11 @@ Gestiona por USB la música del iPhone desde Windows o macOS: importa canciones
 del ordenador, exporta originales y elimina canciones seleccionadas de Música.
 Aplicación nativa, con ventana propia, sin navegador ni necesidad de instalar Python.
 
-La **0.3.0-preview.25** adopta las referencias claras y oscuras: navegación lateral,
+La **0.3.0-preview.26** corrige las importaciones interrumpidas por `AttributeError`,
+la prioridad de las carátulas y el estilo de los controles.
+[Detalles de la corrección y recuperación](docs/CORRECCIONES-26.md).
+
+Desde la 0.3.0-preview.25, TUPAQ adopta las referencias claras y oscuras: navegación lateral,
 superficies marfil o verde oscuro, selección verde azulado y acentos naranjas.
 **Windows y Mac usan siempre la fuente de su sistema**; no hay selector ni carga
 de fuentes. Los controles y columnas reservan el ancho real del texto, sin comprimirlo.

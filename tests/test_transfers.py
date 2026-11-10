@@ -106,7 +106,7 @@ class Phone:
 
     async def fclose(self,h):del self.handles[h]
     async def lock(self,h,op):pass
-    async def mkdir(self,path):self.dirs.add(self.path(path))
+    async def makedirs(self,path):self.dirs.add(self.path(path))
 
     async def fread(self,h,size):
         p,off,mode=self.handles[h]

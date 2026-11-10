@@ -55,6 +55,8 @@ def main():
                '--add-data', 'importios/assets/tupaq.png:importios/assets',
                '--add-data', 'importios/assets/check-light.svg:importios/assets',
                '--add-data', 'importios/assets/check-dark.svg:importios/assets',
+               '--add-data', 'importios/assets/chevron-light.svg:importios/assets',
+               '--add-data', 'importios/assets/chevron-dark.svg:importios/assets',
                '--hidden-import','PySide6.QtSvg','--collect-submodules', 'mutagen', '--exclude-module', 'tkinter']
     from PySide6.QtCore import QLibraryInfo
     translations=Path(QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath))

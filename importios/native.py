@@ -255,6 +255,7 @@ class Window(QMainWindow):
         set_language(saved_language)
         from .typography import configure
         app=QApplication.instance()
+        if app.style().objectName().lower()!='fusion':app.setStyle('Fusion')
         configure(app)
         self.setFont(app.font())
         from .motion import MotionController
@@ -768,7 +769,10 @@ class Window(QMainWindow):
                 pixmap=QPixmap.fromImage(image).scaled(round(224*ratio),round(224*ratio),Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation)
                 pixmap.setDevicePixelRatio(ratio);self.now_cover.setPixmap(pixmap);self.now_cover.setProperty('previewImageKey',key)
             self.cover_metadata.setText(f"{result['cover_width']} × {result['cover_height']} px · {byte_label(result['cover_bytes'])} · {result['cover_format']}")
-        elif result:self.cover_metadata.setText(tr('Sin carátula original accesible'))
+        elif result:
+            self.cover_metadata.setText(tr('Sin carátula original accesible'))
+            self.now_cover.setPixmap(self.default_music_icon.pixmap(96,96))
+            self.now_cover.setProperty('previewImageKey',None)
         self.view_cover.setEnabled(bool(result.get('cover')))
         self.view_lyrics.setEnabled(bool(result.get('lyrics_text')))
 

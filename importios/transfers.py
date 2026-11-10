@@ -158,7 +158,7 @@ async def export_selected(selected, folder, progress):
                 if chosen.get('embed_artwork') and Path(track['afc_path']).suffix.casefold()!='.m4p':
                     from .remote_artwork import cover_for_track
                     from .export_artwork import embed
-                    picture=await cover_for_track(afc,track,assets=True)
+                    picture=await cover_for_track(afc,track,assets=True,catalogue_only=True)
                     if picture and embed(temporary_audio,picture.get('cover')):covers_embedded+=1
                 retained=retain_export(temporary_audio,folder,destination_name)
                 require(local_hash(retained)==local_hash(temporary_audio),'export-hash')
@@ -405,7 +405,7 @@ async def deliver_assets(afc,channel,before,entries,receipt,directory,progress,a
                     data=Path(picture['path']).read_bytes()
                     require(len(data)==picture['size'] and hashlib.sha256(data).hexdigest()==picture['id'],'artwork-source-changed')
                     folder='/Airlock/Media/Artwork'
-                    if await missing(afc,folder):await afc.mkdir(folder)
+                    if await missing(afc,folder):await afc.makedirs(folder)
                     require((await afc.stat(folder)).get('st_ifmt')=='S_IFDIR','artwork-staging-directory')
                     await write_bytes(afc,f"{folder}/{identifier}",data)
                 def bytes_progress(done,total):
@@ -548,6 +548,28 @@ async def import_selected(selected, backup_root, progress, expected_snapshot=Non
         raise
 
 
+async def import_with_recovery(selected, backup_root, progress):
+    """Retry only a matching interrupted insertion; keep every durable receipt.
+
+    Recovery rechecks library identity, anchors, originals, destinations and
+    source bytes. An unrelated/ambiguous operation still requires review.
+    """
+    try:
+        return await import_selected(selected,backup_root,progress)
+    except ProtocolError as error:
+        if str(error)!='previous-import-unverified':raise
+        from .recovery import pending_receipt,resume_pending
+        _,receipt=pending_receipt(backup_root)
+        if (receipt.get('operation') or receipt.get('phase')!='metadata-announced'
+                or receipt.get('last_error_code')!='AttributeError'):
+            raise error
+        pending={entry['source']['id'] for entry in receipt['entries']}
+        if not pending <= {item.get('id') for item in selected}:raise error
+    # The previous session and its OS lock have closed before opening recovery.
+    await resume_pending(backup_root,selected,progress)
+    return await import_selected(selected,backup_root,progress)
+
+
 def transfer_error(error, mode):
     code = str(error) if isinstance(error,ProtocolError) else error.diagnostic if isinstance(error,LibraryError) else type(error).__name__
     status = getattr(error,'status',None)
@@ -640,7 +662,7 @@ def run_transfer(mode, selected, destination, progress):
             from .bulk import execute
             return asyncio.run(execute(mode,selected,destination,progress))
         work = (delete_selected(selected,destination,progress) if mode=='delete' else
-                import_selected(selected,destination,progress) if mode == 'import' else
+                import_with_recovery(selected,destination,progress) if mode == 'import' else
                 verify_pending(destination,progress) if mode == 'verify' else
                 repair_imported(destination,selected,progress) if mode == 'repair' else
                 resume_pending(destination,selected,progress) if mode == 'resume' else export_selected(selected,destination,progress))

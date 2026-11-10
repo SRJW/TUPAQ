@@ -164,7 +164,7 @@ def read_catalogue(path, diagnostics=None):
                     from .library_fields import format_label
                     tracks[-1]['format_label'] = format_label(codec,tracks[-1].get('afc_path'))
                     tracks[-1]['format_source'] = 'catalogue'
-                covers = [artwork[key] for key in ((str(pid),0),(str(album_pid),4)) if key in artwork]
+                covers = [artwork[key] for key in ((str(pid),0),) if key in artwork]
                 if covers:
                     tracks[-1]['artwork_paths'] = list(dict.fromkeys(covers))
             if diagnostics is not None:

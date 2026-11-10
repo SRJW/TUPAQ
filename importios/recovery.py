@@ -107,6 +107,8 @@ async def resume_pending(root, selected, progress):
     identity = saved_identity(directory)
     retry = False
     async with device() as (lockdown,afc):
+        required={t['required_device_token'] for t in selected if t.get('required_device_token') is not None}
+        require(not required or required=={getattr(lockdown,'_tupaq_device_token',None)},'bulk-device-changed')
         lock = await afc.fopen('/com.apple.itunes.lock_sync','a+')
         locked = False
         try:
@@ -114,6 +116,8 @@ async def resume_pending(root, selected, progress):
             with tempfile.TemporaryDirectory(prefix='tupaq-recovery-') as temporary:
                 temporary = Path(temporary)
                 current = await capture(afc,temporary/'current')
+                from .bulk import validate_binding
+                validate_binding(lockdown,current)
                 status = classify(before,current,entries)
                 prefs = temporary/'preferences';prefs.mkdir()
                 live_identity,voice = await preferences(afc,prefs,current)

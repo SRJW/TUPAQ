@@ -57,7 +57,7 @@ def save(path,record):
 
 
 async def execute(mode,selected,root,progress):
-    from .transfers import import_selected,transfer_error
+    from .transfers import import_with_recovery,transfer_error
     from .deletion import delete_selected
     chunks=plan(mode,selected);root=Path(root);root.mkdir(parents=True,exist_ok=True)
     folder=root/'bulk-jobs';folder.mkdir(mode=0o700,exist_ok=True)
@@ -85,7 +85,7 @@ async def execute(mode,selected,root,progress):
                 last_value=scaled
                 progress(scaled,len(selected)*100,f'Lote {number+1}/{len(chunks)} · {label}',identifier)
             # A fresh timeout per bounded transaction, never 30 min for the whole selection.
-            work=import_selected(chunk,root,report) if mode=='import' else delete_selected(chunk,root,report)
+            work=import_with_recovery(chunk,root,report) if mode=='import' else delete_selected(chunk,root,report)
             part=await asyncio.wait_for(work,timeout=1800)
             require(not part.get('cancelled') and not part.get('metadata_unverified'),'bulk-batch-unverified')
             result['processed']+=len(chunk);result['batches_completed']+=1

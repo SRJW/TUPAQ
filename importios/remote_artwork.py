@@ -31,27 +31,35 @@ def catalogue_artwork(db):
     for table,columns in required.items():
         if not columns <= {row[1] for row in db.execute(f'PRAGMA table_info({table})')}:
             return {}
-    preferred = []
-    columns = {row[1] for row in db.execute('PRAGMA table_info(best_artwork_token)')}
-    if {'entity_pid','entity_type','available_artwork_token','artwork_variant_type'} <= columns:
-        preferred = db.execute('''SELECT b.entity_pid,b.entity_type,a.relative_path FROM best_artwork_token b
-            JOIN artwork a ON a.artwork_token=b.available_artwork_token AND a.artwork_variant_type=b.artwork_variant_type
-            WHERE b.entity_type IN(0,4) ORDER BY a.artwork_source_type LIMIT 200001''').fetchall()
-    rows = db.execute('''SELECT t.entity_pid,t.entity_type,a.relative_path FROM artwork_token t
-        JOIN artwork a ON a.artwork_token=t.artwork_token AND a.artwork_source_type=t.artwork_source_type
-        AND a.artwork_variant_type=t.artwork_variant_type WHERE t.entity_type IN(0,4)
-        ORDER BY t.artwork_variant_type LIMIT 200001''').fetchall()
-    if len(rows)+len(preferred)>200000:
-        return {}
-    result = {}
-    for pid,kind,relative in preferred+rows:
-        path = original_path(relative)
-        if path:
-            result.setdefault((str(pid),kind),path)
+    artwork_columns={row[1] for row in db.execute('PRAGMA table_info(artwork)')}
+    def query(table,token):
+        columns={row[1] for row in db.execute(f'PRAGMA table_info({table})')}
+        if not {'entity_pid','entity_type',token,'artwork_variant_type'} <= columns:return []
+        joins=[f'a.artwork_token=t.{token}','a.artwork_variant_type=t.artwork_variant_type']
+        # A token alone is not globally unique across source/type namespaces.
+        for column in ('artwork_source_type','artwork_type'):
+            if column in columns and column in artwork_columns:joins.append(f'a.{column}=t.{column}')
+        return db.execute(f"SELECT t.entity_pid,t.entity_type,t.artwork_variant_type,a.relative_path FROM {table} t JOIN artwork a ON {' AND '.join(joins)} WHERE t.entity_type IN(0,4) ORDER BY t.artwork_variant_type LIMIT 200001").fetchall()
+    preferred=query('best_artwork_token','available_artwork_token')
+    rows=query('artwork_token','artwork_token')
+    if len(rows)+len(preferred)>200000:return {}
+    result,seen={},set()
+    for group in (preferred,rows):
+        candidates={}
+        for pid,kind,variant,relative in group:
+            path=original_path(relative)
+            if path:candidates.setdefault((str(pid),kind),{}).setdefault(variant,set()).add(path)
+        for key,variants in candidates.items():
+            if key in seen:continue
+            seen.add(key)
+            paths=next(iter(variants.values()))
+            # An ambiguous binding must not choose another song's cover.
+            if len(paths)==1:result[key]=next(iter(paths))
     return result
 
 
-async def cover_for_track(afc, track, stopped=lambda:False,thumbnail_size=96,assets=False):
+
+async def cover_for_track(afc, track, stopped=lambda:False,thumbnail_size=96,assets=False,catalogue_only=False):
     """Read-only tag ranges: 8 MiB for rows, 24 MiB for the selected original/lyrics."""
     async def fetch(path, embedded=False):
         stat = await afc.stat(path)
@@ -140,34 +148,27 @@ async def cover_for_track(afc, track, stopped=lambda:False,thumbnail_size=96,ass
             from .lyrics import embedded_lyrics
             result.update(embedded_lyrics(tags))
         return result
-    best={}
-    for path in track.get('artwork_paths',[]):
-        if stopped():
-            return None
-        # Paths originate only in our validated catalogue resolver.
-        prefix = 'iTunes_Control/iTunes/Artwork/Originals/'
-        if not path.startswith(prefix) or original_path(path[len(prefix):]) != path:
-            continue
-        try:
-            image = await fetch(path)
-            if image and not assets:
-                return image
-            if assets and image and image.get('cover_width',0)*image.get('cover_height',0)>best.get('cover_width',0)*best.get('cover_height',0):
-                best={**image,'cover_source':'catalogue'}
-        except Exception:
-            continue
     path = track.get('afc_path')
-    if path and not stopped():
+    if path and not stopped() and not catalogue_only:
         from .phone_paths import media_path
         base,_,leaf = path.rpartition('/')
         if media_path(base,leaf) == path:
             try:
                 result=await fetch(path,embedded=True)
-                if not assets:return result
-                result=result or {}
-                if result.get('cover_width',0)*result.get('cover_height',0)>best.get('cover_width',0)*best.get('cover_height',0):
-                    best={**result,'cover_source':'embedded'}
-                else:best.update({key:value for key,value in result.items() if key.startswith('lyrics_')})
+                # A readable file with no embedded picture has no file cover.
+                # Never replace it with another song's/album's cached picture.
+                if assets:
+                    return {**(result or {}),'cover_source':'embedded','embedded_inspected':True}
+                return result
             except Exception:
-                pass
-    return best if assets else None
+                pass  # File unavailable: only exact track catalogue bindings remain.
+    for path in track.get('artwork_paths',[]):
+        if stopped():return None
+        prefix = 'iTunes_Control/iTunes/Artwork/Originals/'
+        if not path.startswith(prefix) or original_path(path[len(prefix):]) != path:continue
+        try:
+            image=await fetch(path)
+            if image:return {**image,'cover_source':'catalogue'} if assets else image
+        except Exception:
+            continue
+    return {} if assets else None
