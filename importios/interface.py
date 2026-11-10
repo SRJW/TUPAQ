@@ -155,6 +155,8 @@ def build(window):
     window.library_path=QLineEdit();window.library_path.setReadOnly(True);paths.addWidget(window.library_path)
     paths.addWidget(button('Cambiar carpeta…','folder',window.choose_library_path))
     metadata.addWidget(text_label('Se aplica a los próximos envíos. Los archivos originales se conservan.','muted',True))
+    window.import_lyrics=QCheckBox(tr('Importar las letras incrustadas en las canciones'));window.import_lyrics.setChecked(True);metadata.addWidget(window.import_lyrics)
+    metadata.addWidget(text_label('Envía la letra de texto a Música con las canciones nuevas. No descarga letras ni activa karaoke.','muted',True))
     window.metadata_choice=QComboBox();window.metadata_choice.addItems(['Conservar metadatos (recomendado)','Usar nombre de archivo como título']);metadata.addWidget(window.metadata_choice)
     window.import_artwork=QCheckBox(tr('Importar carátulas cuando estén disponibles'));window.import_artwork.setChecked(True);artwork.addWidget(window.import_artwork)
     artwork.addWidget(text_label('Controla el envío al catálogo. Las carátulas ya incrustadas en los originales se conservan.','muted',True))
@@ -305,7 +307,7 @@ def build(window):
     window.library_model.checkedChanged.connect(window.checks_changed);window.select_visible.clicked.connect(window.library_model.check_visible)
     window.navigation.idClicked.connect(window.navigate);window.nav_buttons[0].setChecked(True)
     for control in (window.metadata_choice,):control.currentIndexChanged.connect(window.save_transfer_preferences)
-    for control in (window.import_artwork,window.embed_artwork,window.auto_import,window.refresh_after_transfer):control.toggled.connect(window.save_transfer_preferences)
+    for control in (window.import_artwork,window.import_lyrics,window.embed_artwork,window.auto_import,window.refresh_after_transfer):control.toggled.connect(window.save_transfer_preferences)
     from .presentation import DropVeil
     window.drop_veil=DropVeil(root);window.setWindowIcon(app_icon())
 

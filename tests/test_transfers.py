@@ -58,6 +58,7 @@ def initial_catalogue():
           CREATE TABLE album(album_pid INTEGER PRIMARY KEY,album TEXT,album_artist_pid INTEGER,sync_id INTEGER);
           CREATE TABLE album_artist(album_artist_pid INTEGER PRIMARY KEY,album_artist TEXT,sync_id INTEGER);
           CREATE TABLE item_store(item_pid INTEGER PRIMARY KEY,sync_id INTEGER);
+          CREATE TABLE lyrics(item_pid INTEGER PRIMARY KEY,checksum INTEGER,lyrics TEXT);
           CREATE TABLE base_location(base_location_id INTEGER PRIMARY KEY,path TEXT);
           CREATE TABLE db_info(db_pid INTEGER,primary_container_pid INTEGER);
           CREATE TABLE _MLDatabaseProperties(key TEXT,value TEXT);
@@ -153,6 +154,23 @@ class Phone:
             db.execute('INSERT INTO item_store VALUES(?,?)',(pid,wire))
             db.commit();self.files[PREF+'MediaLibrary.sqlitedb']=db.serialize()
         self.register_art(operation,pid)
+        self.register_lyrics(operation,pid)
+
+    def register_lyrics(self,operation,pid):
+        expected=operation['item'].get('lyrics')
+        if not expected:return
+        path=f"/Airlock/Media/Lyrics/{operation['pid']}"
+        if path not in self.files:return
+        data=self.files.pop(path)
+        if self.fail=='ignore-lyrics':return
+        text=data.decode('utf-8')
+        if self.fail=='tamper-lyrics':text+='wrong'
+        checksum=expected['checksum']
+        if self.fail=='tamper-lyrics-checksum':checksum^=1
+        with closing(sqlite3.connect(':memory:')) as db:
+            db.deserialize(self.files[PREF+'MediaLibrary.sqlitedb'])
+            db.execute('INSERT OR REPLACE INTO lyrics VALUES(?,?,?)',(pid,checksum,text))
+            db.commit();self.files[PREF+'MediaLibrary.sqlitedb']=db.serialize()
 
     def register_art(self,operation,pid):
         cache=operation['item'].get('artwork_cache_id');path=f"/Airlock/Media/Artwork/{operation['pid']}"
@@ -207,7 +225,11 @@ class Peer:
             p.operations=envelope['operations'][1:]
             assert all(op['operation']=='insert_track' for op in p.operations)
             self.remaining={str(op['pid']) for op in p.operations}
-            assets=[{'AssetType':'Music','IsDownload':True,'AssetID':i,'Variant':{'AssetParts':3 if next(op for op in p.operations if str(op['pid'])==i)['item'].get('artwork_cache_id') else 1}} for i in sorted(self.remaining)]
+            assets=[]
+            for identifier in sorted(self.remaining):
+                item=next(op for op in p.operations if str(op['pid'])==identifier)['item']
+                parts=1 | (2 if item.get('artwork_cache_id') else 0) | (8 if item.get('lyrics') else 0)
+                assets.append({'AssetType':'Music','IsDownload':True,'AssetID':identifier,'Variant':{'AssetParts':parts}})
             with closing(sqlite3.connect(':memory:')) as db:
                 db.deserialize(p.files[PREF+'MediaLibrary.sqlitedb'])
                 if db.execute('SELECT 1 FROM item_store WHERE sync_id=77').fetchone():

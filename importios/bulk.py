@@ -68,7 +68,7 @@ async def execute(mode,selected,root,progress):
     save(journal,record)
     result={'bulk':True,'requested':len(selected),'processed':0,'batches_completed':0,
             'bulk_journal':str(journal),'source_ids':[],'item_ids':[]}
-    result.update({'imported':0,'already_imported':0} if mode=='import' else {'deleted':0})
+    result.update({'imported':0,'already_imported':0,'lyrics_registered':0} if mode=='import' else {'deleted':0})
     control=CURRENT.get();reserve=MIN_FREE;binding_token=BINDING.set({})
     try:
         for number,chunk in enumerate(chunks):
@@ -89,7 +89,7 @@ async def execute(mode,selected,root,progress):
             part=await asyncio.wait_for(work,timeout=1800)
             require(not part.get('cancelled') and not part.get('metadata_unverified'),'bulk-batch-unverified')
             result['processed']+=len(chunk);result['batches_completed']+=1
-            for key in ('imported','already_imported','deleted'):
+            for key in ('imported','already_imported','deleted','lyrics_registered'):
                 if key in result:result[key]+=part.get(key,0)
             result['source_ids'].extend(part.get('source_ids',[]));result['item_ids'].extend(part.get('item_ids',[]))
             result['backup']=part.get('backup','')

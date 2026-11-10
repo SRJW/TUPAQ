@@ -43,7 +43,7 @@ class LyricsChecksumTests(unittest.TestCase):
             for identifier,checksum,text in rows:
                 self.assertNotIn(text,report);self.assertNotIn(str(checksum),report);self.assertNotIn(str(identifier),report)
 
-    def test_embedded_lyrics_keep_bytes_and_do_not_enable_unqualified_usb_parts(self):
+    def test_embedded_lyrics_keep_original_bytes_and_register_native_text(self):
         import hashlib
         phone=Phone()
         with tempfile.TemporaryDirectory() as root:
@@ -54,5 +54,9 @@ class LyricsChecksumTests(unittest.TestCase):
             with patch('importios.transfers.device',phone.device),patch('importios.transfers.Atc',lambda peer:peer):
                 result=run_transfer('import',[track],Path(root)/'backups',lambda *a:None)
             self.assertEqual(result['imported'],1);self.assertEqual(path.read_bytes(),before)
-            self.assertNotIn('lyrics',phone.operations[0]['item'])
-            self.assertFalse(any('/Lyrics/' in value for value in phone.writes))
+            self.assertEqual(phone.operations[0]['item']['lyrics'],{'checksum':host_checksum('Verso de prueba')})
+            self.assertTrue(any('/Lyrics/' in value for value in phone.writes))
+            with closing(sqlite3.connect(':memory:')) as db:
+                from test_transfers import PREF
+                db.deserialize(phone.files[PREF+'MediaLibrary.sqlitedb'])
+                self.assertEqual(db.execute('SELECT lyrics FROM lyrics WHERE item_pid!=1').fetchone()[0],'Verso de prueba')

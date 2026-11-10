@@ -69,8 +69,9 @@ class PendingPeer(Peer):
                     for identifier in sorted(self.remaining)]}}})
             for record in self.queue[-1]['Params']['AssetManifest']['Media']:
                 if record['AssetID'] in self.remaining:
-                    covered=next(op for op in p.operations if str(op['pid'])==record['AssetID'])['item'].get('artwork_cache_id')
-                    record['Variant']['AssetParts']=7 if covered and p.parts==5 else p.parts
+                    item=next(op for op in p.operations if str(op['pid'])==record['AssetID'])['item']
+                    record['Variant']['AssetParts']=(p.parts | (2 if item.get('artwork_cache_id') else 0) |
+                        (8 if item.get('lyrics') else 0)) if p.parts==5 else p.parts
             return
         if msg['Command']=='FileComplete':
             p.sent.append(msg);identifier=msg['Params']['AssetID'];destination=msg['Params']['AssetPath']
@@ -83,6 +84,7 @@ class PendingPeer(Peer):
                 db.execute('UPDATE item_state SET has_non_purgeable_asset=1 WHERE item_pid=?',(item,))
                 db.commit();p.files[PREF+'MediaLibrary.sqlitedb']=db.serialize()
             p.register_art(next(op for op in p.operations if str(op['pid'])==identifier),item)
+            p.register_lyrics(next(op for op in p.operations if str(op['pid'])==identifier),item)
             self.remaining.remove(identifier)
             if not self.remaining:self.queue.append({'Command':'SyncFinished','Session':2})
             return

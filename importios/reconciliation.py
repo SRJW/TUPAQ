@@ -50,7 +50,7 @@ async def reconcile(root,afc,current,identity,progress=lambda *args:None,exclude
                     await check_empty_staging(afc)
                     require(bool(record.get('entries')),'pending-no-entries')
                     for entry in record['entries']:
-                        for path in (entry['destination'],f"/Airlock/Media/{entry['track_id']}",f"/Airlock/Media/{entry['track_id']}{entry['source']['extension']}",f"/Airlock/Media/Artwork/{entry['track_id']}"):
+                        for path in (entry['destination'],f"/Airlock/Media/{entry['track_id']}",f"/Airlock/Media/{entry['track_id']}{entry['source']['extension']}",f"/Airlock/Media/Artwork/{entry['track_id']}",f"/Airlock/Media/Lyrics/{entry['track_id']}"):
                             require(await missing(afc,path),'pending-staging-files-remain')
                     record.update(phase='before-write-failed',reconciliation='unannounced-empty-staging-and-unchanged-catalogue')
                     save_receipt(journal.parent,record);result['reconciled']+=1;continue

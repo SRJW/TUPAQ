@@ -281,7 +281,7 @@ class Window(QMainWindow):
         music_folder=QStandardPaths.writableLocation(QStandardPaths.StandardLocation.MusicLocation) or str(Path.home())
         self.library_path.setText(str(settings.value('library_path',music_folder)) if auto_connect else music_folder)
         for control,key,default in [(self.use_accent,'use_accent',True),(self.reduce_transparency,'reduce_transparency',False),
-                                   (self.import_artwork,'send_artwork',True),(self.embed_artwork,'embed_export_artwork',False),
+                                   (self.import_artwork,'send_artwork',True),(self.import_lyrics,'send_lyrics',True),(self.embed_artwork,'embed_export_artwork',False),
                                    (self.auto_import,'auto_import',False),(self.refresh_after_transfer,'refresh_after_transfer',True)]:
             control.blockSignals(True);control.setChecked(settings.value(key,default,type=bool) if auto_connect else default);control.blockSignals(False)
         self.metadata_choice.blockSignals(True);self.metadata_choice.setCurrentIndex(1 if auto_connect and settings.value('metadata_policy','keep')=='filename' else 0);self.metadata_choice.blockSignals(False)
@@ -462,7 +462,7 @@ class Window(QMainWindow):
     def save_transfer_preferences(self,*ignored):
         if not getattr(self,'persist_settings',False):return
         settings=QSettings()
-        for control,key in [(self.import_artwork,'send_artwork'),(self.embed_artwork,'embed_export_artwork'),(self.auto_import,'auto_import'),(self.refresh_after_transfer,'refresh_after_transfer')]:settings.setValue(key,control.isChecked())
+        for control,key in [(self.import_artwork,'send_artwork'),(self.import_lyrics,'send_lyrics'),(self.embed_artwork,'embed_export_artwork'),(self.auto_import,'auto_import'),(self.refresh_after_transfer,'refresh_after_transfer')]:settings.setValue(key,control.isChecked())
         settings.setValue('metadata_policy','filename' if self.metadata_choice.currentIndex()==1 else 'keep')
 
     def change_visual_options(self,*ignored):
@@ -847,7 +847,7 @@ class Window(QMainWindow):
         if self.transfer_worker is not None or self.worker is not None or self.library_worker is not None or self.device_worker is not None:
             return
         if mode == 'import' and not selected:return
-        if mode=='import':selected=[dict(t,metadata_policy='filename' if self.metadata_choice.currentIndex()==1 else 'keep',send_artwork=self.import_artwork.isChecked(),required_device_token=self.device_details.get('_device_token')) for t in selected]
+        if mode=='import':selected=[dict(t,metadata_policy='filename' if self.metadata_choice.currentIndex()==1 else 'keep',send_artwork=self.import_artwork.isChecked(),send_lyrics=self.import_lyrics.isChecked(),required_device_token=self.device_details.get('_device_token')) for t in selected]
         if self.thumbnail_worker is not None:
             self.after_artwork = ('transfer',mode,selected,destination)
             self.cancel_transfer_button.setText(tr('Cancelar'));self.cancel_transfer_button.setEnabled(True);self.cancel_transfer_button.setVisible(mode in ('import','export','delete','diagnose'))
@@ -947,6 +947,7 @@ class Window(QMainWindow):
             count = result.get('imported',result.get('verified',0))
             skipped = result.get('already_imported',0)
             self.status.setText(tr(f'{count} canciones importadas y comprobadas. Ya importadas: {skipped}. Copia del catálogo en Ver respaldo.'))
+            if result.get('lyrics_registered'):self.status.setText(self.status.text()+' '+tr(f"Letras de texto registradas: {result['lyrics_registered']}."))
 
         if result.get('cancel_deferred'):self.status.setText(tr('El lote ya enviado se completó y verificó. La solicitud de cancelación llegó después de iniciar los cambios en Música.'))
         if result.get('metadata_unverified') and 'imported' in result:

@@ -6,10 +6,11 @@ Gestiona por USB la música del iPhone desde Windows o macOS: importa canciones
 del ordenador, exporta originales y elimina canciones seleccionadas de Música.
 Aplicación nativa, con ventana propia, sin navegador ni necesidad de instalar Python.
 
-La **0.3.0-preview.28** corrige la verificación de carátulas con los tipos reales de iOS,
-recorta el marco exterior de los desplegables y retira las explicaciones sobre fuentes.
-La comprobación completa de lectura es opcional y está separada de la importación.
-[Correcciones, pruebas y alternativas de importación](docs/CORRECCIONES-28.md).
+La **0.3.0-preview.29** implementa el envío USB de letras de texto incrustadas en
+canciones nuevas, con comprobación del texto y checksum registrados en el catálogo.
+La ruta procede del análisis estático de AMPDevicesAgent; la visualización en un
+iPhone físico está pendiente de confirmación. **No se afirma soporte de karaoke**.
+[Implementación, pruebas y límites](docs/LETRAS-INVESTIGACION.md).
 
 Desde la 0.3.0-preview.25, TUPAQ adopta las referencias claras y oscuras: navegación lateral,
 superficies marfil o verde oscuro, selección verde azulado y acentos naranjas.

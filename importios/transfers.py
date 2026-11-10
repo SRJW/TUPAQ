@@ -198,7 +198,7 @@ async def verified_import_catalogue(afc,directory,before,entries,receipt,progres
         try:
             verify_before_after(before,after,entries)
         except ProtocolError as error:
-            if str(error)!='verify-new-metadata' or attempt==2:raise
+            if str(error) not in ('verify-new-metadata','verify-lyrics-registration') or attempt==2:raise
             progress(90,100,'Esperando la actualización de metadatos de Música…')
             await asyncio.sleep(.5*(attempt+1))
         else:
@@ -295,6 +295,13 @@ async def plan_entries(afc, before, sources, directory):
         destinations.add(destination.lower())
         entry = {'track_id':allocate_id(reserved),'album_id':albums[album],'artist_id':artists[artist],
                  'destination':destination,'source':source,'added_at':int(time.time())}
+        from .sync.lyrics import prepare as prepare_lyrics
+        lyrics=prepare_lyrics(source,directory/'lyrics')
+        require(local_hash(source['path'])==source['id'],'source-changed-before-upload')
+        if lyrics:
+            require(before.get('lyrics_records') is not None,'lyrics-catalogue-schema')
+            entry['lyrics']=lyrics
+            require(await missing(afc,f"/Airlock/Media/Lyrics/{entry['track_id']}"),'lyrics-staging-collision')
         if source.get('has_artwork') and source.get('send_artwork',True):
             from .sync.artwork import prepare
             require(before['artwork_known'],'artwork-catalogue-schema')
@@ -395,7 +402,8 @@ async def deliver_assets(afc,channel,before,entries,receipt,directory,progress,a
             require(not manifest_seen, 'manifest-repeated')
             existing_music = {wire for wire,item in before['wire_to_item'].items() if item in before['tracks'] and wire not in (forbidden or set())}
             existing_music.update(str(int(wire)&((1<<64)-1)) for wire in list(existing_music))
-            declared = {identifier:2 if artwork_only else 3 if entry.get('artwork') else 1 for identifier,entry in own.items()}
+            declared = {identifier:2 if artwork_only else 1 | (2 if entry.get('artwork') else 0) | (8 if entry.get('lyrics') else 0)
+                        for identifier,entry in own.items()}
             audio, ancillary = validate_manifest(message,set(own),existing_music,declared)
             manifest_seen = True
             receipt['manifest_parts'] = sorted({asset['Variant']['AssetParts'] for asset in message['Params']['AssetManifest']['Media']})
@@ -403,6 +411,16 @@ async def deliver_assets(afc,channel,before,entries,receipt,directory,progress,a
             # Every request is checked before any completion/refusal is sent.
             for index, identifier in enumerate(audio):
                 entry = own[identifier]
+                if entry.get('lyrics') and not artwork_only:
+                    lyrics=entry['lyrics'];path=Path(lyrics['path'])
+                    from .sync.lyrics import MAX_TEXT_BYTES
+                    require(path.stat().st_size==lyrics['size'] and 0<lyrics['size']<=MAX_TEXT_BYTES,'lyrics-source-changed')
+                    data=path.read_bytes()
+                    require(hashlib.sha256(data).hexdigest()==lyrics['id'],'lyrics-source-changed')
+                    folder='/Airlock/Media/Lyrics'
+                    if await missing(afc,folder):await afc.makedirs(folder)
+                    require((await afc.stat(folder)).get('st_ifmt')=='S_IFDIR','lyrics-staging-directory')
+                    await write_bytes(afc,f'{folder}/{identifier}',data)
                 if entry.get('artwork'):
                     picture=entry['artwork']
                     data=Path(picture['path']).read_bytes()
@@ -449,6 +467,7 @@ async def import_selected(selected, backup_root, progress, expected_snapshot=Non
             require(0<len(title)<=4096 and not any(ord(c)<32 for c in title),'metadata-text')
             source['title']=title
         source['send_artwork']=chosen.get('send_artwork',True)
+        source['send_lyrics']=chosen.get('send_lyrics',True)
         sources.append(source)
     require(sum(s['size'] for s in sources) <= 2*1024*1024*1024, 'import-batch-size')
     root = Path(backup_root)
@@ -542,7 +561,8 @@ async def import_selected(selected, backup_root, progress, expected_snapshot=Non
                 receipt['phase'] = 'completed'
                 save_receipt(directory,receipt)
                 progress(100,100,'Importación comprobada en el catálogo.')
-                return {'imported':len(entries),'already_imported':len(already),'source_ids':list(hashes),'backup':str(directory),'reconciled':reconciliation['reconciled'],'metadata_unverified':reconciliation['metadata_unverified'],'metadata_diagnostics':reconciliation['metadata_diagnostics']}
+                return {'imported':len(entries),'lyrics_registered':sum(bool(e.get('lyrics')) for e in entries),
+                        'already_imported':len(already),'source_ids':list(hashes),'backup':str(directory),'reconciled':reconciliation['reconciled'],'metadata_unverified':reconciliation['metadata_unverified'],'metadata_diagnostics':reconciliation['metadata_diagnostics']}
             finally:
                 if locked:
                     with suppress(Exception):
@@ -611,6 +631,10 @@ def transfer_error(error, mode):
         'delete-recovery-readonly':'Una eliminación pendiente se comprueba con Revisar operación; no se reenvía audio.',
         'previous-import-unverified':'Hay una operación anterior sin confirmar. En Diagnóstico → Mostrar opciones avanzadas de recuperación → Revisar operación pendiente puedes comprobarla. Si falta audio, Completar importación pendiente utiliza el original.',
         'manifest-own-parts':'El iPhone solicitó componentes que esta versión no puede entregar. No repitas la importación. Copia el diagnóstico completo; los metadatos podrían estar ya en Música.',
+        'lyrics-catalogue-schema':'No se reconoce el registro de letras de este catálogo. No se han enviado cambios. Copia el diagnóstico.',
+        'lyrics-source-size':'Una letra incrustada supera el límite de 256 KB. No se ha enviado el lote. Puedes desactivar el envío de letras en Preferencias.',
+        'lyrics-source-encoding':'Una letra contiene texto que no se puede codificar sin alterarlo. No se ha enviado el lote.',
+        'verify-lyrics-registration':'El texto de la letra no pudo verificarse en el catálogo del iPhone. La canción puede estar ya importada. Conserva el respaldo y usa Revisar operación pendiente en Diagnóstico; no repitas el envío ni borres los registros.',
         'recovery-source-missing':'No se encuentra el archivo original. Añádelo con Elegir canciones y vuelve a usar Diagnóstico → Completar importación pendiente.',
         'recovery-pending-state':'La canción no tiene el estado local pendiente admitido para completar su audio. No se ha reenviado la canción. Copia el diagnóstico.',
         'recovery-mixed-state':'La operación contiene canciones en estados diferentes. No se ha reenviado. Conserva el respaldo y copia el diagnóstico.',

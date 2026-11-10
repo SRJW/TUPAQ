@@ -1,5 +1,12 @@
 """English UI catalogue. Spanish source messages are the fallback."""
 EN = {
+    'Letras de texto registradas: {count}.':'Plain lyrics registered: {count}.',
+    'No se reconoce el registro de letras de este catálogo. No se han enviado cambios. Copia el diagnóstico.':'The lyrics schema in this catalogue is not recognized. No changes were sent. Copy diagnostics.',
+    'Una letra incrustada supera el límite de 256 KB. No se ha enviado el lote. Puedes desactivar el envío de letras en Preferencias.':'Embedded lyrics exceed the 256 KB limit. The batch was not sent. You can disable lyrics transfer in Settings.',
+    'Una letra contiene texto que no se puede codificar sin alterarlo. No se ha enviado el lote.':'Lyrics contain text that cannot be encoded unchanged. The batch was not sent.',
+    'El texto de la letra no pudo verificarse en el catálogo del iPhone. La canción puede estar ya importada. Conserva el respaldo y usa Revisar operación pendiente en Diagnóstico; no repitas el envío ni borres los registros.':'The lyrics could not be verified in the iPhone catalogue. The song may already be imported. Keep the backup and use Review pending operation in Diagnostics; do not resend or delete the records.',
+    'Importar las letras incrustadas en las canciones':'Import embedded song lyrics',
+    'Envía la letra de texto a Música con las canciones nuevas. No descarga letras ni activa karaoke.':'Send plain lyrics to Music with new songs. Does not download lyrics or enable karaoke.',
     'Comprobar lectura de audios':'Check audio readability',
     'Comprobación opcional: lee los audios completos y puede tardar. No modifica el iPhone y no es necesaria para importar.':'Optional check: reads complete audio files and may take time. Does not modify your iPhone and is not required to import.',
 

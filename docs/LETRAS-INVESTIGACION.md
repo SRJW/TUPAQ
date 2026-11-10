@@ -1,6 +1,46 @@
 # Letras dentro de Música — investigación del 10 de noviembre de 2026
 
-Estado: la letra incrustada se conserva al importar, pero todavía no se ha validado su entrega como componente nativo a Música. Esta investigación no habilita la parte 8 del manifiesto ni cambia los envíos USB.
+Estado: preview.29 implementa la entrega nativa de **letras de texto** con canciones nuevas. Se habilita la parte 8 únicamente para entradas propias con un recurso preparado y checksum válido. Las pruebas con teléfono simulado pasan; falta confirmar la visualización en Música del iPhone físico. **El karaoke no está implementado ni validado.**
+
+## AMPDevicesAgent moderno: ruta USB identificada
+
+El usuario aportó `AMPDevicesAgent.exe` 1.7.0.155, AMD64, 12.486.008 bytes, SHA-256 `9503c6084a662f594e79a22201dc579d127040ae38b56996b682d49e28710b10`, base `0x140000000`. Solo se leyó y desensambló; no se ejecutó ni cargó. Las direcciones siguientes son RVA:
+
+- `466da8`: el despachador de letras admite Track (2) y Lyrics (5). Para el identificador combinado de una canción, selecciona Media y el subdirectorio `Lyrics`. El global elegido en `466eec` se inicializa con ese literal en `1bd008`.
+- `464fd4` llama a `47ce44` para resolver Airlock y la clase Media y añade el subdirectorio. Esto no es una ruta deducida del envío de carátulas.
+- `46691c`: obtiene el objeto Lyrics y llama a su serializador en `466c06`.
+- `32f4f8`: llama a `CFStringCreateExternalRepresentation` con UTF-8 `0x08000100` y lossByte 0. El texto no se empaqueta en un plist ni en un contenedor XML.
+- `47d118`: copia el AssetID para el nombre del recurso, sin añadir una extensión. El ajuste de separadores de `5bc1d4` no afecta a los identificadores decimales usados por TUPAQ. Resultado: `/Airlock/Media/Lyrics/<AssetID decimal>`.
+- `466d28`: el callback recibe ese directorio, nombre y CFData; `467070` guarda los datos. El callback de finalización `466fa0` entrega la parte 8 a `464bd8`. Este elimina el bit finalizado y **espera las demás partes antes de enviar FileComplete** (`464d9e`); no se envían confirmaciones contradictorias para un mismo identificador combinado.
+- `472304`: el constructor anuncia `item.lyrics.checksum`. El cálculo moderno `32f2ac` coincide con el algoritmo reconstruido abajo; el selector 1 termina en MD5, comprobado por la constante de primera ronda `d76aa478` y rotación 7 en `794f42` y `794f54`.
+
+El código público de CoreFoundation se contrastó para la codificación: `CFString.c`, `CFStringEncodings.c` y `CFBuiltinConverters.c` en `swiftlang/swift-corelibs-foundation`. Aunque la función de representación externa pasa un flag genérico de BOM, el conversor UTF-8 `__CFToUTF8` no lo utiliza para anteponer bytes. Se envía UTF-8 estricto sin BOM añadido ni terminador; el checksum usa el texto exacto UTF-16BE sin BOM.
+
+`scripts/inspect_amp_lyrics.py RUTA/AMPDevicesAgent.exe` reproduce las comprobaciones de instrucciones y rechaza otra versión. Requiere `pefile` solo para investigación. No se distribuye ningún ejecutable, DLL ni desensamblado de Apple.
+
+## Comportamiento de preview.29
+
+Se leen USLT o ©lyr de los originales. Para un archivo que solo lleva SYLT se puede entregar su texto, pero eso **no convierte sus tiempos en karaoke**. Los bytes originales, incluidos todos sus tiempos, no se modifican. Preferencias → Metadatos permite desactivar el envío adicional de letras; la opción está activa por defecto.
+
+La letra se limita a 256 KiB, se prepara en un archivo local privado y se comprueba su hash al enviarla y al releerla por AFC. El journal guarda hashes y rutas, no el texto de la letra. La copia privada del catálogo sí puede contener letras, igual que el archivo auxiliar preparado. No se suben a Internet.
+
+Solo se admiten los manifiestos exactos de componentes declarados para cada entrada propia: audio/letra (9) o audio/carátula/letra (11), con Genius opcional (13 o 15). Una solicitud ajena o inesperada no se acepta por habilitar el bit 8. La entrega de texto precede a la confirmación del identificador combinado. Se compara después el texto completo registrado en `lyrics`, su SHA-256, tamaño UTF-8 y checksum normalizado a uint32, vinculados por el item_pid que corresponde al sync_id enviado. Se relee el catálogo hasta tres veces si está asentando la letra, sin reenviar metadatos ni audios.
+
+Una letra ausente, distinta o con checksum incorrecto no se declara verificada. Se conserva el registro y la información de audio presente. Revisar operación pendiente puede observarlo sin repetir la inserción. La recuperación de una entrada sin audio utiliza su mismo ID, original y letra preparados. No se cambian letras preexistentes de otras canciones ni se escribe SQLite en el dispositivo.
+
+Esta primera implementación añade letras con **canciones nuevas**. Volver a elegir una canción ya importada no actualiza su letra ni la duplica. La herramienta antigua de reparar portadas/fecha tampoco añade letras retroactivamente.
+
+Pruebas: MP3 USLT, M4A AAC/ALAC ©lyr, acentos, emojis y CRLF exactos, con y sin portada, recursos corruptos, letras omitidas o alteradas por el receptor simulado, checksum erróneo, límites, esquema desconocido, recuperación, registro previo intacto y duplicados. Ninguna de estas pruebas sustituye la comprobación de la pantalla de Música en un iPhone.
+
+## Letras sincronizadas: resultado y límite actual
+
+El usuario confirma que sus archivos contienen tiempos incrustados. Para comprobar el formato concreto hace falta una canción de muestra: puede ser SYLT, LRC almacenado como texto o TTML, y no son intercambiables.
+
+El ejecutable sí contiene la propiedad `ttml` en la serialización del objeto Lyrics (RVA `32f78c`, clave en `9ac9f8`). **No se ignora esa pista ni se presenta como prueba de karaoke USB**: el lector local encontrado construye el objeto en `331823`; el constructor `32f0f8` inicializa los flags TTML a cero en `32f16a`. El emisor USB `32f4f8` transmite el CFString, sin los flags de esa serialización de objeto. El metadato enviado en `472304` contiene el checksum; no se encontró en esta cadena un anuncio de tiempos o una activación de karaoke.
+
+El esquema iOS de referencia distingue texto `lyrics` de `time_synced_lyrics_available` y de las disponibilidades del catálogo Apple. Marcar a mano esos indicadores no entrega los recursos con tiempos y no se implementa. Tampoco se envía XML o timestamps como si su mera presencia garantizase que Música los interprete.
+
+Pendiente: inspeccionar los tiempos de un original real del usuario y encontrar/contrastar una ruta receptora de iOS para ese recurso; después verificar tanto su registro temporal como el resaltado durante la reproducción en Música. No hay todavía evidencia suficiente para prometer que el flujo de texto encontrado resuelva karaoke.
 
 El usuario confirma que tiene canciones con letras visibles importadas previamente con Música y Finder en su Mac. Son una referencia positiva: el objetivo es reproducir ese registro, además de conservar las etiquetas del archivo.
 
@@ -54,10 +94,11 @@ Una coincidencia en las canciones del usuario importadas con Finder permitiría 
 
 La implementación publicada de rustunes también se volvió a consultar en HEAD `4511f49aed021152f579568f116fd7d329dcdef6` (0.1.1). Sigue documentando la parte Lyrics = 8 y `lyrics.checksum`, sin implementar ni declarar la parte de letras. Por tanto, no se presenta esa referencia como una solución completa para las letras.
 
-## Lo que falta para habilitar el envío
+## Pendientes de la investigación anterior, actualizados
 
-- Identificar el formato y codificación del recurso USB, su ruta de entrega y la confirmación de recepción. La conversión UTF-8 de la rama de nube encontrada en `0xf7a060` no demuestra el formato USB.
-- Contrastar la cadena con un componente moderno del host. El `AMPDevicesAgent` del Mac que ya sincroniza correctamente es una referencia más útil que asumir que todos los detalles del host antiguo se mantienen.
-- Comprobar la transferencia con una canción de prueba y leer después el texto y checksum del catálogo. Confirmar también su visualización dentro de Música en el iPhone físico.
+- Formato, codificación, ruta y confirmación de texto: identificados en el nuevo AMPDevicesAgent de Windows, sin asumir el formato de la rama de nube antigua.
+- Contraste con host moderno: realizado; no hace falta otro binario del Mac para implementar el envío de texto.
+- Lectura de texto/checksum tras el envío: implementada y probada en simulación. Confirmación visual en iPhone físico: pendiente.
+- Karaoke: investigación abierta, sin afirmar compatibilidad a partir del registro de texto.
 
-No se edita `MediaLibrary.sqlitedb` en el teléfono, no se declara una parte sin poder entregarla y no se publica una versión que afirme soporte nativo de letras antes de comprobarlo. Los originales siguen transfiriéndose sin modificar sus etiquetas.
+No se edita `MediaLibrary.sqlitedb` en el teléfono ni se declara una parte sin preparar su contenido. La preview.29 es una implementación candidata para validación en dispositivo; no presenta como realizadas pruebas físicas inexistentes. Los originales siguen transfiriéndose sin modificar sus etiquetas.

@@ -124,6 +124,10 @@ def encode_operations(database, primary, anchor, entries):
         item.update(date_created=created,date_modified=created)
         if entry.get('artwork'):
             item.update(artwork_cache_id=entry['artwork']['cache_id'],artwork_checksum=entry['artwork']['checksum'])
+        if entry.get('lyrics'):
+            checksum=entry['lyrics']['checksum']
+            require(type(checksum) is int and 0<checksum<=0xffffffff,'lyrics-checksum')
+            item['lyrics']={'checksum':checksum}
         for key in ['genre','composer','year','track_number','track_count','disc_number','disc_count']:
             if source.get(key):
                 item[key] = source[key]
@@ -283,7 +287,7 @@ def validate_manifest(message, own_ids, existing_ids, declared_parts=None):
             # Native AMP gives audio precedence for masks 1 and 5. Do not
             # accept artwork/lyrics/unknown bits without delivering them.
             declared = (declared_parts or {}).get(identifier,1)
-            require(declared in (1,2,3), 'manifest-declared-parts')
+            require(declared in (1,2,3,9,11), 'manifest-declared-parts')
             if parts not in (declared,declared|4):
                 raise ProtocolError('manifest-own-parts',{'asset_parts':parts})
             audio.append(identifier)

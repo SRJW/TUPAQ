@@ -81,6 +81,8 @@ def snapshot(path):
                 if wire is not None and cache_id(token) is not None:artwork_tracks[wire]=cache_id(token)
         from .artwork import originals as artwork_originals
         original_artwork=artwork_originals(db)
+        from .lyrics import catalogue_records
+        lyrics_records=catalogue_records(db)
         dates_known = 'date_added' in item_columns
         dates = {str(pid):value for pid,value in db.execute('SELECT item_pid,date_added FROM item')} if dates_known else {}
         if {'item_pid','is_placeholder','is_library_added','has_non_purgeable_asset','is_supported_type'} <= state_columns and 'remote_location_id' in item_columns:
@@ -90,7 +92,8 @@ def snapshot(path):
     return {'database':database,'primary':primary,'anchor':anchor,'ids':ids,'originals':originals,
             'wire_to_item':wire_to_item,'tracks':{t['id']:t for t in tracks},'artists':artist_groups,'albums':albums,
             'groups':groups,'states':states,'artwork_ids':artwork_ids,'artwork_known':artwork_known,
-            'artwork_tokens':artwork_tokens,'artwork_tracks':artwork_tracks,'artwork_originals':original_artwork,'dates':dates,'dates_known':dates_known}
+            'artwork_tokens':artwork_tokens,'artwork_tracks':artwork_tracks,'artwork_originals':original_artwork,'dates':dates,'dates_known':dates_known,
+            'lyrics_records':lyrics_records}
 
 
 def verify_originals(before, after):
@@ -100,6 +103,9 @@ def verify_originals(before, after):
         new = after['tracks'].get(identifier)
         require(new is not None and all(old.get(k) == new.get(k) for k in ('title','artist','album','duration','afc_path')),
                 'verify-original-music-changed')
+    if before.get('lyrics_records') is not None:
+        require(after.get('lyrics_records') is not None and all(after['lyrics_records'].get(pid)==value
+                for pid,value in before['lyrics_records'].items()),'verify-original-lyrics-changed')
 
 
 def verify_before_after(before, after, entries):
@@ -117,6 +123,8 @@ def verify_owned_entries(after,entries):
         item_id = after['wire_to_item'].get(str(entry['track_id']))
         track = after['tracks'].get(item_id)
         require(track is not None and track.get('afc_path') == entry['destination'], 'verify-new-item')
+        from .lyrics import verify as verify_lyrics
+        verify_lyrics(after,entry,item_id)
         differences=metadata_differences(track,entry['source'])
         if differences:
             raise ProtocolError('verify-new-metadata',{'entry_index':index+1,
