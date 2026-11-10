@@ -597,7 +597,7 @@ def transfer_error(error, mode):
     else:
         message = 'La importación se detuvo o no pudo verificarse. Revisa el diagnóstico y el respaldo del catálogo antes de repetirla.'
     messages = {
-        'verify-new-metadata':'Los metadatos leídos del iPhone no coinciden con los enviados. La canción puede estar ya importada. Conserva el respaldo y usa Revisar operación pendiente en Preferencias.',
+        'verify-new-metadata':'Los metadatos leídos del iPhone no coinciden con los enviados. La canción puede estar ya importada. Conserva el respaldo y usa Revisar operación pendiente en Diagnóstico.',
         'catalogue:changing':'Música sigue actualizando su catálogo y no se pudo obtener una lectura estable. Conserva los registros y vuelve a actualizar la biblioteca.',
         'delete-stale-selection':'La biblioteca o el dispositivo cambió. Actualiza la lista y vuelve a marcar las canciones.',
         'import-catalogue-limit':'Este lote excedería el máximo de canciones que TUPAQ puede comprobar. No se ha enviado.',
@@ -609,15 +609,15 @@ def transfer_error(error, mode):
         'bulk-batch-unverified':'El lote necesita una revisión. No se enviaron los siguientes lotes.',
         'delete-selection-limit':'Marca entre 1 y 100 canciones para eliminarlas.',
         'delete-recovery-readonly':'Una eliminación pendiente se comprueba con Revisar operación; no se reenvía audio.',
-        'previous-import-unverified':'Hay una operación anterior sin confirmar. En Preferencias → Mostrar opciones avanzadas de recuperación → Revisar operación pendiente puedes comprobarla. Si falta audio, Completar importación pendiente utiliza el original.',
+        'previous-import-unverified':'Hay una operación anterior sin confirmar. En Diagnóstico → Mostrar opciones avanzadas de recuperación → Revisar operación pendiente puedes comprobarla. Si falta audio, Completar importación pendiente utiliza el original.',
         'manifest-own-parts':'El iPhone solicitó componentes que esta versión no puede entregar. No repitas la importación. Copia el diagnóstico completo; los metadatos podrían estar ya en Música.',
-        'recovery-source-missing':'No se encuentra el archivo original. Añádelo con Elegir canciones y vuelve a usar Preferencias → Completar importación pendiente.',
+        'recovery-source-missing':'No se encuentra el archivo original. Añádelo con Elegir canciones y vuelve a usar Diagnóstico → Completar importación pendiente.',
         'recovery-pending-state':'La canción no tiene el estado local pendiente admitido para completar su audio. No se ha reenviado la canción. Copia el diagnóstico.',
         'recovery-mixed-state':'La operación contiene canciones en estados diferentes. No se ha reenviado. Conserva el respaldo y copia el diagnóstico.',
         'recovery-file-exists':'Ya hay un archivo en el destino o en el área de envío. Se detuvo la recuperación para evitar sobrescribirlo. Prueba Revisar importación y copia el diagnóstico si falla.',
         'recovery-anchor':'La biblioteca avanzó o cambió desde la operación pendiente. No se ha reenviado. Conserva los registros y copia el diagnóstico.',
         'metadata-no-owned-tracks':'No hay importaciones registradas por TUPAQ en este ordenador que se puedan actualizar.',
-        'metadata-selection-limit':'No se encontraron canciones registradas para actualizar o son más de 49. Añade con Elegir canciones los originales del lote que quieras actualizar y vuelve a Preferencias.',
+        'metadata-selection-limit':'No se encontraron canciones registradas para actualizar o son más de 49. Añade con Elegir canciones los originales del lote que quieras actualizar y vuelve a Diagnóstico.',
         'metadata-owned-track-changed':'Una canción cambió desde su importación. Se detuvo la actualización; conserva el registro y copia el diagnóstico.',
         'recovery-metadata-only':'Esta operación actualiza portadas y fechas. Usa Revisar importación pendiente para comprobar su resultado; no requiere reenviar el audio.',
         'artwork-image-profile':'La portada incrustada no tiene un formato o unas dimensiones admitidas. No se ha enviado una actualización de biblioteca.',
