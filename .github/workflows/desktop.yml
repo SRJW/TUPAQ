@@ -9,6 +9,8 @@ on:
       - tests/test_lyrics_trial.py
       - .github/workflows/lyrics-trial.yml
       - docs/PRUEBA-TTML.md
+      - research/native_lyrics/**
+      - .github/workflows/native-lyrics-probe.yml
   workflow_dispatch:
 
 permissions:
