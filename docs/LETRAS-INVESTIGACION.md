@@ -44,13 +44,13 @@ Se preparó una **copia privada de experimento**, separada del original y del re
 
 El usuario confirmó que **TUPAQ terminó como importación comprobada**. Por tanto, su comprobación de letra/texto se completó, aunque Música no resaltó los tiempos. La verificación de transferencia no debe describirse como verificación de karaoke.
 
-Se contrastó después la referencia abierta AMLL (`9db9236818464ce83f696ee9c5ff0e5395cb744a`): su perfil por líneas utiliza el atributo de contenido `itunes:timing="Line"` y claves `itunes:key="L1"`. La primera copia solo tenía TTML genérico. La variante v3 añade esos atributos documentados y una sección de metadatos vacía, sin cambiar flags del catálogo de iOS ni inventar tiempos por palabra. La documentación y alcance de ese ensayo están en `PRUEBA-TTML.md`. Sigue pendiente la interpretación física de v3; esta referencia de formato no prueba que la ruta USB admita karaoke.
+Se contrastó después la referencia abierta AMLL (`9db9236818464ce83f696ee9c5ff0e5395cb744a`): su perfil por líneas utiliza el atributo de contenido `itunes:timing="Line"` y claves `itunes:key="L1"`. La primera copia solo tenía TTML genérico. La variante v3 añade esos atributos documentados y una sección de metadatos vacía, sin cambiar flags del catálogo de iOS ni inventar tiempos por palabra. La documentación y alcance de ese ensayo están en `PRUEBA-TTML.md`. El usuario confirmó después el resultado físico negativo de v3: aparece letra estática, no avanza y pulsar una línea no cambia la posición de reproducción. La conversión de contenido a este perfil tampoco activó karaoke. Se dan por cerrados los ensayos de conversión por esta vía; no se proponen más variantes de formato sin evidencia nueva.
 
 El ejecutable sí contiene la propiedad `ttml` en la serialización del objeto Lyrics (RVA `32f78c`, clave en `9ac9f8`). **No se ignora esa pista ni se presenta como prueba de karaoke USB**: el lector local encontrado construye el objeto en `331823`; el constructor `32f0f8` inicializa los flags TTML a cero en `32f16a`. El emisor USB `32f4f8` transmite el CFString, sin los flags de esa serialización de objeto. El metadato enviado en `472304` contiene el checksum; no se encontró en esta cadena un anuncio de tiempos o una activación de karaoke.
 
 El esquema iOS de referencia distingue texto `lyrics` de `time_synced_lyrics_available` y de las disponibilidades del catálogo Apple. Marcar a mano esos indicadores no entrega los recursos con tiempos y no se implementa. Tampoco se envía XML o timestamps como si su mera presencia garantizase que Música los interprete.
 
-Pendiente: encontrar/contrastar una ruta receptora de iOS que registre tiempos, distinta de limitarse a incluir XML en la letra de texto; después verificar tanto su registro temporal como el resaltado durante la reproducción en Música. El primer ensayo TTML fue negativo y no hay evidencia suficiente para prometer que el flujo de texto encontrado resuelva karaoke. No se añaden metadatos o flags adivinados para anunciar soporte inexistente.
+Pendiente: encontrar/contrastar una ruta receptora de iOS que registre tiempos, distinta de limitarse a incluir XML en la letra de texto; después verificar tanto su registro temporal como el resaltado durante la reproducción en Música. Los ensayos TTML genérico y TTML Line fueron negativos; no hay una vía USB de karaoke verificada en TUPAQ. No se añaden metadatos o flags adivinados para anunciar soporte inexistente.
 
 El usuario confirma que tiene canciones con letras visibles importadas previamente con Música y Finder en su Mac. Son una referencia positiva: el objetivo es reproducir ese registro, además de conservar las etiquetas del archivo.
 
@@ -95,6 +95,27 @@ Vectores del modelo:
 | `🎵 café` | `bdc4a67d` |
 
 La prueba de reducción cero es sintética; no se presenta como un texto real encontrado con digest reducido cero.
+
+## Interfaces de letras del reproductor, consultadas después de v3
+
+En `qingralf/iOS18-Runtime-Headers`, commit
+`cfdd406d3a0bbac8473571dda5482e155b1cc402` (2024-12-21), se observaron:
+
+- [MPModelLyrics.h](https://github.com/qingralf/iOS18-Runtime-Headers/blob/cfdd406d3a0bbac8473571dda5482e155b1cc402/Frameworks/MediaPlayer.framework/MPModelLyrics.h) distingue `text`, `TTML`, `hasLibraryLyrics`, `hasStoreLyrics` y `hasTimeSyncedLyrics`.
+- [MIPSong.h](https://github.com/qingralf/iOS18-Runtime-Headers/blob/cfdd406d3a0bbac8473571dda5482e155b1cc402/PrivateFrameworks/MusicLibrary.framework/MIPSong.h) declara texto `lyrics` y `lyricsChecksum`; no expone una propiedad TTML equivalente en esa declaración.
+- [MPStoreLyricsMusicKitRequestOperation.h](https://github.com/qingralf/iOS18-Runtime-Headers/blob/cfdd406d3a0bbac8473571dda5482e155b1cc402/Frameworks/MediaPlayer.framework/MPStoreLyricsMusicKitRequestOperation.h) define una solicitud por `songAdamID` y URL de letras; `MPStoreLyricsResponse` devuelve contenido e identificador de letras.
+
+Son declaraciones por introspección, no implementación del receptor USB,
+documentación oficial o prueba del comportamiento de la versión concreta del
+iPhone del usuario. Apoyan distinguir el texto de biblioteca de los recursos del
+reproductor. No constituyen un método para registrar tiempos personalizados desde
+Windows. Las declaraciones antiguas de `nst/iOS-Runtime-Headers` también se
+comprobaron y no se presentan como prueba de una versión actual.
+
+TUPAQ comprobó la transferencia de texto en el ensayo de v3; el usuario comprobó
+que no hay avance ni búsqueda por línea en Música. No se describe esa comprobación
+de transferencia como validación de karaoke. No se ejecutaron frameworks de iOS ni se modificaron flags del catálogo.
+Tampoco se distribuyeron binarios de Apple.
 
 ## Comprobación contra un catálogo existente
 

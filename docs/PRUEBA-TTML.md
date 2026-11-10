@@ -1,5 +1,11 @@
 # Crear la prueba TTML en Windows
 
+**Ensayos cerrados con resultado negativo para karaoke.** El usuario confirmó
+que también en v3 la letra aparece, pero no avanza con la reproducción ni permite
+saltar al pulsar una línea. La transferencia de texto fue comprobada por TUPAQ.
+No se recomienda repetir estas conversiones para intentar activar karaoke.
+Las instrucciones siguientes se conservan como registro reproducible del ensayo.
+
 **Resultado de la primera prueba física, reportado por el usuario:** Música mostró
 texto sin sincronizar y sin separaciones entre las líneas. Este método no ha
 activado karaoke. La herramienta no debe anunciarse como solución para karaoke.
@@ -14,7 +20,7 @@ La variante `Crear-prueba-TTML-v3.exe` añade el perfil de contenido por líneas
 metadatos vacía. Su título termina en `[Prueba TTML v3]` para distinguirla del
 primer ensayo. No se afirma que esas diferencias activen la lectura de tiempos
 en Música. Siete pruebas verifican el contenido, los límites y la conservación;
-la prueba física de v3 sigue pendiente.
+la prueba física de v3 fue negativa: texto visible, sin avance ni búsqueda por línea.
 
 Referencia de formato: [AMLL, TTML Format Overview](https://github.com/Steve-xmh/applemusic-like-lyrics/blob/9db9236818464ce83f696ee9c5ff0e5395cb744a/packages/docs/src/content/docs/en/guides/lyric/ttml.md),
 commit `9db9236818464ce83f696ee9c5ff0e5395cb744a`. Es documentación de un

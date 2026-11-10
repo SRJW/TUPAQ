@@ -10,7 +10,9 @@ La **0.3.0-preview.30** implementa el envío USB de letras de texto incrustadas 
 canciones nuevas, con comprobación del texto y checksum registrados en el catálogo.
 La ruta procede del análisis estático de AMPDevicesAgent; el usuario ha confirmado
 la visualización de la letra de texto en Música de su iPhone con preview.30.
-**No se afirma soporte de karaoke**: el LRC del ejemplo se muestra como texto.
+**El karaoke no funciona en los ensayos actuales**: tanto LRC como la variante
+TTML Line se muestran como letra estática; no avanzan ni permiten saltar al tocar
+una línea. Las herramientas TTML son experimentos de investigación, no una solución.
 [Implementación, pruebas y límites](docs/LETRAS-INVESTIGACION.md).
 
 Desde la 0.3.0-preview.25, TUPAQ adopta las referencias claras y oscuras: navegación lateral,
