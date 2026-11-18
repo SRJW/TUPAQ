@@ -163,11 +163,15 @@ class ReferenceUITests(unittest.TestCase):
         w=self.w;w.resize(1080,720);w.show_library([dict(TRACK,id=str(n)) for n in range(12)]);w.library_model.checked.add('2')
         for appearance in (1,2):
             w.theme_choice.setCurrentIndex(appearance)
-            for page in (0,2,3,1):
+            for page in (0,2,4,3,1):
                 w.navigate(page);APP.processEvents();self.assertEqual(w.pages.currentIndex(),page)
                 for control in w.nav_buttons+w.settings_buttons:
                     required=QFontMetrics(control.font()).horizontalAdvance(control.text())+36
                     self.assertGreaterEqual(control.width(),required,control.text())
+                if page==4:
+                    for control in (w.app_add_files,w.app_add_folder,w.app_new_folder,w.app_export,w.app_delete,w.app_up):
+                        required=QFontMetrics(control.font()).horizontalAdvance(control.text())+36
+                        self.assertGreaterEqual(control.width(),required,control.text())
                 self.assertEqual(w.library_model.checked,{'2'})
         self.assertGreaterEqual(w.library_table.columnWidth(3),QFontMetrics(w.library_table.font()).horizontalAdvance('M4A · ALAC')+18)
 

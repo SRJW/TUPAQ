@@ -30,10 +30,17 @@ for n,fixture in enumerate(('sample.mp3','covered-aac.m4a','sample.wav')):
  path=ROOT/'tests'/'fixtures'/fixture;track=inspect_audio(path,fixture);track['path']=str(path);from importios.artwork import thumbnail
  track['thumbnail']=thumbnail(__import__('importios.audio',fromlist=['read_artwork']).read_artwork(path))
  track['title']=('Órbita','Luz de madrugada','Todo vuelve')[n];w.accept_track(track)
+from datetime import datetime
+w.app_list=[{'bundle_id':'org.videolan.vlc-ios','name':'VLC','version':'3.5.0'},{'bundle_id':'com.example.reader','name':'Lector PDF','version':'2.1'}]
+w.app_list_token='synthetic-preview'
+w.app_selector.blockSignals(True);w.app_selector.addItem('VLC (org.videolan.vlc-ios)','org.videolan.vlc-ios');w.app_selector.addItem('Lector PDF (com.example.reader)','com.example.reader');w.app_selector.blockSignals(False)
+w.app_current_bundle='org.videolan.vlc-ios';w.app_current_path=''
+w.app_entries=[{'name':'Películas','relative':'Películas','kind':'dir','size':None,'modified':datetime(2026,5,1,12,30)},{'name':'Concierto.mp4','relative':'Concierto.mp4','kind':'file','size':42*1024**2,'modified':datetime(2026,5,2,18,15)},{'name':'Notas.pdf','relative':'Notas.pdf','kind':'file','size':380*1024,'modified':datetime(2026,5,3,9,5)}]
+w.populate_app_table();w.app_status.setText('3 elementos en la carpeta.')
 w.read_finished();w.update_buttons();w.show();app.processEvents()
 for mode,index in [('oscuro',2),('claro',1)]:
  w.theme_choice.setCurrentIndex(index);app.processEvents()
- for name,page in [('biblioteca',0),('preferencias',1),('importar',2),('diagnostico',3)]:
+ for name,page in [('biblioteca',0),('preferencias',1),('importar',2),('diagnostico',3),('apps',4)]:
   w.navigate(page);app.processEvents();w.grab().save(str(args.output/f'{name}-{mode}.png'))
 (args.output/'render-info.json').write_text(json.dumps({'data':'synthetic','platform':sys.platform,'system_font':QFontInfo(app.font()).family(),'device_pixel_ratio':w.devicePixelRatioF()},indent=2))
 w.tracks.clear();w.close()

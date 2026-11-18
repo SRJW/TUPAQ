@@ -46,6 +46,8 @@ class SortableItem(QTableWidgetItem):
         left,right = self.data(SORT_ROLE),other.data(SORT_ROLE)
         if isinstance(left,(int,float)) and isinstance(right,(int,float)):
             return left < right
+        if isinstance(left,str) and isinstance(right,str):
+            return left < right
         return text_key(self.text()) < text_key(other.text())
 
 

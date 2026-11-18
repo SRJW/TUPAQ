@@ -1,7 +1,7 @@
 """Native teal/orange desktop composition shared by light and dark appearances."""
 from pathlib import Path
 from PySide6.QtCore import Qt,QSize
-from PySide6.QtGui import QColor,QPalette,QFontMetrics,QPainter,QPixmap,QPen
+from PySide6.QtGui import QColor,QPalette,QFont,QFontMetrics,QPainter,QPixmap,QPen
 from PySide6.QtWidgets import (QWidget,QFrame,QVBoxLayout,QHBoxLayout,QButtonGroup,QStackedWidget,
     QGridLayout,QHeaderView,QTableView,QSplitter,QAbstractItemView,QProgressBar,QApplication,
     QScrollArea,QDialog,QSizePolicy)
@@ -65,9 +65,9 @@ def build(window):
     side=QVBoxLayout(sidebar);side.setContentsMargins(14,26,14,18);side.setSpacing(8)
     brand_row=QHBoxLayout();brand_row.setSpacing(10);mark=QLabel();mark.setPixmap(app_icon().pixmap(34,34));brand_row.addWidget(mark)
     brand=text_label('TUPAQ','brand');brand_row.addWidget(brand);brand_row.addStretch();side.addLayout(brand_row);side.addSpacing(26)
-    window.navigation=QButtonGroup(window);window.nav_buttons=[None]*4
+    window.navigation=QButtonGroup(window);window.nav_buttons=[None]*5
     # Keep stable page identities for saved/controller references; order matches the design.
-    for index,text,kind in [(0,'Biblioteca','library'),(2,'Importar','upload'),(3,'Diagnóstico','pulse'),(1,'Preferencias','settings')]:
+    for index,text,kind in [(0,'Biblioteca','library'),(2,'Importar','upload'),(4,'Archivos de apps','folder'),(3,'Diagnóstico','pulse'),(1,'Preferencias','settings')]:
         value=button(text,kind);value.setObjectName('nav');value.setCheckable(True);value.setMinimumHeight(42)
         window.navigation.addButton(value,index);window.nav_buttons[index]=value;side.addWidget(value)
     side.addStretch()
@@ -258,6 +258,47 @@ def build(window):
     recovery_note.setWordWrap(True);recovery_note.setObjectName('muted');maintenance_layout.addWidget(recovery_note)
 
     diagnostics_scroll=QScrollArea();diagnostics_scroll.setObjectName('settingsScroll');diagnostics_scroll.setWidgetResizable(True);diagnostics_scroll.setFrameShape(QFrame.Shape.NoFrame);diagnostics_scroll.setWidget(diagnostics);window.pages.addWidget(diagnostics_scroll)
+
+    apps_page,apps_layout,apps_header,_=page('Archivos de apps','Agrega, exporta o elimina archivos dentro de la carpeta Documentos de apps compatibles.')
+    window.apps_refresh=button('Actualizar','refresh',window.load_apps)
+    window.apps_refresh.setToolTip(tr('Leer las apps compatibles instaladas en el iPhone'))
+    apps_header.addWidget(window.apps_refresh)
+    apps_bar,apps_bar_layout=panel();apps_bar_layout.setContentsMargins(16,14,16,14);apps_bar_layout.setSpacing(12)
+    selector_row=QHBoxLayout();selector_row.setSpacing(10)
+    selector_row.addWidget(text_label('Aplicación','muted'))
+    window.app_selector=QComboBox();window.app_selector.setMinimumWidth(220);window.app_selector.currentIndexChanged.connect(window.app_selected)
+    selector_row.addWidget(window.app_selector,1)
+    window.app_up=button('Subir nivel','folder',window.app_go_up)
+    window.app_up.setToolTip(tr('Volver a la carpeta anterior'))
+    selector_row.addWidget(window.app_up)
+    apps_bar_layout.addLayout(selector_row)
+    actions_row=QHBoxLayout();actions_row.setSpacing(8)
+    window.app_add_files=button('Añadir archivos','plus',window.choose_app_files);window.app_add_files.setObjectName('primary')
+    window.app_add_files.setToolTip(tr('Copiar archivos del ordenador dentro de la carpeta abierta de la aplicación.'))
+    window.app_add_folder=button('Añadir carpeta','upload',window.choose_app_upload_folder)
+    window.app_add_folder.setToolTip(tr('Copiar una carpeta completa y su contenido dentro de la aplicación.'))
+    window.app_new_folder=button('Nueva carpeta','folder',window.create_app_folder)
+    window.app_new_folder.setToolTip(tr('Crear una subcarpeta vacía dentro de Documentos.'))
+    window.app_export=button('Exportar','download',window.export_app_entries)
+    window.app_export.setToolTip(tr('Guardar en el ordenador los archivos o carpetas seleccionados.'))
+    window.app_delete=button('Eliminar','trash',window.delete_app_entries);window.app_delete.setObjectName('destructive')
+    window.app_delete.setToolTip(tr('Eliminar los archivos o carpetas seleccionados dentro de Documentos; pide confirmación.'))
+    for value in (window.app_add_files,window.app_add_folder,window.app_new_folder,window.app_export):actions_row.addWidget(value)
+    actions_row.addStretch();actions_row.addWidget(window.app_delete)
+    apps_bar_layout.addLayout(actions_row)
+    apps_layout.addWidget(apps_bar)
+    path_row=QHBoxLayout();path_row.setSpacing(12)
+    window.app_path_label=QLabel('/Documents');window.app_path_label.setTextFormat(Qt.TextFormat.PlainText);window.app_path_label.setObjectName('section')
+    window.app_entries_count=text_label('','muted')
+    path_row.addWidget(window.app_path_label,1);path_row.addWidget(window.app_entries_count)
+    apps_layout.addLayout(path_row)
+    window.app_status=text_label('Conecta tu iPhone y pulsa Actualizar para ver las apps con archivos compartidos.','muted',True)
+    apps_layout.addWidget(window.app_status)
+    window.app_table=QTableWidget(0,4);window.app_table.setHorizontalHeaderLabels(['Nombre','Tipo','Tamaño','Modificado'])
+    apps_layout.addWidget(window.app_table,1)
+    apps_layout.addWidget(text_label('Solo aparecen apps instaladas con intercambio de archivos habilitado en iOS. También puedes arrastrar archivos o carpetas aquí.','muted',True))
+    window.pages.addWidget(apps_page)
+
     window.inspector_dialog=QDialog(window);window.inspector_dialog.setWindowTitle(tr('Detalles de la canción'));window.inspector_dialog.resize(500,720)
     dialog_layout=QVBoxLayout(window.inspector_dialog);dialog_layout.setContentsMargins(16,16,16,16)
     window.inspector=QFrame();window.inspector.setObjectName('hero')
@@ -293,7 +334,7 @@ def build(window):
     window.pause_transfer_button=button('Pausar','pause',window.pause_transfer);window.pause_transfer_button.hide();activity_layout.addWidget(window.pause_transfer_button)
     window.cancel_transfer_button=button('Cancelar','close',window.cancel_transfer);window.cancel_transfer_button.hide();activity_layout.addWidget(window.cancel_transfer_button);shell.addWidget(activity)
     window.errors=QListWidget();window.errors.setMaximumHeight(80);window.errors.hide();import_layout.addWidget(window.errors)
-    for table in (window.table,window.library_table):
+    for table in (window.table,window.library_table,window.app_table):
         table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows);table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers);table.verticalHeader().hide();table.setShowGrid(False);table.setAlternatingRowColors(True)
         table.setIconSize(QSize(28,28));table.verticalHeader().setDefaultSectionSize(max(42,QFontMetrics(table.font()).height()+16));table.setWordWrap(False)
@@ -301,8 +342,9 @@ def build(window):
         table.horizontalHeader().setSectionsClickable(True);table.setSortingEnabled(True);table.horizontalHeader().setMinimumHeight(38)
     set_column_metrics(window)
     window.table.setColumnWidth(6,QFontMetrics(window.table.font()).horizontalAdvance('Comprobando…')+28)
-    window.library_table.sortByColumn(0,Qt.SortOrder.AscendingOrder);window.table.sortItems(0,Qt.SortOrder.AscendingOrder)
+    window.library_table.sortByColumn(0,Qt.SortOrder.AscendingOrder);window.table.sortItems(0,Qt.SortOrder.AscendingOrder);window.app_table.sortByColumn(0,Qt.SortOrder.AscendingOrder)
     window.library_table.selectionModel().selectionChanged.connect(window.library_selection_changed);window.table.itemSelectionChanged.connect(window.local_selection_changed)
+    window.app_table.itemSelectionChanged.connect(window.update_buttons);window.app_table.cellDoubleClicked.connect(window.app_entry_activated)
     window.library_table.horizontalHeader().sortIndicatorChanged.connect(window.schedule_artwork);window.search.textChanged.connect(window.filter_library);window.format_filter.currentIndexChanged.connect(window.filter_library);window.content_filter.currentIndexChanged.connect(window.filter_library)
     window.library_model.checkedChanged.connect(window.checks_changed);window.select_visible.clicked.connect(window.library_model.check_visible)
     window.navigation.idClicked.connect(window.navigate);window.nav_buttons[0].setChecked(True)
@@ -318,6 +360,10 @@ def set_column_metrics(window):
         metrics=QFontMetrics(table.font())
         for column,sample in ((1,'Artista de la canción'),(2,'Nombre del álbum'),(3,'M4A · ALAC'),(4,'Duración'),(5,'999.9 MB')):
             table.setColumnWidth(column,metrics.horizontalAdvance(sample)+32)
+    if hasattr(window,'app_table'):
+        metrics=QFontMetrics(window.app_table.font())
+        for column,sample in ((1,'Carpeta'),(2,'999.9 MB'),(3,'2026-12-31 23:59')):
+            window.app_table.setColumnWidth(column,metrics.horizontalAdvance(sample)+32)
 
 
 def layout_transfer_actions(window):
@@ -453,9 +499,11 @@ def apply_theme(window):
     window.device_symbol.setPixmap(line_icon('phone','#a6d7d5' if dark else '#18565a',32).pixmap(32,32))
     window.diagnostic_symbol.setPixmap(line_icon('phone','#a6d7d5' if dark else '#18565a',54).pixmap(54,72))
     window.drop_symbol.setPixmap(line_icon('upload',c['orange'],38).pixmap(38,38))
-    for table in (window.library_table,window.table):table.setProperty('checkAccent',c['orange']);table.setProperty('checkForeground',c['primaryText'])
+    for table in (window.library_table,window.table,window.app_table):table.setProperty('checkAccent',c['orange']);table.setProperty('checkForeground',c['primaryText'])
     window.default_music_icon=line_icon('music',c['muted'],28);window.library_model.default_icon=window.default_music_icon
+    window.default_folder_icon=line_icon('folder',c['orange'],22);window.default_file_icon=line_icon('file',c['muted'],22)
     if window.library_model.rowCount():window.library_model.dataChanged.emit(window.library_model.index(0,0),window.library_model.index(window.library_model.rowCount()-1,0),[Qt.ItemDataRole.DecorationRole])
+    if getattr(window,'app_entries',None):window.refresh_app_table_icons()
     window.theme_options[selection].setChecked(True);window.theme_dark=dark
     fit_controls(window);window.paint_transfer_stages()
 
@@ -463,7 +511,10 @@ def apply_theme(window):
 def fit_controls(window):
     for control in window.findChildren(QPushButton):
         if not control.text():continue
-        metrics=QFontMetrics(control.font())
-        control.setMinimumWidth(metrics.horizontalAdvance(control.text())+(48 if control.property('iconKind') else 30))
-    window.sidebar.setFixedWidth(max(180,max(nav.minimumWidth() for nav in window.nav_buttons)+28))
-    window.settings_menu.setFixedWidth(max(176,max(nav.minimumWidth() for nav in window.settings_buttons)+20))
+        font=QFont(control.font())
+        if control.objectName() in ('nav','settingsNav','primary'):
+            font.setWeight(QFont.Weight.DemiBold)
+        metrics=QFontMetrics(font)
+        control.setMinimumWidth(metrics.horizontalAdvance(control.text())+(56 if control.property('iconKind') else 32))
+    window.sidebar.setFixedWidth(max(180,max(nav.minimumWidth() for nav in window.nav_buttons)+32))
+    window.settings_menu.setFixedWidth(max(176,max(nav.minimumWidth() for nav in window.settings_buttons)+24))

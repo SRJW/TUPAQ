@@ -67,7 +67,7 @@ class LibraryViewTests(unittest.TestCase):
     def test_reference_navigation_preserves_library_transfer_actions(self):
         window=Window(auto_connect=False);window.show();APP.processEvents()
         try:
-            self.assertEqual([button.text() for button in window.nav_buttons],['Biblioteca','Preferencias','Importar','Diagnóstico'])
+            self.assertEqual([button.text() for button in window.nav_buttons],['Biblioteca','Preferencias','Importar','Diagnóstico','Archivos de apps'])
             self.assertTrue(window.choose.isVisible());self.assertTrue(window.import_phone.isVisible());self.assertTrue(window.export_phone.isVisible())
             rows=[{'id':'local','title':'Local','artist':'A','album':'B','duration':1,'is_local':True,'usb_exists':True},
                   {'id':'cloud','title':'Local','artist':'A','album':'B','duration':1,'is_local':False}]

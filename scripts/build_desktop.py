@@ -57,7 +57,10 @@ def main():
                '--add-data', 'importios/assets/check-dark.svg:importios/assets',
                '--add-data', 'importios/assets/chevron-light.svg:importios/assets',
                '--add-data', 'importios/assets/chevron-dark.svg:importios/assets',
-               '--hidden-import','PySide6.QtSvg','--collect-submodules', 'mutagen', '--exclude-module', 'tkinter']
+               '--hidden-import','PySide6.QtSvg',
+               '--hidden-import','pymobiledevice3.services.house_arrest',
+               '--hidden-import','pymobiledevice3.services.installation_proxy',
+               '--collect-submodules', 'mutagen', '--exclude-module', 'tkinter']
     from PySide6.QtCore import QLibraryInfo
     translations=Path(QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath))
     spanish=translations/'qtbase_es.qm'

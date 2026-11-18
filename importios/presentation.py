@@ -48,7 +48,11 @@ class DropVeil(QFrame):
         super().__init__(parent);self.setObjectName('dropVeil')
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         layout=QVBoxLayout(self);layout.setSpacing(14);layout.addStretch()
-        title=QLabel(tr('Suelta tus canciones aquí'));title.setObjectName('emptyTitle');title.setAlignment(Qt.AlignmentFlag.AlignCenter);layout.addWidget(title)
-        note=QLabel(tr('Se añadirán a la cola. Tú decides cuándo importarlas.'));note.setObjectName('muted');note.setAlignment(Qt.AlignmentFlag.AlignCenter);note.setWordWrap(True);layout.addWidget(note)
+        self.title=QLabel(tr('Suelta tus canciones aquí'));self.title.setObjectName('emptyTitle');self.title.setAlignment(Qt.AlignmentFlag.AlignCenter);layout.addWidget(self.title)
+        self.note=QLabel(tr('Se añadirán a la cola. Tú decides cuándo importarlas.'));self.note.setObjectName('muted');self.note.setAlignment(Qt.AlignmentFlag.AlignCenter);self.note.setWordWrap(True);layout.addWidget(self.note)
         layout.addStretch();self.hide()
-    def reveal(self):self.setGeometry(self.parentWidget().rect().adjusted(14,14,-14,-14));self.show();self.raise_()
+    def reveal(self,title=None,note=None):
+        if title is not None:self.title.setText(tr(title))
+        if note is not None:self.note.setText(tr(note))
+        self.setGeometry(self.parentWidget().rect().adjusted(14,14,-14,-14));self.show();self.raise_()
+

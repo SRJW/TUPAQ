@@ -16,16 +16,16 @@ def main():
     if subprocess.run(view, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         with tempfile.TemporaryDirectory() as directory:
             notes = Path(directory)/'notes.md'
-            notes.write_text('''TUPAQ 0.3.0-preview.31: correcciones en el filtrado de canciones por formato.
+            notes.write_text('''TUPAQ 0.3.0-preview.32: nueva sección «Archivos de apps» para gestionar la carpeta Documentos de apps instaladas en el iPhone.
 
-- El filtro de formato de la biblioteca ya solo evalúa el formato real de la canción y no coincidencias parciales en título, artista o álbum (por ejemplo, canciones con «Wave», «Palace» o «Isaac» dejaban pasar MP3 al filtrar por WAV, ALAC o AAC).
-- Corregida la equivalencia de variantes AIFF: ahora los archivos `AIFF-C` y `.aif` sin etiqueta de catálogo (o marcados como `PCM`) aparecen correctamente al filtrar por `AIFF`.
-- Corregido el reconocimiento de contenedor `M4A` para archivos `.alac` y pistas con contenedor `M4A`.
-- Cuando la inspección USB por cabecera confirma que un archivo no tiene un formato válido (`format_source='header'`), deja de mostrarse por su extensión de nombre.
-- Al completarse la comprobación USB de cabecera de una fila visible, si su formato real contradice el filtro activo, la lista se vuelve a filtrar automáticamente.
-- El lector del catálogo ya no marca `format_source='catalogue'` cuando `item_playback.audio_format` tiene un código no reconocido.
+- Lista las aplicaciones de usuario instaladas en el iPhone que habilitan el intercambio de archivos de iOS (`UIFileSharingEnabled`) mediante `installation_proxy` y abre su carpeta `/Documents` por USB mediante `house_arrest` (`VendDocuments`).
+- Permite explorar subcarpetas, subir de nivel y crear carpetas nuevas dentro de `/Documents`.
+- Permite añadir archivos de cualquier tipo y carpetas completas (mediante selector o arrastrando y soltando), copiando por bloques con barra de progreso, cancelación, comprobación de tamaño y SHA-256 por lectura y sin sobrescribir archivos existentes en el iPhone.
+- Permite exportar al ordenador archivos o carpetas seleccionados sin sobrescribir archivos locales existentes y sin seguir enlaces simbólicos.
+- Permite eliminar archivos o carpetas dentro de `/Documents` siempre con confirmación explícita y sin permitir nunca eliminar la raíz `/Documents`.
+- Verificado con pruebas automatizadas sin dispositivo físico; la prueba con un iPhone real conectado por USB queda pendiente en el equipo del usuario.
 
-MP3, WAV, M4A (AAC/ALAC) y AIFF; sin M4P ni FLAC. Windows necesita el servicio/controlador USB de Apple. Paquetes sin firma ni notarización. No se distribuyen fuentes ni DLL de Apple o 3uTools.
+MP3, WAV, M4A (AAC/ALAC) y AIFF para Música; cualquier formato dentro de `/Documents` de apps compatibles. Windows necesita el servicio/controlador USB de Apple. Paquetes sin firma ni notarización. No se distribuyen fuentes ni DLL de Apple o 3uTools.
 ''', encoding='utf-8')
             created = subprocess.run(['gh','release','create',tag,'--repo',repo,'--title',
                 'TUPAQ '+tag,'--notes-file',str(notes),'--prerelease','--verify-tag'])

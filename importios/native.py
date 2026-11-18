@@ -15,7 +15,7 @@ import threading
 
 from PySide6.QtCore import Qt, QThread, Signal, QSize, QStandardPaths, QLockFile, QUrl, QTimer, QSettings, QPoint, QItemSelectionModel
 from PySide6.QtGui import QImage,QFontMetrics,QIcon, QPixmap, QDesktopServices, QShortcut, QKeySequence
-from PySide6.QtWidgets import QApplication,QFileDialog,QMainWindow,QMessageBox,QAbstractItemView,QDialog,QVBoxLayout,QScrollArea,QLabel,QPlainTextEdit
+from PySide6.QtWidgets import QApplication,QFileDialog,QInputDialog,QMainWindow,QMessageBox,QAbstractItemView,QDialog,QVBoxLayout,QScrollArea,QLabel,QPlainTextEdit
 
 from .i18n import tr, set_language, language, LANGUAGES, QMessageBox
 from .audio import inspect_audio, read_artwork
@@ -26,6 +26,7 @@ from .library import read_phone_library, read_catalogue, LibraryError, format_di
 from .models import LibraryModel, SortableItem, SORT_ROLE, byte_label, duration_label
 from .version import VERSION
 from .transfers import run_transfer, TransferError
+from .app_files import run_app_action, AppFilesError, documents_path, parent_relative
 
 from .bulk import MAX_SELECTION
 
@@ -213,6 +214,33 @@ class TransferWorker(QThread):
             lock.unlock()
 
 
+class AppFilesWorker(QThread):
+    result = Signal(dict)
+    problem = Signal(str)
+    progress = Signal(int, int, str)
+
+    def __init__(self, action, bundle_id=None, relative='', payload=None, parent=None):
+        super().__init__(parent)
+        self.action = action
+        self.bundle_id = bundle_id
+        self.relative = relative
+        self.payload = payload
+        from .cancellation import TransferControl
+        self.control = TransferControl()
+
+    def cancel(self):
+        return self.control.request()
+
+    def run(self):
+        try:
+            def report(value, total, label):
+                self.progress.emit(value, total, label)
+            report.control = self.control
+            self.result.emit(run_app_action(self.action, self.bundle_id, self.relative, self.payload, report))
+        except AppFilesError as error:
+            self.problem.emit(f'TUPAQ {VERSION}\n{error}\nDiagnóstico: {error.diagnostic}')
+
+
 def csv_value(value):
     text = str(value if value is not None else '')
     return "'"+text if re.match(r'^\s*[=+@-]', text) else text
@@ -232,6 +260,13 @@ class Window(QMainWindow):
         self.device_worker = None
         self.library_worker = None
         self.transfer_worker = None
+        self.app_worker = None
+        self.app_list = []
+        self.app_list_token = None
+        self.app_entries = []
+        self.app_current_bundle = None
+        self.app_current_path = ''
+        self.app_pending_refresh = False
         self.transfer_outcome = None
         self.transfer_diagnostic = ''
         self.progress_track_id = None
@@ -312,7 +347,7 @@ class Window(QMainWindow):
         self.clear.setEnabled(not busy and bool(self.tracks))
         self.export.setEnabled(not busy and bool(self.tracks))
         self.remove.setEnabled(not busy and bool(self.table.selectionModel().selectedRows()))
-        phone_busy = busy or self.library_worker is not None or self.device_worker is not None or self.after_artwork is not None
+        phone_busy = busy or self.library_worker is not None or self.device_worker is not None or self.app_worker is not None or self.after_artwork is not None
         self.device_button.setEnabled(not phone_busy)
         self.library_button.setEnabled(not phone_busy)
         self.import_phone.setEnabled(not phone_busy and bool(self.tracks))
@@ -332,10 +367,21 @@ class Window(QMainWindow):
         self.queue_summary.setText(tr(f'{len(self.tracks)} canciones · {byte_label(size)}'))
         self.diagnostic_refresh.setEnabled(not phone_busy);self.diagnostic_run.setEnabled(not phone_busy and (self.usb_connected or bool(self.phone_tracks)))
         self.diagnostic_run.setText(tr('Comprobar selección' if selected else 'Comprobar lectura de audios'))
+        if hasattr(self,'apps_refresh'):
+            has_app=bool(self.app_current_bundle)
+            selected_app=self.selected_app_entries()
+            self.apps_refresh.setEnabled(not phone_busy)
+            self.app_selector.setEnabled(not phone_busy and bool(self.app_list))
+            self.app_up.setEnabled(not phone_busy and has_app and bool(self.app_current_path))
+            self.app_add_files.setEnabled(not phone_busy and has_app)
+            self.app_add_folder.setEnabled(not phone_busy and has_app)
+            self.app_new_folder.setEnabled(not phone_busy and has_app)
+            self.app_export.setEnabled(not phone_busy and has_app and bool(selected_app))
+            self.app_delete.setEnabled(not phone_busy and has_app and bool(selected_app))
         self.update_diagnostics()
 
     def navigate(self, number):
-        if number not in (0,1,2,3):return
+        if number not in (0,1,2,3,4):return
         self.nav_buttons[number].setChecked(True)
         from .visuals import line_icon
         colors=getattr(self,'colors',{'text':'#ffffff'})
@@ -344,6 +390,10 @@ class Window(QMainWindow):
         self.update_buttons()
         self.schedule_artwork()
         self.library_empty.refresh()
+        if (number==4 and self.background_enabled and (self.usb_connected or self.connection_token is not None)
+                and self.app_list_token!=self.connection_token
+                and self.app_worker is None and self.transfer_worker is None and self.library_worker is None and self.device_worker is None and self.after_artwork is None):
+            self.load_apps()
 
     def focus_search(self):
         self.navigate(0);self.search.setFocus()
@@ -359,12 +409,14 @@ class Window(QMainWindow):
         code=self.language_choice.currentData()
         set_language(code,self)
         self.library_model.headerDataChanged.emit(Qt.Orientation.Horizontal,0,5)
-        sorting=self.table.isSortingEnabled();self.table.setSortingEnabled(False)
-        try:
-            for row in range(self.table.rowCount()):
-                for column in range(self.table.columnCount()):
-                    self.table.item(row,column).retranslate()
-        finally:self.table.setSortingEnabled(sorting)
+        for table in (self.table,self.app_table):
+            sorting=table.isSortingEnabled();table.setSortingEnabled(False)
+            try:
+                for row in range(table.rowCount()):
+                    for column in range(table.columnCount()):
+                        item=table.item(row,column)
+                        if item is not None and hasattr(item,'retranslate'):item.retranslate()
+            finally:table.setSortingEnabled(sorting)
         if hasattr(self,'preview_track'):self.request_preview(self.preview_track)
         self.library_empty.refresh()
         from .interface import fit_controls,set_column_metrics
@@ -588,7 +640,7 @@ class Window(QMainWindow):
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.backup_root)))
 
     def poll_device(self):
-        if not self.background_enabled or not self.auto_read.isChecked() or self.worker is not None or self.thumbnail_worker is not None or self.after_artwork is not None:
+        if not self.background_enabled or not self.auto_read.isChecked() or self.worker is not None or self.thumbnail_worker is not None or self.app_worker is not None or self.after_artwork is not None:
             return
         self.check_device(automatic=True)
 
@@ -612,6 +664,7 @@ class Window(QMainWindow):
             self.library_model.checked.clear()
             self.filter_library()
             self.artwork_attempted.clear()
+            self.reset_app_files()
             self.device_name.setText('iPhone');self.device_details={};self.diagnostic_result=None
             self.set_connection_status(False,'Sin conexión USB' if not devices else 'Conecta un solo iPhone')
             self.device_status.setVisible(bool(devices))
@@ -630,6 +683,7 @@ class Window(QMainWindow):
             self.library_model.checked.clear()
             self.filter_library()
             self.artwork_attempted.clear()
+            self.reset_app_files()
         stamp=devices[0].get('catalogue_stamp')
         if self.refresh_after_transfer.isChecked() and stamp is not None and self.device_details.get('_catalogue_stamp') is not None and stamp!=self.device_details['_catalogue_stamp']:
             self.library_ready=False;self.retry_library_at=0
@@ -647,6 +701,7 @@ class Window(QMainWindow):
         self.library_model.checked.clear()
         self.filter_library()
         self.artwork_attempted.clear()
+        self.reset_app_files()
         self.set_connection_status(False,'Servicio USB no disponible')
         if self.connection_token is None:
             self.device_status.setText(tr(message))
@@ -660,7 +715,7 @@ class Window(QMainWindow):
 
     def fetch_visible_artwork(self):
         if (self.thumbnail_worker is not None or self.library_worker is not None or self.transfer_worker is not None or self.device_worker is not None
-            or self.after_artwork is not None or self.pages.currentIndex() != 0):
+            or self.app_worker is not None or self.after_artwork is not None or self.pages.currentIndex() != 0):
             return
         if self.preview_pending is not None:
             track,self.preview_pending=self.preview_pending,None
@@ -818,6 +873,8 @@ class Window(QMainWindow):
         if pending:
             if pending[0] == 'library':
                 self.load_library(automatic=pending[1])
+            elif pending[0] == 'app_files':
+                self.start_app_action(*pending[1:])
             else:
                 self.start_transfer(*pending[1:])
         else:
@@ -863,7 +920,7 @@ class Window(QMainWindow):
             self.start_transfer('export',[dict(t,embed_artwork=self.embed_artwork.isChecked()) for t in selected],Path(folder))
 
     def start_transfer(self, mode, selected, destination):
-        if self.transfer_worker is not None or self.worker is not None or self.library_worker is not None or self.device_worker is not None:
+        if self.transfer_worker is not None or self.worker is not None or self.library_worker is not None or self.device_worker is not None or self.app_worker is not None:
             return
         if mode == 'import' and not selected:return
         if mode=='import':selected=[dict(t,metadata_policy='filename' if self.metadata_choice.currentIndex()==1 else 'keep',send_artwork=self.import_artwork.isChecked(),send_lyrics=self.import_lyrics.isChecked(),required_device_token=self.device_details.get('_device_token')) for t in selected]
@@ -902,8 +959,19 @@ class Window(QMainWindow):
         self.transfer_worker.start()
 
     def cancel_transfer(self):
+        if self.app_worker is not None:
+            if self.app_worker.action not in ('upload','export','delete'):return
+            self.app_worker.cancel()
+            self.cancel_transfer_button.setEnabled(False)
+            self.cancel_transfer_button.setText(tr('Cancelando…'))
+            self.status.setText(tr('Cancelando la operación…'))
+            self.app_status.setText(tr('Cancelando la operación…'))
+            return
         worker=self.transfer_worker
         if worker is None:
+            if self.after_artwork and self.after_artwork[0]=='app_files' and self.after_artwork[1] in ('upload','export','delete'):
+                self.after_artwork=None;self.cancel_transfer_button.hide();self.status.setText(tr('Operación cancelada antes de iniciar el envío.'));self.app_status.setText(tr('Operación cancelada antes de iniciar el envío.'));self.update_buttons()
+                return
             if self.after_artwork and self.after_artwork[0]=='transfer' and self.after_artwork[1] in ('import','export','delete','diagnose'):
                 self.after_artwork=None;self.cancel_transfer_button.hide();self.status.setText(tr('Operación cancelada antes de iniciar el envío.'));self.update_buttons()
             return
@@ -1007,7 +1075,7 @@ class Window(QMainWindow):
         self.add_paths(paths)
 
     def check_device(self, automatic=False):
-        if self.device_worker is not None or self.transfer_worker is not None or self.library_worker is not None or self.after_artwork is not None:
+        if self.device_worker is not None or self.transfer_worker is not None or self.library_worker is not None or self.app_worker is not None or self.after_artwork is not None:
             return
         self.device_button.setEnabled(False)
         if not automatic:
@@ -1047,7 +1115,7 @@ class Window(QMainWindow):
         if self.current_library_result():self.device_details=info;self.update_diagnostics()
 
     def load_library(self, automatic=False):
-        if self.library_worker is not None or self.transfer_worker is not None:
+        if self.library_worker is not None or self.transfer_worker is not None or self.app_worker is not None:
             return
         if self.thumbnail_worker is not None:
             self.after_artwork = ('library',automatic)
@@ -1234,9 +1302,332 @@ class Window(QMainWindow):
             except OSError:
                 QMessageBox.warning(self, tr('No se pudo guardar'), tr('Elige una carpeta donde tengas permiso para escribir.'))
 
+    def reset_app_files(self):
+        self.app_list = []
+        self.app_list_token = None
+        self.app_entries = []
+        self.app_current_bundle = None
+        self.app_current_path = ''
+        self.app_pending_refresh = False
+        if not hasattr(self,'app_selector'):return
+        self.app_selector.blockSignals(True)
+        self.app_selector.clear()
+        self.app_selector.blockSignals(False)
+        self.app_table.setRowCount(0)
+        self.app_path_label.setText('/Documents')
+        self.app_entries_count.setText('')
+        self.app_status.setText(tr('Conecta tu iPhone y pulsa Actualizar para ver las apps con archivos compartidos.'))
+        self.update_buttons()
+
+    def load_apps(self):
+        self.start_app_action('list_apps')
+
+    def app_selected(self, index):
+        bundle_id = self.app_selector.itemData(index) if index >= 0 else None
+        if not bundle_id:
+            self.app_current_bundle = None
+            self.app_current_path = ''
+            self.app_entries = []
+            self.populate_app_table()
+            self.update_buttons()
+            return
+        self.app_current_bundle = bundle_id
+        self.app_current_path = ''
+        self.app_entries = []
+        self.populate_app_table()
+        self.update_buttons()
+        self.load_app_folder('')
+
+    def load_app_folder(self, relative=None):
+        if not self.app_current_bundle:
+            return
+        target = self.app_current_path if relative is None else relative
+        self.start_app_action('list_folder', self.app_current_bundle, target)
+
+    def app_go_up(self):
+        if not self.app_current_bundle or not self.app_current_path:
+            return
+        self.load_app_folder(parent_relative(self.app_current_path))
+
+    def app_entry_activated(self, row, _column=0):
+        item = self.app_table.item(row, 0)
+        if item is None:
+            return
+        rel = item.data(Qt.ItemDataRole.UserRole)
+        entry = next((e for e in self.app_entries if e['relative'] == rel), None)
+        if entry and entry.get('kind') == 'dir':
+            self.load_app_folder(entry['relative'])
+
+    def selected_app_entries(self):
+        if not hasattr(self,'app_table'):
+            return []
+        by_rel = {entry['relative']: entry for entry in self.app_entries}
+        selected = []
+        for idx in self.app_table.selectionModel().selectedRows():
+            item = self.app_table.item(idx.row(), 0)
+            if item is not None:
+                entry = by_rel.get(item.data(Qt.ItemDataRole.UserRole))
+                if entry is not None:
+                    selected.append(entry)
+        return selected
+
+    def choose_app_files(self):
+        if not self.app_current_bundle:
+            return
+        paths, _ = QFileDialog.getOpenFileNames(self, tr('Elegir archivos para copiar a la app'), self.library_path.text(), tr('Todos los archivos (*)'))
+        if paths:
+            self.upload_app_paths(paths)
+
+    def choose_app_upload_folder(self):
+        if not self.app_current_bundle:
+            return
+        folder = QFileDialog.getExistingDirectory(self, tr('Elegir carpeta para copiar a la app'), self.library_path.text())
+        if folder:
+            self.upload_app_paths([folder])
+
+    def upload_app_paths(self, paths):
+        if not paths or not self.app_current_bundle:
+            return
+        self.start_app_action('upload', self.app_current_bundle, self.app_current_path, [str(Path(p)) for p in paths])
+
+    def create_app_folder(self):
+        if not self.app_current_bundle:
+            return
+        name, ok = QInputDialog.getText(self, tr('Nueva carpeta'), tr('Nombre de la nueva carpeta en Documentos:'))
+        if ok and name.strip():
+            self.start_app_action('create_folder', self.app_current_bundle, self.app_current_path, name.strip())
+
+    def export_app_entries(self):
+        selected = self.selected_app_entries()
+        if not selected or not self.app_current_bundle:
+            return
+        folder = QFileDialog.getExistingDirectory(self, tr('Guardar archivos de la app en…'), self.library_path.text())
+        if folder:
+            self.start_app_action('export', self.app_current_bundle, self.app_current_path, ([e['relative'] for e in selected], str(Path(folder))))
+
+    def delete_app_entries(self):
+        selected = self.selected_app_entries()
+        if not selected or not self.app_current_bundle:
+            return
+        dialog = QMessageBox(self)
+        dialog.setWindowTitle(tr('Eliminar archivos de la app'))
+        dialog.setTextFormat(Qt.TextFormat.PlainText)
+        dialog.setText(tr(f'¿Eliminar {len(selected)} elementos de esta aplicación en el iPhone?'))
+        dialog.setInformativeText(tr('Esta acción elimina los archivos o carpetas seleccionados de Documentos en el iPhone y no se puede deshacer.') + '\n\n' + '\n'.join(e['name'] for e in selected[:5]))
+        dialog.setDetailedText('\n'.join(documents_path(e['relative']) for e in selected[:100]))
+        dialog.setStandardButtons(QMessageBox.StandardButton.Cancel | QMessageBox.StandardButton.Yes)
+        dialog.button(QMessageBox.StandardButton.Cancel).setText(tr('Cancelar'))
+        dialog.setDefaultButton(QMessageBox.StandardButton.Cancel)
+        dialog.button(QMessageBox.StandardButton.Yes).setText(tr('Eliminar elementos'))
+        if dialog.exec() == QMessageBox.StandardButton.Yes:
+            self.start_app_action('delete', self.app_current_bundle, self.app_current_path, [e['relative'] for e in selected])
+
+    def start_app_action(self, action, bundle_id=None, relative='', payload=None):
+        if self.app_worker is not None or self.transfer_worker is not None or self.library_worker is not None or self.device_worker is not None or self.worker is not None:
+            return
+        if self.thumbnail_worker is not None:
+            self.after_artwork = ('app_files', action, bundle_id, relative, payload)
+            self.cancel_transfer_button.setText(tr('Cancelar'));self.cancel_transfer_button.setEnabled(True)
+            self.cancel_transfer_button.setVisible(action in ('upload', 'export', 'delete'))
+            self.thumbnail_worker.stop()
+            self.update_buttons()
+            return
+        labels = {
+            'list_apps': 'Leyendo las apps compatibles del iPhone…',
+            'list_folder': 'Leyendo la carpeta de la aplicación…',
+            'create_folder': 'Creando carpeta en el iPhone…',
+            'upload': 'Copiando archivos a la aplicación…',
+            'export': 'Exportando archivos de la aplicación…',
+            'delete': 'Eliminando archivos de la aplicación…',
+        }
+        status_label = tr(labels.get(action, 'Leyendo la carpeta de la aplicación…'))
+        self.app_pending_refresh = False
+        self.app_status.setText(status_label)
+        self.status.setText(status_label)
+        self.app_worker = AppFilesWorker(action, bundle_id, relative, payload, self)
+        self.app_worker.progress.connect(self.app_action_progress)
+        self.app_worker.result.connect(self.app_action_result)
+        self.app_worker.problem.connect(self.app_action_problem)
+        self.app_worker.finished.connect(self.app_action_finished)
+        if action in ('upload', 'export', 'delete'):
+            self.progress.setRange(0, 100);self.progress.setValue(0)
+            self.cancel_transfer_button.setText(tr('Cancelar'));self.cancel_transfer_button.setEnabled(True);self.cancel_transfer_button.show()
+        else:
+            self.progress.setRange(0, 0)
+            self.cancel_transfer_button.hide()
+        self.progress.show()
+        self.update_buttons()
+        self.app_worker.start()
+
+    def app_action_progress(self, value, total, label):
+        if total > 0:
+            self.progress.setRange(0, max(1, total));self.progress.setValue(value)
+        control = self.app_worker.control if self.app_worker is not None else None
+        if not (control and control.event.is_set()):
+            message = tr(label)
+            self.status.setText(message)
+            self.app_status.setText(message)
+
+    def app_action_result(self, result):
+        action = result.get('action')
+        if action == 'list_apps':
+            apps = result.get('apps', [])
+            previous = self.app_current_bundle
+            self.app_list = apps
+            self.app_list_token = self.connection_token
+            self.app_selector.blockSignals(True)
+            self.app_selector.clear()
+            selected_idx = -1
+            for idx, app in enumerate(apps):
+                label = f"{app['name']} ({app['bundle_id']})" if app['name'] != app['bundle_id'] else app['bundle_id']
+                self.app_selector.addItem(label, app['bundle_id'])
+                if app['bundle_id'] == previous:
+                    selected_idx = idx
+            if apps and selected_idx < 0:
+                selected_idx = 0
+            if selected_idx >= 0:
+                self.app_selector.setCurrentIndex(selected_idx)
+                self.app_current_bundle = apps[selected_idx]['bundle_id']
+                if self.app_current_bundle != previous:
+                    self.app_current_path = ''
+                    self.app_entries = []
+                self.app_pending_refresh = True
+                message = tr(f'{len(apps)} apps con intercambio de archivos disponibles.')
+            else:
+                self.app_current_bundle = None
+                self.app_current_path = ''
+                self.app_entries = []
+                self.populate_app_table()
+                message = tr('No se encontraron apps con intercambio de archivos habilitado en este iPhone.')
+            self.app_selector.blockSignals(False)
+            self.app_status.setText(message)
+            self.status.setText(message)
+        elif action == 'list_folder':
+            self.app_current_bundle = result.get('bundle_id', self.app_current_bundle)
+            self.app_current_path = result.get('relative', '')
+            self.app_entries = result.get('entries', [])
+            self.populate_app_table()
+            message = tr('Carpeta vacía.') if not self.app_entries else tr(f'{len(self.app_entries)} elementos en la carpeta.')
+            self.app_status.setText(message)
+            self.status.setText(message)
+        elif action == 'create_folder':
+            self.app_current_path = result.get('relative', self.app_current_path)
+            if result.get('entries') is not None:
+                self.app_entries = result['entries']
+                self.populate_app_table()
+            message = tr('Carpeta creada y verificada en el iPhone.')
+            self.app_status.setText(message)
+            self.status.setText(message)
+        elif action == 'upload':
+            if result.get('entries') is not None:
+                self.app_entries = result['entries']
+                self.populate_app_table()
+            elif result.get('cancelled'):
+                self.app_pending_refresh = True
+            uploaded = result.get('uploaded', 0)
+            skipped = result.get('skipped', 0)
+            message = tr(f'Copia cancelada. Copiados: {uploaded} · Omitidos: {skipped}.' if result.get('cancelled')
+                         else f'Copia completada y verificada. Copiados: {uploaded} · Omitidos: {skipped}.')
+            self.app_status.setText(message)
+            self.status.setText(message)
+        elif action == 'export':
+            exported = result.get('exported', 0)
+            skipped = result.get('skipped', 0)
+            message = tr(f'Exportación cancelada. Exportados: {exported} · Omitidos: {skipped}.' if result.get('cancelled')
+                         else f'Exportación completada. Exportados: {exported} · Omitidos: {skipped}.')
+            self.app_status.setText(message)
+            self.status.setText(message)
+        elif action == 'delete':
+            if result.get('entries') is not None:
+                self.app_entries = result['entries']
+                self.populate_app_table()
+            elif result.get('cancelled'):
+                self.app_pending_refresh = True
+            deleted = result.get('deleted', 0)
+            message = tr(f'Eliminación cancelada. Eliminados: {deleted}.' if result.get('cancelled')
+                         else f'Elementos eliminados y verificados: {deleted}.')
+            self.app_status.setText(message)
+            self.status.setText(message)
+        self.activity_message = self.status.text()
+        self.update_buttons()
+
+    def app_action_problem(self, message):
+        self.last_diagnostic = message
+        self.copy_diagnostic.setEnabled(True)
+        self.app_status.setText(tr(message))
+        self.status.setText(tr('No se pudo completar la operación en archivos de apps.'))
+        self.activity_message = self.status.text()
+
+    def app_action_finished(self):
+        worker = self.app_worker
+        self.app_worker = None
+        if worker is not None:
+            worker.deleteLater()
+        self.progress.hide()
+        self.progress.setRange(0, 100)
+        self.cancel_transfer_button.hide()
+        self.update_buttons()
+        if self.app_pending_refresh and self.app_current_bundle:
+            self.app_pending_refresh = False
+            self.load_app_folder(self.app_current_path)
+        else:
+            self.schedule_artwork()
+
+    def refresh_app_table_icons(self):
+        if not hasattr(self,'app_table'):return
+        by_rel = {entry['relative']: entry for entry in self.app_entries}
+        for row in range(self.app_table.rowCount()):
+            item = self.app_table.item(row, 0)
+            if item is None:continue
+            entry = by_rel.get(item.data(Qt.ItemDataRole.UserRole))
+            if entry is not None:
+                item.setIcon(self.default_folder_icon if entry.get('kind') == 'dir' else self.default_file_icon)
+
+    def populate_app_table(self):
+        if not hasattr(self,'app_table'):return
+        self.app_path_label.setText(documents_path(self.app_current_path))
+        self.app_entries_count.setText(tr(f'{len(self.app_entries)} elementos') if self.app_entries else '')
+        sorting = self.app_table.isSortingEnabled()
+        self.app_table.setSortingEnabled(False)
+        try:
+            self.app_table.setRowCount(0)
+            for row, entry in enumerate(self.app_entries):
+                self.app_table.insertRow(row)
+                kind = entry.get('kind', 'file')
+                kind_label = tr('Carpeta' if kind == 'dir' else 'Enlace' if kind == 'link' else 'Archivo')
+                size = entry.get('size')
+                modified = entry.get('modified')
+                from .models import text_key
+                name_item = SortableItem(entry['name'])
+                name_item.setData(Qt.ItemDataRole.UserRole, entry['relative'])
+                name_item.setData(SORT_ROLE, ('0:' if kind == 'dir' else '1:') + text_key(entry['name']))
+                if hasattr(self,'default_folder_icon'):
+                    name_item.setIcon(self.default_folder_icon if kind == 'dir' else self.default_file_icon)
+                kind_item = SortableItem(kind_label)
+                size_item = SortableItem('—' if size is None else byte_label(size))
+                size_item.setData(SORT_ROLE, -1 if size is None else size)
+                mod_item = SortableItem(modified.strftime('%Y-%m-%d %H:%M') if modified is not None else '—')
+                mod_item.setData(SORT_ROLE, modified.timestamp() if modified is not None else 0)
+                for col, item in enumerate((name_item, kind_item, size_item, mod_item)):
+                    self.app_table.setItem(row, col, item)
+                self.app_table.setRowHeight(row, max(40, QFontMetrics(self.app_table.font()).height() + 14))
+        finally:
+            self.app_table.setSortingEnabled(sorting)
+
     def dragEnterEvent(self, event):
-        if self.worker is None and self.transfer_worker is None and any(url.isLocalFile() for url in event.mimeData().urls()):
-            self.drop_veil.reveal();event.acceptProposedAction()
+        if not any(url.isLocalFile() for url in event.mimeData().urls()):
+            event.ignore();return
+        if self.pages.currentIndex() == 4:
+            busy = (self.worker is not None or self.transfer_worker is not None or self.app_worker is not None
+                    or self.library_worker is not None or self.device_worker is not None or self.after_artwork is not None)
+            if not busy and self.app_current_bundle:
+                self.drop_veil.reveal('Suelta archivos o carpetas aquí', 'Se copiarán en la carpeta actual de la aplicación seleccionada.')
+                event.acceptProposedAction()
+            else:
+                event.ignore()
+            return
+        if self.worker is None and self.transfer_worker is None:
+            self.drop_veil.reveal('Suelta tus canciones aquí', 'Se añadirán a la cola. Tú decides cuándo importarlas.');event.acceptProposedAction()
         else:event.ignore()
 
     def dragLeaveEvent(self,event):
@@ -1245,12 +1636,21 @@ class Window(QMainWindow):
     def dropEvent(self, event):
         self.drop_veil.hide()
         paths = [url.toLocalFile() for url in event.mimeData().urls() if url.isLocalFile()]
+        if self.pages.currentIndex() == 4:
+            if self.app_current_bundle and paths:
+                self.upload_app_paths(paths)
+            event.acceptProposedAction()
+            return
         self.add_paths(paths)
         event.acceptProposedAction()
 
     def closeEvent(self, event):
         if self.transfer_worker is not None:
             self.status.setText(tr('Espera a que termine la transferencia y su comprobación antes de cerrar.'))
+            event.ignore()
+            return
+        if self.app_worker is not None:
+            self.status.setText(tr('Espera a que termine la operación en archivos de apps antes de cerrar.'))
             event.ignore()
             return
         if self.library_worker is not None:
@@ -1286,7 +1686,10 @@ def smoke(app, window, fixtures, output=None):
     # Import the USB transport inside the frozen build without opening a device.
     from pymobiledevice3.lockdown import create_using_usbmux
     from pymobiledevice3.services.afc import AfcService
+    from pymobiledevice3.services.house_arrest import HouseArrestService
+    from pymobiledevice3.services.installation_proxy import InstallationProxyService
     assert callable(create_using_usbmux) and callable(AfcService)
+    assert callable(HouseArrestService) and callable(InstallationProxyService)
     vectors = plistlib.loads((fixtures/'sync/grappa-fixed-vectors.plist').read_bytes())
     assert len(vectors) == 4
     for vector in vectors:
