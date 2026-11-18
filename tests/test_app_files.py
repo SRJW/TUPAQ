@@ -415,10 +415,11 @@ class AppFilesUITests(unittest.TestCase):
             w.create_app_folder()
             start.assert_called_once_with('create_folder', 'org.videolan.vlc-ios', 'Videos', 'Nueva')
 
-        with patch('importios.native.QFileDialog.getExistingDirectory', return_value='/tmp'), \
+        dest_dir = str(Path(tempfile.gettempdir()))
+        with patch('importios.native.QFileDialog.getExistingDirectory', return_value=dest_dir), \
              patch.object(w, 'start_app_action') as start:
             w.export_app_entries()
-            start.assert_called_once_with('export', 'org.videolan.vlc-ios', 'Videos', (['Videos/Demo.mp4'], '/tmp'))
+            start.assert_called_once_with('export', 'org.videolan.vlc-ios', 'Videos', (['Videos/Demo.mp4'], dest_dir))
 
         with patch('importios.native.QMessageBox.exec', return_value=QMessageBox.StandardButton.Cancel), \
              patch.object(w, 'start_app_action') as start:
@@ -433,8 +434,9 @@ class AppFilesUITests(unittest.TestCase):
     def test_contextual_drop_on_app_files_page_and_disconnect_reset(self):
         w = self.window
         w.navigate(4)
+        sample_file = str(Path(tempfile.gettempdir()) / 'sample.pdf')
         mime = QMimeData()
-        mime.setUrls([QUrl.fromLocalFile('/tmp/sample.pdf')])
+        mime.setUrls([QUrl.fromLocalFile(sample_file)])
         enter = QDragEnterEvent(QPointF(10, 10).toPoint(), Qt.DropAction.CopyAction, mime, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
         w.dragEnterEvent(enter)
         self.assertFalse(enter.isAccepted())
@@ -449,7 +451,7 @@ class AppFilesUITests(unittest.TestCase):
         drop = QDropEvent(QPointF(10, 10), Qt.DropAction.CopyAction, mime, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
         with patch.object(w, 'start_app_action') as start, patch.object(w, 'add_paths') as add_music:
             w.dropEvent(drop)
-            start.assert_called_once_with('upload', 'org.videolan.vlc-ios', 'Inbox', ['/tmp/sample.pdf'])
+            start.assert_called_once_with('upload', 'org.videolan.vlc-ios', 'Inbox', [sample_file])
             add_music.assert_not_called()
 
         w.devices_found([])

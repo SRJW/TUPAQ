@@ -16,7 +16,7 @@ def main():
     if subprocess.run(view, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         with tempfile.TemporaryDirectory() as directory:
             notes = Path(directory)/'notes.md'
-            notes.write_text('''TUPAQ 0.3.0-preview.32: nueva sección «Archivos de apps» para gestionar la carpeta Documentos de apps instaladas en el iPhone.
+            notes.write_text('''TUPAQ 0.3.0-preview.33: nueva sección «Archivos de apps» para gestionar la carpeta Documentos de apps instaladas en el iPhone.
 
 - Lista las aplicaciones de usuario instaladas en el iPhone que habilitan el intercambio de archivos de iOS (`UIFileSharingEnabled`) mediante `installation_proxy` y abre su carpeta `/Documents` por USB mediante `house_arrest` (`VendDocuments`).
 - Permite explorar subcarpetas, subir de nivel y crear carpetas nuevas dentro de `/Documents`.
