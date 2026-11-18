@@ -98,3 +98,14 @@ class LibraryViewTests(unittest.TestCase):
                 db.executescript("ALTER TABLE item_playback ADD COLUMN duration; ALTER TABLE item_playback ADD COLUMN sample_rate; UPDATE item_extra SET total_time_ms=0; INSERT INTO item_playback VALUES(1,301,6526800,44100);")
                 db.commit()
             self.assertEqual(read_catalogue(path)[0]['duration'],148)
+
+    def test_unknown_audio_format_code_does_not_claim_catalogue_format_source(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/'library.db';path.write_bytes(initial_catalogue())
+            with closing(sqlite3.connect(path)) as db:
+                db.execute("INSERT INTO item_playback VALUES(1,9999)")
+                db.commit()
+            track=read_catalogue(path)[0]
+            self.assertIsNone(track.get('format_label'))
+            self.assertNotIn('format_source',track)
+

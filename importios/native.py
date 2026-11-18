@@ -381,6 +381,21 @@ class Window(QMainWindow):
         for control in (self.search,self.format_filter,self.content_filter):control.blockSignals(False)
         self.filter_library()
 
+    def track_matches_filters(self, track):
+        from .search import matches, matches_format
+        if self.format_filter.currentIndex() and not matches_format(track, self.format_filter.currentText()):
+            return False
+        if self.content_filter.currentIndex() == 1 and not (track.get('has_artwork') or track.get('artwork_paths')):
+            return False
+        if self.content_filter.currentIndex() == 2:
+            from .lyrics import state
+            if not state(track):
+                return False
+        text = self.search.text().strip().casefold()
+        if text and not matches(track, text):
+            return False
+        return True
+
     def filter_library(self, *ignored):
         from .library_fields import local_tracks
         self.library_epoch += 1
@@ -391,14 +406,15 @@ class Window(QMainWindow):
         known = any('is_local' in track for track in self.phone_tracks)
         displayed=local
         text=self.search.text().strip().casefold()
-        from .search import matches
-        if self.format_filter.currentIndex():displayed=[t for t in displayed if matches(t,self.format_filter.currentText())]
+        from .search import matches, matches_format
+        if self.format_filter.currentIndex():
+            selected_format = self.format_filter.currentText()
+            displayed=[t for t in displayed if matches_format(t, selected_format)]
         if self.content_filter.currentIndex()==1:displayed=[t for t in displayed if t.get('has_artwork') or t.get('artwork_paths')]
         elif self.content_filter.currentIndex()==2:
             from .lyrics import state
             displayed=[t for t in displayed if state(t)]
         if text:
-            from .search import matches
             displayed=[track for track in displayed if matches(track,text)]
         view=self.library_table
         selected={self.library_model.tracks[i.row()]['id'] for i in view.selectionModel().selectedRows()}
@@ -683,7 +699,10 @@ class Window(QMainWindow):
     def phone_details_ready(self, epoch, identifier, details):
         if epoch == self.library_epoch:
             self.library_model.set_details(identifier,details)
-            if details.get('usb_exists') is False:self.filter_library()
+            row = self.library_model.rows.get(identifier)
+            track = self.library_model.tracks[row] if row is not None else None
+            if details.get('usb_exists') is False or (track is not None and not self.track_matches_filters(track)):
+                self.filter_library()
             else:self.library_selection_changed()
 
     def library_selection_changed(self, *ignored):

@@ -176,6 +176,29 @@ class ReferenceUITests(unittest.TestCase):
         w.library_model.checked.add('a');w.format_filter.setCurrentIndex(w.format_filter.findText('MP3'));self.assertEqual([t['id'] for t in w.library_model.tracks],['b'])
         w.format_filter.setCurrentIndex(0);w.content_filter.setCurrentIndex(1);self.assertEqual([t['id'] for t in w.library_model.tracks],['a']);self.assertEqual(w.library_model.checked,{'a'})
 
+    def test_format_filter_excludes_metadata_false_positives_and_refilters_on_header_mismatch(self):
+        w=self.w
+        w.show_library([
+            dict(TRACK,id='mp3',title='Heat Waves',artist='Isaac Palace',album='New Wave AIFF',format_label='MP3',afc_path='iTunes_Control/Music/F00/AAAA.mp3'),
+            dict(TRACK,id='aif',title='Uno',format_label=None,afc_path='iTunes_Control/Music/F00/BBBB.aif'),
+            dict(TRACK,id='aifc',title='Dos',format_label='AIFF-C',format_source='header',afc_path='iTunes_Control/Music/F00/CCCC.aif'),
+            dict(TRACK,id='fake',title='Falso',format_label='MP3',format_source='catalogue',afc_path='iTunes_Control/Music/F00/DDDD.mp3'),
+        ])
+        for label in ('WAV','AAC','ALAC','M4A'):
+            w.format_filter.setCurrentIndex(w.format_filter.findText(label))
+            self.assertEqual([t['id'] for t in w.library_model.tracks],[],label)
+        w.format_filter.setCurrentIndex(w.format_filter.findText('AIFF'))
+        self.assertEqual({t['id'] for t in w.library_model.tracks},{'aif','aifc'})
+        w.format_filter.setCurrentIndex(w.format_filter.findText('MP3'))
+        self.assertEqual({t['id'] for t in w.library_model.tracks},{'mp3','fake'})
+        epoch=w.library_epoch
+        w.phone_details_ready(epoch,'mp3',{'format_label':'MP3','format_source':'header','usb_exists':True,'usb_details_read':True})
+        self.assertEqual(w.library_epoch,epoch)
+        w.phone_details_ready(epoch,'fake',{'format_label':'WAV','format_source':'header','usb_exists':True,'usb_details_read':True})
+        self.assertEqual([t['id'] for t in w.library_model.tracks],['mp3'])
+        w.format_filter.setCurrentIndex(w.format_filter.findText('WAV'))
+        self.assertEqual([t['id'] for t in w.library_model.tracks],['fake'])
+
     def test_automatic_import_requires_the_same_loaded_device_and_explicit_setting(self):
         w=self.w;w.connection_token='one';w.library_ready=True;w.device_details={'_device_token':'a'*64}
         with patch.object(w,'import_songs') as send:

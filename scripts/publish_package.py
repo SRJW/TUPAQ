@@ -16,19 +16,14 @@ def main():
     if subprocess.run(view, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         with tempfile.TemporaryDirectory() as directory:
             notes = Path(directory)/'notes.md'
-            notes.write_text('''TUPAQ 0.3.0-preview.30: envío nativo de letras de texto con canciones nuevas.
+            notes.write_text('''TUPAQ 0.3.0-preview.31: correcciones en el filtrado de canciones por formato.
 
-- Implementado el recurso de letras USB, además de conservar las etiquetas originales. Se leen USLT y ©lyr; el texto de SYLT puede enviarse sin activar karaoke.
-- Basado en el análisis estático de AMPDevicesAgent 1.7.0.155: UTF-8, ruta específica Lyrics, checksum y confirmación conjunta de componentes.
-- Verificación del texto completo y checksum registrados en el catálogo. Letras omitidas, alteradas o corruptas no se declaran verificadas.
-- Preferencias → Metadatos: opción para importar letras incrustadas, activa por defecto. Los originales no se modifican ni se descargan letras.
-- Recuperación con los mismos IDs, conservación de letras anteriores y prevención de duplicados. Volver a elegir una canción ya importada no actualiza sus letras retroactivamente.
-- 245 pruebas en desarrollo, incluidos fallos de entrega, MP3/M4A, Unicode, carátulas, manifiestos y conservación de tiempos SYLT.
-- Corregida la espera de la prueba de animación en runners Mac ocupados: comprueba su finalización natural con límite, manteniendo la duración de producción de 180 ms. No se fuerza ni omite la animación para aprobar la prueba.
-
-Esta versión es candidata para validación: el registro se prueba en un teléfono simulado y se comprueba en el catálogo del dispositivo conectado; la visualización en Música del iPhone físico sigue pendiente. No se afirma soporte de letras sincronizadas ni karaoke. La referencia TTML encontrada no demuestra su entrega por USB. Investigación y límites en docs/LETRAS-INVESTIGACION.md.
-
-Prueba una canción nueva con letra incrustada y comprueba después su visualización en Música. Si falla, conserva catalogue-backups y copia el diagnóstico. No repitas una inserción pendiente ni elimines sus registros. Una copia de catálogo no sustituye una copia de los audios.
+- El filtro de formato de la biblioteca ya solo evalúa el formato real de la canción y no coincidencias parciales en título, artista o álbum (por ejemplo, canciones con «Wave», «Palace» o «Isaac» dejaban pasar MP3 al filtrar por WAV, ALAC o AAC).
+- Corregida la equivalencia de variantes AIFF: ahora los archivos `AIFF-C` y `.aif` sin etiqueta de catálogo (o marcados como `PCM`) aparecen correctamente al filtrar por `AIFF`.
+- Corregido el reconocimiento de contenedor `M4A` para archivos `.alac` y pistas con contenedor `M4A`.
+- Cuando la inspección USB por cabecera confirma que un archivo no tiene un formato válido (`format_source='header'`), deja de mostrarse por su extensión de nombre.
+- Al completarse la comprobación USB de cabecera de una fila visible, si su formato real contradice el filtro activo, la lista se vuelve a filtrar automáticamente.
+- El lector del catálogo ya no marca `format_source='catalogue'` cuando `item_playback.audio_format` tiene un código no reconocido.
 
 MP3, WAV, M4A (AAC/ALAC) y AIFF; sin M4P ni FLAC. Windows necesita el servicio/controlador USB de Apple. Paquetes sin firma ni notarización. No se distribuyen fuentes ni DLL de Apple o 3uTools.
 ''', encoding='utf-8')

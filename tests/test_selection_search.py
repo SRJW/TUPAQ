@@ -5,7 +5,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QMessageBox
 from test_native_connection import APP,Window
-from importios.search import matches
+from importios.search import matches, matches_format
 
 ROWS=[{'id':'a','title':'Alpha','artist':'Artist','album':'Album','duration':42,'is_local':True,'usb_exists':True,
        'afc_path':'iTunes_Control/Music/F00/AAAA.mp3','format_label':'MP3'},
@@ -46,3 +46,35 @@ class SearchTests(unittest.TestCase):
         self.assertTrue(matches(ROWS[1],'m4a'));self.assertTrue(matches(ROWS[1],'.m4a artist'))
         self.assertTrue(matches(ROWS[1],'alac'));self.assertTrue(matches({'title':'Piano','format_label':'WAV'},'.wav'))
         self.assertFalse(matches(dict(ROWS[0],format_label='WAV',format_source='header'),'.mp3'))
+
+    def test_format_filter_never_matches_title_artist_or_album_substrings(self):
+        tricky={'title':'Heat Waves','artist':'Isaac Palace','album':'New Wave MP3 M4A AIFF',
+                'afc_path':'iTunes_Control/Music/F00/AAAA.mp3','format_label':'MP3'}
+        self.assertTrue(matches_format(tricky,'MP3'))
+        for other in ('WAV','AAC','ALAC','M4A','AIFF'):
+            with self.subTest(other=other):
+                self.assertFalse(matches_format(tricky,other))
+        self.assertTrue(matches(tricky,'waves'))
+        self.assertTrue(matches(tricky,'isaac'))
+
+    def test_aiff_variants_and_alac_container_and_header_unknown_bytes(self):
+        aifc={'title':'AIFC','afc_path':'iTunes_Control/Music/F00/A.aif','format_label':'AIFF-C','format_source':'header'}
+        self.assertTrue(matches_format(aifc,'AIFF'))
+        self.assertTrue(matches(aifc,'.aif'))
+        self.assertTrue(matches(aifc,'aiff'))
+        aif_no_label={'title':'AIF','afc_path':'iTunes_Control/Music/F00/B.aif'}
+        self.assertTrue(matches_format(aif_no_label,'AIFF'))
+        aif_pcm={'title':'PCM','afc_path':'iTunes_Control/Music/F00/C.aif','format_label':'PCM','format_source':'catalogue'}
+        self.assertTrue(matches_format(aif_pcm,'AIFF'))
+        alac_ext={'title':'ALAC','afc_path':'iTunes_Control/Music/F00/D.alac'}
+        self.assertTrue(matches_format(alac_ext,'ALAC'))
+        self.assertTrue(matches_format(alac_ext,'M4A'))
+        local_alac={'title':'Local','format':'ALAC','container':'M4A'}
+        self.assertTrue(matches_format(local_alac,'M4A'))
+        self.assertTrue(matches_format(local_alac,'ALAC'))
+        self.assertFalse(matches_format(local_alac,'AAC'))
+        bad_header={'title':'Corrupt','afc_path':'iTunes_Control/Music/F00/E.mp3','format_label':None,'format_source':'header'}
+        self.assertFalse(matches_format(bad_header,'MP3'))
+        self.assertFalse(matches(bad_header,'.mp3'))
+        self.assertFalse(matches({'title':'Song','artist':None,'album':None,'format_label':'MP3'},'none'))
+
