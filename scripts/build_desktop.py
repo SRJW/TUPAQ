@@ -60,6 +60,7 @@ def main():
                '--hidden-import','PySide6.QtSvg',
                '--hidden-import','pymobiledevice3.services.house_arrest',
                '--hidden-import','pymobiledevice3.services.installation_proxy',
+               '--hidden-import','pymobiledevice3.services.diagnostics',
                '--collect-submodules', 'mutagen', '--exclude-module', 'tkinter']
     from PySide6.QtCore import QLibraryInfo
     translations=Path(QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath))

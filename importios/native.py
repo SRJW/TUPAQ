@@ -6,6 +6,7 @@ from contextlib import closing
 import plistlib
 from pathlib import Path
 import re
+import shutil
 import sys
 import sqlite3
 import tempfile
@@ -27,10 +28,12 @@ from .models import LibraryModel, SortableItem, SORT_ROLE, byte_label, duration_
 from .version import VERSION
 from .transfers import run_transfer, TransferError
 from .app_files import run_app_action, AppFilesError, documents_path, parent_relative
+from .player import AudioPreviewPlayer
 
 from .bulk import MAX_SELECTION
 
 MAX_SIZE = 256 * 1024 * 1024
+MAX_CONVERT_SOURCE_SIZE = 512 * 1024 * 1024
 
 
 class Reader(QThread):
@@ -38,28 +41,49 @@ class Reader(QThread):
     problem = Signal(str)
     progress = Signal(int, int)
 
-    def __init__(self, paths, parent=None,limit=MAX_SELECTION):
+    def __init__(self, paths, parent=None, limit=MAX_SELECTION, convert_audio=False, convert_codec='alac', ffmpeg_path='', temp_dir=None):
         super().__init__(parent)
         self.paths = paths;self.limit=limit
+        self.convert_audio = bool(convert_audio)
+        self.convert_codec = convert_codec or 'alac'
+        self.ffmpeg_path = ffmpeg_path or ''
+        self.temp_dir = temp_dir
         self.credits=threading.Semaphore(64)
         self.problem_count=0
 
     def run(self):
         try:
             from .preparation import expand
-            self.paths=expand(self.paths,self.isInterruptionRequested,self.limit)
+            self.paths=expand(self.paths,self.isInterruptionRequested,self.limit,include_convertible=self.convert_audio)
         except (OSError,ValueError) as error:
             self.problem_count=1;self.problem.emit(str(error));return
+        from .transcode import CONVERTIBLE_EXTENSIONS, convert_to_m4a
         self.progress.emit(0,len(self.paths))
         last_progress=0.
         for index, path in enumerate(self.paths):
             if self.isInterruptionRequested():
                 break
             try:
+                source_path = path
+                converted_from = None
+                if source_path.suffix.casefold() in CONVERTIBLE_EXTENSIONS:
+                    if not self.convert_audio:
+                        raise ValueError('Formato no admitido directamente por Música. Activa la conversión automática en Preferencias.')
+                    if not 0 < source_path.stat().st_size <= MAX_CONVERT_SOURCE_SIZE:
+                        raise ValueError('El archivo está vacío o supera los 512 MB.')
+                    path = convert_to_m4a(
+                        source_path,
+                        target_codec=self.convert_codec,
+                        output_dir=self.temp_dir,
+                        ffmpeg_path=self.ffmpeg_path or None,
+                    )
+                    converted_from = source_path.name
                 if not 0 < path.stat().st_size <= MAX_SIZE:
                     raise ValueError('El archivo está vacío o supera los 256 MB.')
                 track = inspect_audio(path, path.name)
                 track['path'] = str(path.resolve())
+                if converted_from:
+                    track['converted_from'] = converted_from
                 try:
                     track['thumbnail'] = thumbnail(read_artwork(path),64) if index<96 else None
                 except (OSError, ValueError):
@@ -75,6 +99,37 @@ class Reader(QThread):
             if now-last_progress>=.1 or index+1==len(self.paths):
                 self.progress.emit(index+1,len(self.paths));last_progress=now
         if self.problem_count>100:self.problem.emit(f'{self.problem_count-100} archivos adicionales no se pudieron preparar.')
+
+
+class UpdateWorker(QThread):
+    result = Signal(dict)
+    problem = Signal(str)
+
+    def run(self):
+        try:
+            from .updates import check_for_updates
+            self.result.emit(check_for_updates(VERSION))
+        except Exception as error:
+            self.problem.emit(str(error))
+
+
+class PreviewAudioWorker(QThread):
+    ready = Signal(str)
+    problem = Signal(str)
+
+    def __init__(self, afc_path, target_path, parent=None):
+        super().__init__(parent)
+        self.afc_path = afc_path
+        self.target_path = Path(target_path)
+
+    def run(self):
+        try:
+            from .transfers import fetch_preview_audio
+            asyncio.run(fetch_preview_audio(self.afc_path, self.target_path))
+            self.ready.emit(str(self.target_path))
+        except Exception:
+            self.target_path.unlink(missing_ok=True)
+            self.problem.emit('No se pudo preparar la vista previa de audio desde el iPhone.')
 
 
 class DeviceReader(QThread):
@@ -143,7 +198,17 @@ class ArtworkReader(QThread):
                     from .lyrics import embedded_lyrics
                     audio=mutagen.File(track['path'])
                     result=embedded_lyrics(audio.tags if audio is not None else None)
-                    data=read_artwork(track['path'],limit=PREVIEW_BYTES)
+                    custom_cover = track.get('custom_artwork_path')
+                    data = None
+                    if custom_cover and Path(custom_cover).is_file():
+                        try:
+                            raw = Path(custom_cover).read_bytes()
+                            if len(raw) <= PREVIEW_BYTES:
+                                data = raw
+                        except OSError:
+                            data = None
+                    if data is None:
+                        data=read_artwork(track['path'],limit=PREVIEW_BYTES)
                     if data and image_info(data):result.update(cover=data,cover_source='embedded',**image_info(data))
                 else:
                     from .transfers import device
@@ -261,6 +326,14 @@ class Window(QMainWindow):
         self.library_worker = None
         self.transfer_worker = None
         self.app_worker = None
+        self.update_worker = None
+        self.latest_release = None
+        self.playlists = []
+        self.current_view_mode = 0
+        self.audio_player = AudioPreviewPlayer()
+        self.preview_audio_worker = None
+        self.preview_temp_dir = None
+        self.converted_temp_dir = None
         self.app_list = []
         self.app_list_token = None
         self.app_entries = []
@@ -302,6 +375,7 @@ class Window(QMainWindow):
         self.language_choice.currentIndexChanged.connect(self.change_language)
         QShortcut(QKeySequence.StandardKey.Find,self,activated=self.focus_search)
         QShortcut(QKeySequence.StandardKey.Open,self,activated=self.choose_files)
+        QShortcut(QKeySequence(Qt.Key.Key_F2),self,activated=self.shortcut_rename_app)
         self.persist_settings = auto_connect
         if self.persist_settings:
             settings = QSettings()
@@ -317,9 +391,14 @@ class Window(QMainWindow):
         self.library_path.setText(str(settings.value('library_path',music_folder)) if auto_connect else music_folder)
         for control,key,default in [(self.use_accent,'use_accent',True),(self.reduce_transparency,'reduce_transparency',False),
                                    (self.import_artwork,'send_artwork',True),(self.import_lyrics,'send_lyrics',True),(self.embed_artwork,'embed_export_artwork',False),
-                                   (self.auto_import,'auto_import',False),(self.refresh_after_transfer,'refresh_after_transfer',True)]:
+                                   (self.auto_import,'auto_import',False),(self.refresh_after_transfer,'refresh_after_transfer',True),
+                                   (self.export_incremental,'export_incremental',False),(self.convert_audio,'convert_audio',False),
+                                   (self.auto_check_updates,'auto_check_updates',True)]:
             control.blockSignals(True);control.setChecked(settings.value(key,default,type=bool) if auto_connect else default);control.blockSignals(False)
         self.metadata_choice.blockSignals(True);self.metadata_choice.setCurrentIndex(1 if auto_connect and settings.value('metadata_policy','keep')=='filename' else 0);self.metadata_choice.blockSignals(False)
+        self.export_structure.blockSignals(True);self.export_structure.setCurrentIndex(1 if auto_connect and settings.value('export_structure','flat')=='artist_album' else 0);self.export_structure.blockSignals(False)
+        self.convert_codec.blockSignals(True);self.convert_codec.setCurrentIndex(1 if auto_connect and settings.value('convert_codec','alac')=='aac' else 0);self.convert_codec.blockSignals(False)
+        self.ffmpeg_path.blockSignals(True);self.ffmpeg_path.setText(str(settings.value('ffmpeg_path','')) if auto_connect else '');self.ffmpeg_path.blockSignals(False)
         self.theme_choice.currentIndexChanged.connect(self.change_theme)
         self.auto_read.toggled.connect(self.change_auto_read)
         QApplication.styleHints().colorSchemeChanged.connect(self.system_theme_changed)
@@ -331,6 +410,9 @@ class Window(QMainWindow):
         self.artwork_timer.setSingleShot(True)
         self.artwork_timer.setInterval(180)
         self.artwork_timer.timeout.connect(self.fetch_visible_artwork)
+        self.preview_audio_timer = QTimer(self)
+        self.preview_audio_timer.setInterval(500)
+        self.preview_audio_timer.timeout.connect(self.poll_audio_preview)
         self.library_table.verticalScrollBar().valueChanged.connect(self.schedule_artwork)
         self.refresh_workspace()
         self.nav_buttons[0].setChecked(True)
@@ -339,6 +421,8 @@ class Window(QMainWindow):
         if self.background_enabled and self.auto_read.isChecked():
             self.device_timer.start()
             QTimer.singleShot(150,self.poll_device)
+        if self.background_enabled and self.auto_check_updates.isChecked():
+            QTimer.singleShot(2500, lambda: self.check_updates(automatic=True))
         self.rebuild_app_breadcrumbs()
         self.update_buttons()
 
@@ -347,7 +431,14 @@ class Window(QMainWindow):
         self.choose.setEnabled(not busy)
         self.clear.setEnabled(not busy and bool(self.tracks))
         self.export.setEnabled(not busy and bool(self.tracks))
-        self.remove.setEnabled(not busy and bool(self.table.selectionModel().selectedRows()))
+        selected_queue = self.table.selectionModel().selectedRows()
+        self.remove.setEnabled(not busy and bool(selected_queue))
+        if hasattr(self,'edit_metadata'):
+            self.edit_metadata.setEnabled(not busy and len(selected_queue) == 1)
+        if hasattr(self,'remove_duplicates'):
+            has_dups = any(t.get('in_phone') for t in self.tracks.values())
+            self.remove_duplicates.setVisible(has_dups)
+            self.remove_duplicates.setEnabled(not busy and has_dups)
         phone_busy = busy or self.library_worker is not None or self.device_worker is not None or self.app_worker is not None or self.after_artwork is not None
         self.device_button.setEnabled(not phone_busy)
         self.library_button.setEnabled(not phone_busy)
@@ -378,10 +469,15 @@ class Window(QMainWindow):
             self.app_add_files.setEnabled(not phone_busy and has_app)
             self.app_add_folder.setEnabled(not phone_busy and has_app)
             self.app_new_folder.setEnabled(not phone_busy and has_app)
+            if hasattr(self,'app_rename'):
+                self.app_rename.setEnabled(not phone_busy and has_app and len(selected_app) == 1)
             self.app_export.setEnabled(not phone_busy and has_app and bool(selected_app))
             self.app_delete.setEnabled(not phone_busy and has_app and bool(selected_app))
+            visible_rows = self.app_table.rowCount()
             if self.app_entries:
-                if selected_app:
+                if visible_rows != len(self.app_entries):
+                    self.app_entries_count.setText(tr(f'{visible_rows} de {len(self.app_entries)} elementos'))
+                elif selected_app:
                     self.app_entries_count.setText(tr(f'{len(self.app_entries)} elementos · {len(selected_app)} seleccionados'))
                 else:
                     self.app_entries_count.setText(tr(f'{len(self.app_entries)} elementos'))
@@ -430,6 +526,9 @@ class Window(QMainWindow):
             self.load_apps()
 
     def focus_search(self):
+        if self.pages.currentIndex() == 4 and hasattr(self, 'app_search'):
+            self.app_search.setFocus()
+            return
         self.navigate(0);self.search.setFocus()
 
     def resizeEvent(self,event):
@@ -452,6 +551,8 @@ class Window(QMainWindow):
                         if item is not None and hasattr(item,'retranslate'):item.retranslate()
             finally:table.setSortingEnabled(sorting)
         if hasattr(self,'preview_track'):self.request_preview(self.preview_track)
+        self.refresh_playlist_filter()
+        self.refresh_collection_grid()
         self.rebuild_app_breadcrumbs()
         self.library_empty.refresh()
         from .interface import fit_controls,set_column_metrics
@@ -463,13 +564,37 @@ class Window(QMainWindow):
         self.schedule_artwork()
 
     def clear_filters(self):
-        for control in (self.search,self.format_filter,self.content_filter):control.blockSignals(True)
-        self.search.clear();self.format_filter.setCurrentIndex(0);self.content_filter.setCurrentIndex(0)
-        for control in (self.search,self.format_filter,self.content_filter):control.blockSignals(False)
+        for control in (self.search,self.format_filter,self.content_filter,self.playlist_filter):control.blockSignals(True)
+        self.search.clear();self.format_filter.setCurrentIndex(0);self.content_filter.setCurrentIndex(0);self.playlist_filter.setCurrentIndex(0)
+        for control in (self.search,self.format_filter,self.content_filter,self.playlist_filter):control.blockSignals(False)
         self.filter_library()
 
     def active_format_filter(self):
         return self.format_filter.currentText() if self.format_filter.currentIndex() else None
+
+    def active_playlist(self):
+        if not hasattr(self, 'playlist_filter'):
+            return None
+        pid = self.playlist_filter.currentData()
+        if not pid:
+            return None
+        return next((pl for pl in self.playlists if pl['id'] == pid), None)
+
+    def refresh_playlist_filter(self):
+        if not hasattr(self, 'playlist_filter'):
+            return
+        previous = self.playlist_filter.currentData()
+        self.playlist_filter.blockSignals(True)
+        self.playlist_filter.clear()
+        self.playlist_filter.addItem(str(tr('Todas las playlists')), '')
+        for pl in self.playlists:
+            self.playlist_filter.addItem(f"{pl['name']} ({len(pl['track_ids'])})", pl['id'])
+        if previous:
+            idx = self.playlist_filter.findData(previous)
+            if idx >= 0:
+                self.playlist_filter.setCurrentIndex(idx)
+        self.playlist_filter.setVisible(bool(self.playlists))
+        self.playlist_filter.blockSignals(False)
 
     def exportable_tracks(self):
         selected = self.marked_tracks()
@@ -482,8 +607,9 @@ class Window(QMainWindow):
     def update_select_all_label(self):
         has_search = bool(self.search.text().strip())
         has_content = bool(self.content_filter.currentIndex())
+        has_playlist = self.active_playlist() is not None
         fmt = self.active_format_filter()
-        if has_search or has_content:
+        if has_search or has_content or has_playlist:
             self.select_visible.setText(tr('Seleccionar resultados'))
         elif fmt:
             self.select_visible.setText(tr(f'Seleccionar todos los {fmt}'))
@@ -492,6 +618,9 @@ class Window(QMainWindow):
 
     def track_matches_filters(self, track):
         from .search import matches, matches_format
+        pl = self.active_playlist()
+        if pl is not None and track.get('id') not in set(pl['track_ids']):
+            return False
         if self.format_filter.currentIndex() and not matches_format(track, self.format_filter.currentText()):
             return False
         if self.content_filter.currentIndex() == 1 and not (track.get('has_artwork') or track.get('artwork_paths')):
@@ -500,10 +629,53 @@ class Window(QMainWindow):
             from .lyrics import state
             if not state(track):
                 return False
+        if self.content_filter.currentIndex() == 3:
+            from .library_fields import local_tracks
+            from .duplicates import duplicate_ids_in_library
+            if track.get('id') not in duplicate_ids_in_library(local_tracks(self.phone_tracks)):
+                return False
         text = self.search.text().strip().casefold()
         if text and not matches(track, text):
             return False
         return True
+
+    def change_library_view_mode(self, mode_index):
+        self.current_view_mode = mode_index if mode_index in (0, 1, 2) else 0
+        if hasattr(self, 'library_views'):
+            self.library_views.setCurrentIndex(0 if self.current_view_mode == 0 else 1)
+        self.refresh_collection_grid()
+
+    def refresh_collection_grid(self):
+        if self.current_view_mode == 0 or not hasattr(self, 'collection_grid'):
+            return
+        mode = 'albums' if self.current_view_mode == 1 else 'artists'
+        self.collection_grid.populate(
+            self.library_model.tracks,
+            self.library_model.checked,
+            self.library_model.icons,
+            getattr(self, 'default_music_icon', None),
+            mode=mode,
+        )
+
+    def toggle_collection_group(self, track_ids, checked):
+        if checked:
+            self.library_model.checked.update(track_ids)
+        else:
+            self.library_model.checked.difference_update(track_ids)
+        if self.library_model.rowCount():
+            self.library_model.dataChanged.emit(
+                self.library_model.index(0, 0),
+                self.library_model.index(self.library_model.rowCount() - 1, 0),
+                [Qt.ItemDataRole.CheckStateRole],
+            )
+        self.library_model.checkedChanged.emit()
+
+    def open_collection_group(self, mode, label):
+        if hasattr(self, 'view_mode_buttons') and self.view_mode_buttons:
+            self.view_mode_buttons[0].setChecked(True)
+        self.change_library_view_mode(0)
+        if label not in ('Sin álbum', 'Sin artista'):
+            self.search.setText(label)
 
     def filter_library(self, *ignored):
         from .library_fields import local_tracks
@@ -514,6 +686,10 @@ class Window(QMainWindow):
         local = local_tracks(self.phone_tracks)
         known = any('is_local' in track for track in self.phone_tracks)
         displayed=local
+        pl = self.active_playlist()
+        if pl is not None:
+            order = {tid: idx for idx, tid in enumerate(pl['track_ids'])}
+            displayed = sorted([t for t in displayed if t['id'] in order], key=lambda t: order[t['id']])
         text=self.search.text().strip().casefold()
         from .search import matches, matches_format
         if self.format_filter.currentIndex():
@@ -523,6 +699,10 @@ class Window(QMainWindow):
         elif self.content_filter.currentIndex()==2:
             from .lyrics import state
             displayed=[t for t in displayed if state(t)]
+        elif self.content_filter.currentIndex()==3:
+            from .duplicates import duplicate_ids_in_library
+            dup_ids = duplicate_ids_in_library(local)
+            displayed=[t for t in displayed if t['id'] in dup_ids]
         if text:
             displayed=[track for track in displayed if matches(track,text)]
         view=self.library_table
@@ -553,6 +733,7 @@ class Window(QMainWindow):
         self.library_selection_changed()
         self.update_library_summary()
         self.checks_changed()
+        self.refresh_collection_grid()
         self.update_buttons()
         self.schedule_artwork()
 
@@ -585,11 +766,66 @@ class Window(QMainWindow):
             self.library_path.setText(folder)
             if self.persist_settings:QSettings().setValue('library_path',folder)
 
+    def choose_ffmpeg_path(self):
+        path,_=QFileDialog.getOpenFileName(self,tr('Elegir ejecutable ffmpeg'),self.ffmpeg_path.text())
+        if path:
+            self.ffmpeg_path.setText(path)
+            self.save_transfer_preferences()
+
+    def check_updates(self, automatic=False):
+        if self.update_worker is not None:
+            return
+        if hasattr(self, 'check_updates_button'):
+            self.check_updates_button.setEnabled(False)
+        if not automatic and hasattr(self, 'update_status_label'):
+            self.update_status_label.setText(tr('Comprobando GitHub Releases…'))
+        self.update_worker = UpdateWorker(self)
+        self.update_worker.result.connect(lambda info, auto=automatic: self.update_check_result(info, auto))
+        self.update_worker.problem.connect(lambda msg, auto=automatic: self.update_check_problem(msg, auto))
+        self.update_worker.finished.connect(self.update_check_finished)
+        self.update_worker.start()
+
+    def update_check_result(self, info, automatic=False):
+        available = bool(info and info.get('available'))
+        self.latest_release = info if available else None
+        if available:
+            ver = info.get('version') or info.get('tag') or ''
+            self.update_banner_label.setText(tr(f'Nueva versión disponible: TUPAQ {ver}'))
+            self.update_banner.show()
+            self.open_update_button.show()
+            self.update_status_label.setText(tr(f'Disponible TUPAQ {ver} en GitHub Releases (actual: {VERSION}).'))
+        else:
+            self.update_banner.hide()
+            self.open_update_button.hide()
+            if not automatic:
+                self.update_status_label.setText(tr(f'Ya tienes la última versión publicada ({VERSION}).'))
+
+    def update_check_problem(self, message, automatic=False):
+        if not automatic and hasattr(self, 'update_status_label'):
+            self.update_status_label.setText(tr(message))
+
+    def update_check_finished(self):
+        worker = self.update_worker
+        self.update_worker = None
+        if worker is not None:
+            worker.deleteLater()
+        if hasattr(self, 'check_updates_button'):
+            self.check_updates_button.setEnabled(True)
+
+    def open_update_release(self):
+        from .updates import ALLOWED_PREFIX
+        url = (self.latest_release or {}).get('url', '')
+        if url.startswith(ALLOWED_PREFIX):
+            QDesktopServices.openUrl(QUrl(url))
+
     def save_transfer_preferences(self,*ignored):
         if not getattr(self,'persist_settings',False):return
         settings=QSettings()
-        for control,key in [(self.import_artwork,'send_artwork'),(self.import_lyrics,'send_lyrics'),(self.embed_artwork,'embed_export_artwork'),(self.auto_import,'auto_import'),(self.refresh_after_transfer,'refresh_after_transfer')]:settings.setValue(key,control.isChecked())
+        for control,key in [(self.import_artwork,'send_artwork'),(self.import_lyrics,'send_lyrics'),(self.embed_artwork,'embed_export_artwork'),(self.auto_import,'auto_import'),(self.refresh_after_transfer,'refresh_after_transfer'),(self.export_incremental,'export_incremental'),(self.convert_audio,'convert_audio'),(self.auto_check_updates,'auto_check_updates')]:settings.setValue(key,control.isChecked())
         settings.setValue('metadata_policy','filename' if self.metadata_choice.currentIndex()==1 else 'keep')
+        settings.setValue('export_structure','artist_album' if self.export_structure.currentIndex()==1 else 'flat')
+        settings.setValue('convert_codec','aac' if self.convert_codec.currentIndex()==1 else 'alac')
+        settings.setValue('ffmpeg_path',self.ffmpeg_path.text().strip())
 
     def change_visual_options(self,*ignored):
         from .interface import apply_theme
@@ -628,6 +864,36 @@ class Window(QMainWindow):
             self.diagnostic_fields['storage'].setText(f'{(total-free)/10**9:.1f} GB / {total/10**9:.1f} GB')
             self.storage_bar.setValue(round((total-free)*1000/total));self.storage_bar.show()
         else:self.diagnostic_fields['storage'].setText(tr('Pendiente'));self.storage_bar.hide()
+        battery=info.get('battery')
+        if 'battery_health' in self.diagnostic_fields:
+            if isinstance(battery,dict) and battery:
+                headline_parts=[]
+                if 'health_percent' in battery:
+                    headline_parts.append(f"{battery['health_percent']:g}%")
+                    self.battery_bar.setValue(round(battery['health_percent']*10));self.battery_bar.show()
+                elif 'charge_percent' in battery:
+                    headline_parts.append(f"{battery['charge_percent']}%")
+                    self.battery_bar.setValue(battery['charge_percent']*10);self.battery_bar.show()
+                else:
+                    self.battery_bar.hide()
+                if 'cycle_count' in battery:
+                    headline_parts.append(str(tr(f"{battery['cycle_count']} ciclos")))
+                self.diagnostic_fields['battery_health'].setText(' · '.join(headline_parts) or tr('Disponible'))
+                details=[]
+                if 'charge_percent' in battery:
+                    charge_suffix = tr(' (cargando)') if battery.get('is_charging') else tr(' (conectado)') if battery.get('external_connected') else ''
+                    details.append(str(tr(f"Carga actual: {battery['charge_percent']}%")) + str(charge_suffix))
+                if 'max_capacity_mah' in battery and 'design_capacity_mah' in battery:
+                    details.append(f"{battery['max_capacity_mah']} / {battery['design_capacity_mah']} mAh")
+                if 'temperature_c' in battery:
+                    details.append(f"{battery['temperature_c']:.1f} °C")
+                if 'voltage_v' in battery:
+                    details.append(f"{battery['voltage_v']:.2f} V")
+                self.diagnostic_fields['battery_detail'].setText(' · '.join(details) if details else tr('Telemetría de batería leída desde iOS.'))
+            else:
+                self.diagnostic_fields['battery_health'].setText(tr('Pendiente'))
+                self.battery_bar.hide()
+                self.diagnostic_fields['battery_detail'].setText(tr('Batería no disponible en esta sesión USB.' if self.usb_connected else 'Conecta el iPhone para consultar la telemetría de batería por USB.'))
         result=self.diagnostic_result
         self.diagnostic_fields['files'].setText(tr(f"{result['diagnosed']} audios leídos · {result.get('files_failed',0)} no disponibles") if result else tr('Pendiente'))
         self.diagnostic_fields['formats'].setText(tr('Formatos admitidos'))
@@ -721,8 +987,11 @@ class Window(QMainWindow):
             self.library_ready = False
             self.library_epoch += 1
             self.phone_tracks = []
+            self.playlists = []
+            self.refresh_playlist_filter()
             self.library_model.checked.clear()
             self.filter_library()
+            self.refresh_queue_duplicates()
             self.artwork_attempted.clear()
             self.reset_app_files()
             self.device_name.setText('iPhone');self.device_details={};self.diagnostic_result=None
@@ -740,8 +1009,11 @@ class Window(QMainWindow):
             self.retry_library_at = 0
             self.library_epoch += 1
             self.phone_tracks = []
+            self.playlists = []
+            self.refresh_playlist_filter()
             self.library_model.checked.clear()
             self.filter_library()
+            self.refresh_queue_duplicates()
             self.artwork_attempted.clear()
             self.reset_app_files()
         stamp=devices[0].get('catalogue_stamp')
@@ -758,8 +1030,11 @@ class Window(QMainWindow):
         self.library_ready = False
         self.library_epoch += 1
         self.phone_tracks = []
+        self.playlists = []
+        self.refresh_playlist_filter()
         self.library_model.checked.clear()
         self.filter_library()
+        self.refresh_queue_duplicates()
         self.artwork_attempted.clear()
         self.reset_app_files()
         self.set_connection_status(False,'Servicio USB no disponible')
@@ -810,6 +1085,8 @@ class Window(QMainWindow):
             from .visuals import table_cover
             self.library_model.set_icon(identifier,table_cover(image,28))
             self.artwork_attempted.discard(identifier)
+            if self.current_view_mode > 0:
+                self.refresh_collection_grid()
             self.library_selection_changed()
 
     def phone_details_ready(self, epoch, identifier, details):
@@ -836,15 +1113,98 @@ class Window(QMainWindow):
             identifier=self.table.item(rows[0].row(),0).data(Qt.ItemDataRole.UserRole)
             if identifier in self.tracks:self.show_track_details(self.tracks[identifier],'Para importar')
 
+    def inspector_closed(self, *ignored):
+        self.stop_audio_preview()
+        self.inspector_toggle.setChecked(False)
+
+    def stop_audio_preview(self):
+        if hasattr(self, 'preview_audio_timer'):
+            self.preview_audio_timer.stop()
+        if hasattr(self, 'audio_player'):
+            self.audio_player.stop()
+        if hasattr(self, 'preview_play_button'):
+            self.preview_play_button.setText(tr('Escuchar vista previa'))
+        if hasattr(self, 'preview_audio_status'):
+            self.preview_audio_status.hide()
+
+    def poll_audio_preview(self):
+        if not self.audio_player.is_playing:
+            self.stop_audio_preview()
+
+    def start_local_audio_preview(self, path):
+        try:
+            self.audio_player.play(path)
+            self.preview_play_button.setText(tr('Detener vista previa'))
+            self.preview_audio_status.setText(tr('Reproduciendo vista previa…'))
+            self.preview_audio_status.show()
+            self.preview_audio_timer.start(500)
+        except Exception as error:
+            self.preview_audio_status.setText(tr(str(error)))
+            self.preview_audio_status.show()
+
+    def toggle_audio_preview(self):
+        if self.audio_player.is_playing:
+            self.stop_audio_preview()
+            return
+        if self.preview_audio_worker is not None:
+            return
+        track = getattr(self, 'preview_track', None)
+        if not track:
+            return
+        if track.get('path') and Path(track['path']).is_file():
+            self.start_local_audio_preview(track['path'])
+            return
+        afc_path = track.get('afc_path')
+        if not afc_path:
+            return
+        if self.preview_temp_dir is None:
+            self.preview_temp_dir = Path(tempfile.mkdtemp(prefix='tupaq-preview-'))
+        suffix = Path(afc_path).suffix.lower() or '.m4a'
+        safe_id = re.sub(r'[^a-zA-Z0-9_-]', '_', str(track.get('id') or 'track'))[:64]
+        target = self.preview_temp_dir / f'preview-{safe_id}{suffix}'
+        if target.is_file() and target.stat().st_size > 0:
+            self.start_local_audio_preview(target)
+            return
+        self.preview_play_button.setEnabled(False)
+        self.preview_audio_status.setText(tr('Preparando vista previa desde el iPhone…'))
+        self.preview_audio_status.show()
+        self.preview_audio_worker = PreviewAudioWorker(afc_path, target, self)
+        self.preview_audio_worker.ready.connect(self.preview_audio_ready)
+        self.preview_audio_worker.problem.connect(self.preview_audio_problem)
+        self.preview_audio_worker.finished.connect(self.preview_audio_finished)
+        self.preview_audio_worker.start()
+
+    def preview_audio_ready(self, local_path):
+        if not self.closing:
+            self.start_local_audio_preview(local_path)
+
+    def preview_audio_problem(self, message):
+        self.preview_audio_status.setText(tr(message))
+        self.preview_audio_status.show()
+
+    def preview_audio_finished(self):
+        worker = self.preview_audio_worker
+        self.preview_audio_worker = None
+        if worker is not None:
+            worker.deleteLater()
+        track = getattr(self, 'preview_track', None)
+        playable = bool(track and (track.get('path') or (track.get('afc_path') and track.get('usb_exists') is not False)))
+        self.preview_play_button.setEnabled(playable)
+
     def clear_inspector(self):
+        self.stop_audio_preview()
         self.preview_generation+=1;self.preview_key=None;self.preview_result={};self.preview_pending=None
         self.cover_metadata.setText('—');self.view_cover.setEnabled(False);self.view_lyrics.setEnabled(False);self.lyrics_status.setText(tr('No se ha detectado letra'))
+        if hasattr(self, 'preview_play_button'):
+            self.preview_play_button.setEnabled(False)
         self.now_cover.setPixmap(QPixmap());self.now_cover.setText('♪')
         self.now_title.setText(tr('Tu música, siempre contigo.'));self.info_artist.setText(tr('Selecciona una canción para ver sus detalles.'));self.info_origin.setText(tr('TU COLECCIÓN'))
         for value in self.info_fields.values():value.setText('—')
         for value in self.inspector_details:value.hide()
 
     def show_track_details(self,track,origin):
+        if self.preview_key != self.preview_identity(track):
+            self.stop_audio_preview()
         for value in self.inspector_details:value.show()
         self.now_title.setText(track.get('title') or tr('Sin título'));self.info_artist.setText(track.get('artist') or tr('Sin artista'))
         self.info_origin.setText(tr(origin.upper()))
@@ -860,6 +1220,9 @@ class Window(QMainWindow):
                 'Disponible por USB' if track.get('afc_path') and track.get('usb_exists') is not False else 'Sin acceso USB'}
         for key,value in values.items():
             if key in self.info_fields:self.info_fields[key].setText(value)
+        if hasattr(self, 'preview_play_button'):
+            playable = bool(track.get('path') or (track.get('afc_path') and track.get('usb_exists') is not False))
+            self.preview_play_button.setEnabled(playable and self.preview_audio_worker is None)
         if self.preview_result.get('image') is not None and self.preview_key==self.preview_identity(track):
             self.request_preview(track);return
         image=QPixmap()
@@ -870,7 +1233,7 @@ class Window(QMainWindow):
         self.request_preview(track)
 
     def preview_identity(self,track):
-        return ('local',track.get('id'),track.get('path')) if track.get('path') else ('phone',self.connection_token,track.get('id'),self.library_model.cover_key(track))
+        return ('local',track.get('id'),track.get('path'),track.get('custom_artwork_path')) if track.get('path') else ('phone',self.connection_token,track.get('id'),self.library_model.cover_key(track))
 
     def request_preview(self,track):
         from .lyrics import label
@@ -964,7 +1327,10 @@ class Window(QMainWindow):
         visible={track['id'] for track in self.library_model.tracks};checked=visible & self.library_model.checked
         self.select_visible.blockSignals(True)
         self.select_visible.setCheckState(Qt.CheckState.Checked if visible and checked==visible else Qt.CheckState.PartiallyChecked if checked else Qt.CheckState.Unchecked)
-        self.select_visible.blockSignals(False);self.update_buttons()
+        self.select_visible.blockSignals(False)
+        if self.current_view_mode > 0 and hasattr(self, 'collection_grid'):
+            self.collection_grid.sync_checks(self.library_model.checked)
+        self.update_buttons()
 
     def delete_songs(self):
         selected=self.marked_tracks()
@@ -986,9 +1352,20 @@ class Window(QMainWindow):
         if not selected:
             return
         fmt=self.active_format_filter()
+        structure='artist_album' if hasattr(self,'export_structure') and self.export_structure.currentIndex()==1 else 'flat'
+        incremental=bool(hasattr(self,'export_incremental') and self.export_incremental.isChecked())
+        pl=self.active_playlist()
+        extra={}
+        if fmt:extra['expected_format']=fmt
+        if structure!='flat':extra['folder_structure']=structure
+        if incremental:extra['incremental']=True
+        if pl is not None:
+            extra['playlist_name']=pl['name']
+            order={tid:idx for idx,tid in enumerate(pl['track_ids'])}
+            selected=sorted(selected,key=lambda t:order.get(t['id'],len(order)))
         folder = QFileDialog.getExistingDirectory(self,tr('Guardar audio del iPhone en…'),self.library_path.text())
         if folder:
-            items=[dict(t,embed_artwork=self.embed_artwork.isChecked(),**({'expected_format':fmt} if fmt else {})) for t in selected]
+            items=[dict(t,embed_artwork=self.embed_artwork.isChecked(),**extra) for t in selected]
             self.start_transfer('export',items,Path(folder))
 
     def start_transfer(self, mode, selected, destination):
@@ -1061,7 +1438,7 @@ class Window(QMainWindow):
         if not (control and control.event.is_set()):self.status.setText(tr(label));self.transfer_stage.setText(tr(label))
         phase_label=label.partition(' · ')[2] if label.startswith('Lote ') else label
         if phase_label.startswith(('Importando:','Exportando:','Enviando metadatos')):self.transfer_phase=1
-        elif phase_label.startswith(('Comprobando las canciones','Esperando la actualización','Importación comprobada','Exportada:','Omitida por formato distinto:')):self.transfer_phase=2
+        elif phase_label.startswith(('Comprobando las canciones','Esperando la actualización','Importación comprobada','Exportada:','Omitida por formato distinto:','Omitida (ya exportada):')):self.transfer_phase=2
         elif phase_label.startswith(('Leyendo el estado','Preparando el envío','Comprobando operaciones','Buscando canciones')):self.transfer_phase=0
         self.paint_transfer_stages()
         if identifier and identifier != self.progress_track_id and identifier in self.tracks:
@@ -1097,11 +1474,14 @@ class Window(QMainWindow):
             self.library_model.checked.difference_update(result.get('item_ids',[]))
         elif 'exported' in result:
             skipped_format = result.get('skipped_format',0)
+            skipped_existing = result.get('skipped_existing',0)
             if skipped_format:
                 self.status.setText(tr(f"{result['exported']} archivos exportados y comprobados. {skipped_format} omitidos por formato distinto."))
             else:
                 self.status.setText(tr(f"{result['exported']} archivos exportados y comprobados."))
+            if skipped_existing:self.status.setText(self.status.text()+' '+tr(f"{skipped_existing} omitidos (ya existían)."))
             if result.get('covers_embedded'):self.status.setText(self.status.text()+' '+tr(f"{result['covers_embedded']} carátulas incrustadas en las copias."))
+            if result.get('playlist_file'):self.status.setText(self.status.text()+' '+tr('Playlist .m3u8 guardada.'))
         elif 'reconciled' in result and 'imported' not in result:
             self.status.setText(tr(f"{result.get('verified',0)} audios comprobados · {result.get('metadata_unverified',0)} con metadatos por revisar · {result.get('retired',0)} retirados por el iPhone · {result.get('removed',0)} eliminaciones comprobadas"))
         elif 'updated' in result:
@@ -1152,8 +1532,12 @@ class Window(QMainWindow):
             self.load_library()
 
     def choose_files(self):
-        paths, _ = QFileDialog.getOpenFileNames(self, tr('Elegir canciones'), self.library_path.text(),
-            tr('Audio (*.mp3 *.wav *.m4a *.alac *.aif *.aiff);;Todos los archivos (*)'))
+        audio_filter = (
+            'Audio (*.mp3 *.wav *.m4a *.alac *.aif *.aiff *.flac *.ogg *.oga *.opus *.wma *.mka *.webm);;Todos los archivos (*)'
+            if hasattr(self, 'convert_audio') and self.convert_audio.isChecked()
+            else 'Audio (*.mp3 *.wav *.m4a *.alac *.aif *.aiff);;Todos los archivos (*)'
+        )
+        paths, _ = QFileDialog.getOpenFileNames(self, tr('Elegir canciones'), self.library_path.text(), tr(audio_filter))
         self.add_paths(paths)
 
     def check_device(self, automatic=False):
@@ -1194,7 +1578,11 @@ class Window(QMainWindow):
         if self.current_library_result():self.device_name.setText(name);self.update_diagnostics()
 
     def accept_library_info(self,info):
-        if self.current_library_result():self.device_details=info;self.update_diagnostics()
+        if self.current_library_result():
+            self.device_details=info
+            self.playlists=list(info.get('_playlists') or [])
+            self.refresh_playlist_filter()
+            self.update_diagnostics()
 
     def load_library(self, automatic=False):
         if self.library_worker is not None or self.transfer_worker is not None or self.app_worker is not None:
@@ -1234,6 +1622,7 @@ class Window(QMainWindow):
         from .library_fields import local_tracks
         self.library_model.checked.intersection_update(t['id'] for t in local_tracks(tracks))
         self.filter_library()
+        self.refresh_queue_duplicates()
         self.device_status.setVisible(not bool(tracks))
         self.last_diagnostic = self.transfer_diagnostic or diagnostic or format_diagnostics({'tracks_returned': len(tracks)})
         self.copy_diagnostic.setEnabled(True)
@@ -1282,7 +1671,20 @@ class Window(QMainWindow):
         self.progress.setValue(0)
         self.progress.show()
         self.status.setText(tr('Revisando canciones…'))
-        self.worker = Reader([Path(path) for path in paths], self,MAX_SELECTION-len(self.tracks))
+        convert = bool(hasattr(self, 'convert_audio') and self.convert_audio.isChecked())
+        codec = 'aac' if hasattr(self, 'convert_codec') and self.convert_codec.currentIndex() == 1 else 'alac'
+        ffmpeg = self.ffmpeg_path.text().strip() if hasattr(self, 'ffmpeg_path') else ''
+        if convert and self.converted_temp_dir is None:
+            self.converted_temp_dir = Path(tempfile.mkdtemp(prefix='tupaq-converted-'))
+        self.worker = Reader(
+            [Path(path) for path in paths],
+            self,
+            MAX_SELECTION-len(self.tracks),
+            convert_audio=convert,
+            convert_codec=codec,
+            ffmpeg_path=ffmpeg,
+            temp_dir=self.converted_temp_dir,
+        )
         self.worker.track.connect(self.accept_reader_track)
         self.worker.problem.connect(self.show_problem)
         self.worker.progress.connect(self.preparation_progress)
@@ -1298,11 +1700,106 @@ class Window(QMainWindow):
         try:self.accept_track(track)
         finally:worker.credits.release()
 
+    def refresh_queue_duplicates(self):
+        if not self.tracks:
+            if hasattr(self, 'remove_duplicates'):
+                self.remove_duplicates.hide()
+            return
+        from .library_fields import local_tracks
+        from .duplicates import matches_phone_library
+        local = local_tracks(self.phone_tracks)
+        dups = 0
+        for tid, track in self.tracks.items():
+            matched = bool(local) and matches_phone_library(track, local)
+            track['in_phone'] = matched
+            if matched:
+                dups += 1
+            item = self.queue_status.get(tid)
+            if item is not None:
+                current_src = getattr(item.text(), 'source', item.text())
+                if current_src not in ('Enviando…', 'Enviada'):
+                    item.setText(tr('Ya en el iPhone' if matched else 'Convertida' if track.get('converted_from') else 'Preparada'))
+        if hasattr(self, 'remove_duplicates'):
+            self.remove_duplicates.setVisible(dups > 0)
+
+    def remove_duplicate_tracks(self):
+        self.activity_message = ''
+        removed = 0
+        for row in range(self.table.rowCount() - 1, -1, -1):
+            identifier = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+            track = self.tracks.get(identifier)
+            if track and track.get('in_phone'):
+                self.tracks.pop(identifier, None)
+                self.queue_status.pop(identifier, None)
+                self.table.removeRow(row)
+                removed += 1
+        if removed:
+            self.status.setText(tr(f'{removed} canciones repetidas quitadas de la cola.'))
+        self.update_buttons()
+
+    def edit_selected_metadata(self):
+        rows = self.table.selectionModel().selectedRows()
+        if len(rows) != 1:
+            return
+        row = rows[0].row()
+        identifier = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+        track = self.tracks.get(identifier)
+        if track is None:
+            return
+        from .metadata_editor import MetadataEditorDialog
+        dialog = MetadataEditorDialog(track, self.default_music_icon, self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        overrides, custom_cover = dialog.result_values()
+        track['metadata_overrides'] = overrides
+        if custom_cover:
+            track['custom_artwork_path'] = custom_cover
+            try:
+                track['thumbnail'] = thumbnail(Path(custom_cover).read_bytes(), 64)
+            except (OSError, ValueError):
+                pass
+        else:
+            track.pop('custom_artwork_path', None)
+            try:
+                track['thumbnail'] = thumbnail(read_artwork(track['path']), 64)
+            except (OSError, ValueError):
+                track['thumbnail'] = None
+        for key in ('title', 'artist', 'album', 'genre', 'year'):
+            if key in overrides:
+                val = overrides[key]
+                if key == 'title' and not val:
+                    continue
+                track[key] = val
+        sorting = self.table.isSortingEnabled()
+        self.table.setSortingEnabled(False)
+        try:
+            self.table.item(row, 0).setText(track['title'])
+            self.table.item(row, 1).setText(track['artist'] or tr('Sin artista'))
+            self.table.item(row, 2).setText(track['album'] or tr('Sin álbum'))
+            pic = QPixmap()
+            if track.get('thumbnail') and pic.loadFromData(track['thumbnail']):
+                from .visuals import table_cover
+                self.table.item(row, 0).setIcon(table_cover(pic, 28))
+            else:
+                self.table.item(row, 0).setIcon(self.default_music_icon)
+        finally:
+            self.table.setSortingEnabled(sorting)
+        self.refresh_queue_duplicates()
+        self.show_track_details(track, 'Para importar')
+        self.status.setText(tr('Metadatos actualizados en la cola. El archivo original no se ha modificado.'))
+        self.update_buttons()
+
     def accept_track(self, track):
         if track['id'] in self.tracks:
             self.duplicates += 1
             return
         self.tracks[track['id']] = track
+        from .library_fields import local_tracks
+        from .duplicates import matches_phone_library
+        local = local_tracks(self.phone_tracks)
+        in_phone = bool(local) and matches_phone_library(track, local)
+        track['in_phone'] = in_phone
+        status_label = tr('Ya en el iPhone' if in_phone else 'Convertida' if track.get('converted_from') else 'Preparada')
         picture=QPixmap()
         if track.get('thumbnail'):picture.loadFromData(track['thumbnail'])
         if not self.table.rowCount() or self.worker is None:self.show_track_details(track,'Para importar')
@@ -1311,7 +1808,7 @@ class Window(QMainWindow):
         row = self.table.rowCount()
         self.table.insertRow(row)
         values = [track['title'], track['artist'] or tr('Sin artista'), track['album'] or tr('Sin álbum'),
-                  (f"M4A · {track['format']}" if track.get('container') == 'M4A' else track['format']), duration_label(track.get('duration')), byte_label(track['size']),tr('Preparada')]
+                  (f"M4A · {track['format']}" if track.get('container') == 'M4A' else track['format']), duration_label(track.get('duration')), byte_label(track['size']),status_label]
         for column, value in enumerate(values):
             item = SortableItem(value)
             if column == 3:item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -1325,7 +1822,9 @@ class Window(QMainWindow):
                 item.setData(Qt.ItemDataRole.UserRole, track['id'])
                 from .lyrics import state,label
                 from .models import LYRICS_ROLE
-                item.setData(LYRICS_ROLE,state(track));item.setToolTip(track['filename']+'\n'+label(track))
+                item.setData(LYRICS_ROLE,state(track))
+                origin_tip = f"{track['converted_from']} → {track['filename']}" if track.get('converted_from') else track['filename']
+                item.setToolTip(origin_tip+'\n'+label(track))
                 if not picture.isNull():
                     from .visuals import table_cover
                     item.setIcon(table_cover(picture,28))
@@ -1335,6 +1834,8 @@ class Window(QMainWindow):
             if column==6:self.queue_status[track['id']]=item
         self.table.setRowHeight(row,max(44,QFontMetrics(self.table.font()).height()+16))
         self.table.setSortingEnabled(sorting and self.worker is None)
+        if in_phone and hasattr(self, 'remove_duplicates'):
+            self.remove_duplicates.show()
 
     def show_problem(self, message):
         self.errors.addItem(tr(message))
@@ -1401,12 +1902,26 @@ class Window(QMainWindow):
         self.app_selector.blockSignals(True)
         self.app_selector.clear()
         self.app_selector.blockSignals(False)
+        if hasattr(self, 'app_search'):
+            self.app_search.blockSignals(True)
+            self.app_search.clear()
+            self.app_search.blockSignals(False)
         self.app_table.setRowCount(0)
         self.app_path_label.setText('/Documents')
         self.rebuild_app_breadcrumbs()
         self.app_entries_count.setText('')
         self.app_status.setText(tr('Conecta tu iPhone y pulsa Actualizar para ver las apps con archivos compartidos.'))
         self.update_buttons()
+
+    def app_conflict_policy(self):
+        if not hasattr(self, 'app_conflict'):
+            return 'skip'
+        idx = self.app_conflict.currentIndex()
+        return ('skip', 'rename', 'replace')[idx] if 0 <= idx <= 2 else 'skip'
+
+    def shortcut_rename_app(self):
+        if self.pages.currentIndex() == 4 and hasattr(self, 'app_rename') and self.app_rename.isEnabled():
+            self.rename_app_entry()
 
     def load_apps(self):
         self.start_app_action('list_apps')
@@ -1477,7 +1992,10 @@ class Window(QMainWindow):
     def upload_app_paths(self, paths):
         if not paths or not self.app_current_bundle:
             return
-        self.start_app_action('upload', self.app_current_bundle, self.app_current_path, [str(Path(p)) for p in paths])
+        clean = [str(Path(p)) for p in paths]
+        policy = self.app_conflict_policy()
+        payload = clean if policy == 'skip' else {'paths': clean, 'conflict_policy': policy}
+        self.start_app_action('upload', self.app_current_bundle, self.app_current_path, payload)
 
     def create_app_folder(self):
         if not self.app_current_bundle:
@@ -1486,13 +2004,25 @@ class Window(QMainWindow):
         if ok and name.strip():
             self.start_app_action('create_folder', self.app_current_bundle, self.app_current_path, name.strip())
 
+    def rename_app_entry(self):
+        selected = self.selected_app_entries()
+        if len(selected) != 1 or not self.app_current_bundle:
+            return
+        entry = selected[0]
+        new_name, ok = QInputDialog.getText(self, tr('Renombrar elemento'), tr('Nuevo nombre en Documentos:'), text=entry['name'])
+        if ok and new_name.strip() and new_name.strip() != entry['name']:
+            self.start_app_action('rename', self.app_current_bundle, self.app_current_path, (entry['relative'], new_name.strip()))
+
     def export_app_entries(self):
         selected = self.selected_app_entries()
         if not selected or not self.app_current_bundle:
             return
         folder = QFileDialog.getExistingDirectory(self, tr('Guardar archivos de la app en…'), self.library_path.text())
         if folder:
-            self.start_app_action('export', self.app_current_bundle, self.app_current_path, ([e['relative'] for e in selected], str(Path(folder))))
+            items = [e['relative'] for e in selected]
+            policy = self.app_conflict_policy()
+            payload = (items, str(Path(folder))) if policy == 'skip' else {'items': items, 'destination': str(Path(folder)), 'conflict_policy': policy}
+            self.start_app_action('export', self.app_current_bundle, self.app_current_path, payload)
 
     def delete_app_entries(self):
         selected = self.selected_app_entries()
@@ -1525,6 +2055,7 @@ class Window(QMainWindow):
             'list_apps': 'Leyendo las apps compatibles del iPhone…',
             'list_folder': 'Leyendo la carpeta de la aplicación…',
             'create_folder': 'Creando carpeta en el iPhone…',
+            'rename': 'Renombrando elemento en el iPhone…',
             'upload': 'Copiando archivos a la aplicación…',
             'export': 'Exportando archivos de la aplicación…',
             'delete': 'Eliminando archivos de la aplicación…',
@@ -1605,6 +2136,14 @@ class Window(QMainWindow):
                 self.app_entries = result['entries']
                 self.populate_app_table()
             message = tr('Carpeta creada y verificada en el iPhone.')
+            self.app_status.setText(message)
+            self.status.setText(message)
+        elif action == 'rename':
+            self.app_current_path = result.get('relative', self.app_current_path)
+            if result.get('entries') is not None:
+                self.app_entries = result['entries']
+                self.populate_app_table()
+            message = tr('Elemento renombrado y verificado en el iPhone.')
             self.app_status.setText(message)
             self.status.setText(message)
         elif action == 'upload':
@@ -1701,16 +2240,23 @@ class Window(QMainWindow):
                 crumb.clicked.connect(lambda _=False, dest=target: self.load_app_folder(dest))
             self.app_breadcrumbs.addWidget(crumb)
 
-    def populate_app_table(self):
+    def populate_app_table(self, *ignored):
         if not hasattr(self,'app_table'):return
         self.app_path_label.setText(documents_path(self.app_current_path))
         self.rebuild_app_breadcrumbs()
-        self.app_entries_count.setText(tr(f'{len(self.app_entries)} elementos') if self.app_entries else '')
+        query = self.app_search.text().strip().casefold() if hasattr(self, 'app_search') else ''
+        visible = [e for e in self.app_entries if not query or query in e['name'].casefold()]
+        if self.app_entries:
+            self.app_entries_count.setText(
+                tr(f'{len(visible)} de {len(self.app_entries)} elementos') if query else tr(f'{len(self.app_entries)} elementos')
+            )
+        else:
+            self.app_entries_count.setText('')
         sorting = self.app_table.isSortingEnabled()
         self.app_table.setSortingEnabled(False)
         try:
             self.app_table.setRowCount(0)
-            for row, entry in enumerate(self.app_entries):
+            for row, entry in enumerate(visible):
                 self.app_table.insertRow(row)
                 kind = entry.get('kind', 'file')
                 kind_label = tr('Carpeta' if kind == 'dir' else 'Enlace' if kind == 'link' else 'Archivo')
@@ -1784,6 +2330,7 @@ class Window(QMainWindow):
             QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
             event.ignore()
             return
+        self.stop_audio_preview()
         self.motion.set_enabled(False)
         self.closing=True;self.preview_pending=None;self.preview_generation+=1
         self.after_artwork = None
@@ -1797,6 +2344,15 @@ class Window(QMainWindow):
             self.worker.wait()
         if self.device_worker is not None:
             self.device_worker.wait()
+        if self.update_worker is not None:
+            self.update_worker.wait()
+        if self.preview_audio_worker is not None:
+            self.preview_audio_worker.wait()
+        for temp_dir in (self.preview_temp_dir, self.converted_temp_dir):
+            if temp_dir is not None:
+                shutil.rmtree(temp_dir, ignore_errors=True)
+        self.preview_temp_dir = None
+        self.converted_temp_dir = None
         event.accept()
 
 

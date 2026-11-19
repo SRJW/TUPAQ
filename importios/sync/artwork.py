@@ -9,8 +9,8 @@ from ..audio import read_artwork
 from .protocol import require
 
 
-def prepare(path,directory,container):
-    data=read_artwork(path)
+def prepare(path,directory,container,raw_data=None):
+    data=raw_data if raw_data is not None else read_artwork(path)
     if not data:return None
     require(len(data)<=5*1024**2,'artwork-image-size')
     source=QBuffer();source.setData(QByteArray(data));source.open(QIODevice.OpenModeFlag.ReadOnly)

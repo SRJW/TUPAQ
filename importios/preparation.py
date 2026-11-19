@@ -5,7 +5,11 @@ from .audio import EXTENSIONS
 from .bulk import MAX_SELECTION
 
 
-def expand(paths,interrupted=lambda:False,limit=MAX_SELECTION):
+def expand(paths,interrupted=lambda:False,limit=MAX_SELECTION,include_convertible=False):
+    allowed=set(EXTENSIONS)
+    if include_convertible:
+        from .transcode import CONVERTIBLE_EXTENSIONS
+        allowed.update(CONVERTIBLE_EXTENSIONS)
     result=[];seen=set();folders=0
     for item in paths:
         if interrupted():return []
@@ -21,7 +25,7 @@ def expand(paths,interrupted=lambda:False,limit=MAX_SELECTION):
                     for entry in entries:
                         if interrupted():return []
                         if entry.is_dir(follow_symlinks=False):pending.append(Path(entry.path))
-                        elif entry.is_file(follow_symlinks=False) and Path(entry.name).suffix.casefold() in EXTENSIONS:
+                        elif entry.is_file(follow_symlinks=False) and Path(entry.name).suffix.casefold() in allowed:
                             key=str(Path(entry.path).resolve())
                             if key not in seen:seen.add(key);result.append(Path(entry.path))
                         if len(result)>limit:raise ValueError('La carpeta supera el límite de 50.000 canciones.')

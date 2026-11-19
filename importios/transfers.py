@@ -93,12 +93,32 @@ def local_hash(path):
         return hashlib.file_digest(stream,'sha256').hexdigest()
 
 
+def _safe_component(text, fallback='Sin nombre'):
+    value = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '_', str(text or '')).strip(' .')[:100] or fallback
+    if value.split('.')[0].upper() in {'CON','PRN','AUX','NUL',*[f'COM{i}' for i in range(1,10)],*[f'LPT{i}' for i in range(1,10)]}:
+        value = '_'+value
+    return value
+
+
 def export_name(track):
     title = f"{track.get('artist') or 'Sin artista'} - {track.get('title') or 'Sin título'}"
     title = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '_',title).strip(' .')[:120] or 'Canción'
     if title.split('.')[0].upper() in {'CON','PRN','AUX','NUL',*[f'COM{i}' for i in range(1,10)],*[f'LPT{i}' for i in range(1,10)]}:
         title = '_'+title
     return title+PurePosixPath(track['afc_path']).suffix.lower()
+
+
+def export_relative_path(track, structure='flat'):
+    """Return relative target Path inside the destination folder."""
+    if structure == 'artist_album':
+        artist = _safe_component(track.get('artist') or 'Sin artista', 'Sin artista')
+        album = _safe_component(track.get('album') or 'Sin álbum', 'Sin álbum')
+        title = _safe_component(track.get('title') or 'Sin título', 'Canción')
+        num = track.get('track_number')
+        prefix = f'{num:02d} - ' if type(num) is int and 0 < num <= 999 else ''
+        suffix = PurePosixPath(track['afc_path']).suffix.lower()
+        return Path(artist) / album / f'{prefix}{title}{suffix}'
+    return Path(export_name(track))
 
 
 def retain_export(temporary, folder, filename):
@@ -124,8 +144,9 @@ def retain_export(temporary, folder, filename):
 
 
 async def export_selected(selected, folder, progress):
+    from .bulk import MAX_SELECTION
     folder = Path(folder).resolve()
-    require(folder.is_dir() and 1 <= len(selected) <= 1000, 'export-selection')
+    require(folder.is_dir() and 1 <= len(selected) <= MAX_SELECTION, 'export-selection')
     from .audio import EXTENSIONS
     from .search import FORMAT_EXTENSIONS, matches_format, suffix_matches_format
     from .remote_details import audio_details, detect_file_format_label
@@ -134,7 +155,8 @@ async def export_selected(selected, folder, progress):
         expected = chosen.get('expected_format')
         if expected is not None:
             require(isinstance(expected,str) and expected.strip().lstrip('.').casefold() in FORMAT_EXTENSIONS,'export-format')
-    result = [];covers_embedded=0;skipped_format=0;format_updates={}
+    result = [];covers_embedded=0;skipped_format=0;skipped_existing=0;format_updates={};m3u_entries=[]
+    playlist_name = next((c.get('playlist_name') for c in selected if c.get('playlist_name')), None)
     async with device() as (_, afc):
         with tempfile.TemporaryDirectory(prefix='.tupaq-export-',dir=folder) as temporary:
             catalogue = Path(temporary)/'catalogue'
@@ -154,6 +176,8 @@ async def export_selected(selected, folder, progress):
                 await wait_if_paused(progress)
                 checkpoint()
                 track = fresh[chosen['id']]
+                structure = chosen.get('folder_structure') or 'flat'
+                incremental = bool(chosen.get('incremental'))
                 expected_format = chosen.get('expected_format')
                 if expected_format:
                     if not suffix_matches_format(track['afc_path'],expected_format):
@@ -174,7 +198,15 @@ async def export_selected(selected, folder, progress):
                                 skipped_format += 1
                                 progress((index+1)*100,len(selected)*100,'Omitida por formato distinto: '+track['title'])
                                 continue
-                destination_name = export_name(track)
+                rel_target = export_relative_path(track, structure)
+                target_dir = (folder / rel_target.parent).resolve()
+                require(target_dir == folder or folder in target_dir.parents, 'export-selection')
+                destination_name = rel_target.name
+                if incremental and (target_dir / destination_name).is_file():
+                    skipped_existing += 1
+                    m3u_entries.append({'title':track['title'],'artist':track.get('artist'),'duration':track.get('duration'),'relative_path':rel_target})
+                    progress((index+1)*100,len(selected)*100,'Omitida (ya exportada): '+track['title'])
+                    continue
                 temporary_audio = Path(temporary)/'audio.part'
                 def bytes_progress(done,total):
                     progress(index*100+int(done*80/total),len(selected)*100,'Exportando: '+track['title'])
@@ -197,19 +229,41 @@ async def export_selected(selected, folder, progress):
                     from .export_artwork import embed
                     picture=await cover_for_track(afc,track,assets=True,catalogue_only=True)
                     if picture and embed(temporary_audio,picture.get('cover')):covers_embedded+=1
-                retained=retain_export(temporary_audio,folder,destination_name)
+                target_dir.mkdir(parents=True, exist_ok=True)
+                retained=retain_export(temporary_audio,target_dir,destination_name)
                 require(local_hash(retained)==local_hash(temporary_audio),'export-hash')
                 result.append(str(retained))
+                m3u_entries.append({'title':track['title'],'artist':track.get('artist'),'duration':track.get('duration'),'relative_path':retained.relative_to(folder)})
                 control=CURRENT.get()
                 if control is not None:control.files=list(result)
                 temporary_audio.unlink()
                 progress((index+1)*100,len(selected)*100,'Exportada: '+track['title'])
+    playlist_file = None
+    if playlist_name and m3u_entries:
+        from .playlists import write_m3u8
+        safe_pl = _safe_component(playlist_name, 'Playlist')
+        playlist_file = str(write_m3u8(folder / f'{safe_pl}.m3u8', m3u_entries))
     summary = {'exported':len(result),'files':result,'covers_embedded':covers_embedded}
     if skipped_format:
         summary['skipped_format'] = skipped_format
+    if skipped_existing:
+        summary['skipped_existing'] = skipped_existing
     if format_updates:
         summary['format_updates'] = format_updates
+    if playlist_file:
+        summary['playlist_file'] = playlist_file
     return summary
+
+
+async def fetch_preview_audio(afc_path, target_path):
+    """Read-only download of a single track from the iPhone into a temp file for local preview playback."""
+    from .audio import EXTENSIONS
+    require(bool(afc_path) and PurePosixPath(afc_path).suffix.casefold() in EXTENSIONS, 'export-format')
+    async with device() as (_, afc):
+        with Path(target_path).open('wb') as output:
+            _, _, size = await read_remote(afc, afc_path, output=output)
+        require(size > 0, 'export-empty-audio')
+    return Path(target_path)
 
 
 def save_receipt(directory, receipt):
@@ -341,10 +395,12 @@ async def plan_entries(afc, before, sources, directory):
             require(before.get('lyrics_records') is not None,'lyrics-catalogue-schema')
             entry['lyrics']=lyrics
             require(await missing(afc,f"/Airlock/Media/Lyrics/{entry['track_id']}"),'lyrics-staging-collision')
-        if source.get('has_artwork') and source.get('send_artwork',True):
+        custom_cover = source.get('custom_artwork_path')
+        if (source.get('has_artwork') or custom_cover) and source.get('send_artwork',True):
             from .sync.artwork import prepare
             require(before['artwork_known'],'artwork-catalogue-schema')
-            picture = prepare(source['path'],directory/'artwork',source['container'])
+            raw_cover = Path(custom_cover).read_bytes() if custom_cover and Path(custom_cover).is_file() else None
+            picture = prepare(source['path'],directory/'artwork',source['container'],raw_data=raw_cover)
             require(local_hash(source['path'])==source['id'],'source-changed-before-upload')
             if picture:
                 from .sync.artwork import allocate_cache_id
@@ -505,6 +561,28 @@ async def import_selected(selected, backup_root, progress, expected_snapshot=Non
             title=Path(source['path']).stem
             require(0<len(title)<=4096 and not any(ord(c)<32 for c in title),'metadata-text')
             source['title']=title
+        overrides = chosen.get('metadata_overrides')
+        if isinstance(overrides, dict):
+            for field in ('title','artist','album','album_artist','genre','composer'):
+                if field in overrides and isinstance(overrides[field], str):
+                    val = overrides[field].strip()
+                    if val:
+                        require(len(val)<=4096 and not any(ord(c)<32 for c in val),'metadata-text')
+                        source[field] = val
+                    elif field in ('genre','composer'):
+                        source[field] = ''
+            if 'artist' in overrides and 'album_artist' not in overrides and overrides.get('artist','').strip():
+                source['album_artist'] = source['artist']
+            for int_field, low, high in (('year',1,9999),('track_number',1,65535),('track_count',1,65535),('disc_number',1,65535),('disc_count',1,65535)):
+                if int_field in overrides:
+                    val = overrides[int_field]
+                    if val is None or val == '':
+                        source.pop(int_field, None)
+                    elif type(val) is int and low <= val <= high:
+                        source[int_field] = val
+        if chosen.get('custom_artwork_path'):
+            source['custom_artwork_path'] = str(chosen['custom_artwork_path'])
+            source['has_artwork'] = True
         source['send_artwork']=chosen.get('send_artwork',True)
         source['send_lyrics']=chosen.get('send_lyrics',True)
         sources.append(source)

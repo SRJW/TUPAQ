@@ -279,8 +279,57 @@ async def _verify_remote_file(afc, remote_path, expected_size, expected_digest):
         raise AppFilesError('La comprobación de integridad del archivo copiado falló.', 'app-files:upload-hash')
 
 
-async def upload_paths(afc, relative, local_paths, progress=None):
+CONFLICT_POLICIES = ('skip', 'rename', 'replace')
+
+
+async def _unique_remote_path(afc, remote):
+    parent = str(PurePosixPath(remote).parent)
+    name = PurePosixPath(remote).name
+    stem = PurePosixPath(name).stem
+    suffix = PurePosixPath(name).suffix
+    for counter in range(2, 10000):
+        candidate_name = validate_name(f'{stem} ({counter}){suffix}')
+        candidate = f'{parent}/{candidate_name}'
+        if await _stat_or_none(afc, candidate) is None:
+            return candidate
+    raise AppFilesError('Demasiados archivos con el mismo nombre en la carpeta.', 'app-files:name-collisions')
+
+
+def _unique_local_path(target):
+    stem = target.stem
+    suffix = target.suffix
+    for counter in range(2, 10000):
+        candidate = target.with_name(f'{stem} ({counter}){suffix}')
+        if not candidate.exists():
+            return candidate
+    raise AppFilesError('Demasiados archivos con el mismo nombre en la carpeta local.', 'app-files:local-collisions')
+
+
+async def rename_entry(afc, relative, new_name):
+    """Rename a file or folder strictly within its parent directory inside /Documents."""
+    clean = normalize_relative(relative)
+    if not clean:
+        raise AppFilesError('No se puede renombrar la carpeta raíz Documentos.', 'app-files:rename-root')
+    validated = validate_name(new_name)
+    parent_rel = parent_relative(clean)
+    target_rel = f'{parent_rel}/{validated}' if parent_rel else validated
+    if target_rel == clean:
+        return target_rel
+    source_remote = documents_path(clean)
+    target_remote = documents_path(target_rel)
+    if await _stat_or_none(afc, source_remote) is None:
+        raise AppFilesError('El elemento seleccionado ya no existe en el iPhone.', 'app-files:rename-missing')
+    if await _stat_or_none(afc, target_remote) is not None:
+        raise AppFilesError('Ya existe un archivo o carpeta con ese nombre.', 'app-files:exists')
+    await afc.rename(source_remote, target_remote)
+    if await _stat_or_none(afc, target_remote) is None:
+        raise AppFilesError('No se pudo confirmar el cambio de nombre en el iPhone.', 'app-files:rename-verify')
+    return target_rel
+
+
+async def upload_paths(afc, relative, local_paths, progress=None, conflict_policy='skip'):
     """Upload local files/folders into /Documents[/relative] with SHA-256 verification."""
+    policy = conflict_policy if conflict_policy in CONFLICT_POLICIES else 'skip'
     clean = normalize_relative(relative)
     parent = documents_path(clean)
     parent_stat = await _stat_or_none(afc, parent)
@@ -311,12 +360,19 @@ async def upload_paths(afc, relative, local_paths, progress=None):
             return {'uploaded': uploaded, 'skipped': skipped, 'folders_created': folders_created, 'cancelled': True}
         remote_rel = f'{clean}/{rel_sub}' if clean else rel_sub
         remote = documents_path(remote_rel)
-        if await _stat_or_none(afc, remote) is not None:
-            skipped += 1
-            done_bytes += max(1, size)
-            if progress:
-                progress(min(100, round(done_bytes * 100 / total_bytes)), 100, f'Omitido (ya existe): {source.name}')
-            continue
+        existing_info = await _stat_or_none(afc, remote)
+        if existing_info is not None:
+            if policy == 'skip':
+                skipped += 1
+                done_bytes += max(1, size)
+                if progress:
+                    progress(min(100, round(done_bytes * 100 / total_bytes)), 100, f'Omitido (ya existe): {source.name}')
+                continue
+            elif policy == 'rename':
+                remote = await _unique_remote_path(afc, remote)
+            elif policy == 'replace':
+                if existing_info.get('st_ifmt') == 'S_IFDIR':
+                    raise AppFilesError('No se puede reemplazar una carpeta con un archivo.', 'app-files:dir-collision')
         remote_parent = str(PurePosixPath(remote).parent)
         tmp = f'{remote_parent}/{TEMP_PREFIX}{uuid.uuid4().hex}'
         local_hash = hashlib.sha256()
@@ -341,11 +397,17 @@ async def upload_paths(afc, relative, local_paths, progress=None):
             if size == 0:
                 done_bytes += 1
             await _verify_remote_file(afc, tmp, size, local_hash.hexdigest())
-            if await _stat_or_none(afc, remote) is not None:
-                with suppress(Exception):
-                    await afc.rm_single(tmp, force=True)
-                skipped += 1
-                continue
+            current_existing = await _stat_or_none(afc, remote)
+            if current_existing is not None:
+                if policy == 'replace' and current_existing.get('st_ifmt') != 'S_IFDIR':
+                    await afc.rm_single(remote)
+                elif policy == 'rename':
+                    remote = await _unique_remote_path(afc, remote)
+                else:
+                    with suppress(Exception):
+                        await afc.rm_single(tmp, force=True)
+                    skipped += 1
+                    continue
             await afc.rename(tmp, remote)
             uploaded += 1
         except TransferCancelled:
@@ -414,8 +476,9 @@ async def _collect_remote_exports(afc, relative_paths):
     return folders, files
 
 
-async def export_entries(afc, relative_paths, destination_folder, progress=None):
-    """Export selected remote files/folders to destination_folder without overwriting existing files."""
+async def export_entries(afc, relative_paths, destination_folder, progress=None, conflict_policy='skip'):
+    """Export selected remote files/folders to destination_folder honoring conflict_policy."""
+    policy = conflict_policy if conflict_policy in CONFLICT_POLICIES else 'skip'
     destination = Path(destination_folder).resolve()
     if not destination.is_dir():
         raise AppFilesError('La carpeta de destino en el ordenador no existe.', 'app-files:local-dest')
@@ -441,11 +504,16 @@ async def export_entries(afc, relative_paths, destination_folder, progress=None)
                 raise AppFilesError('Ruta local de destino no válida.', 'app-files:local-path')
             target.parent.mkdir(parents=True, exist_ok=True)
             if target.exists():
-                skipped += 1
-                done_bytes += max(1, size)
-                if progress:
-                    progress(min(100, round(done_bytes * 100 / total_bytes)), 100, f'Omitido (ya existe): {local_rel.name}')
-                continue
+                if policy == 'skip':
+                    skipped += 1
+                    done_bytes += max(1, size)
+                    if progress:
+                        progress(min(100, round(done_bytes * 100 / total_bytes)), 100, f'Omitido (ya existe): {local_rel.name}')
+                    continue
+                elif policy == 'rename':
+                    target = _unique_local_path(target)
+                elif policy == 'replace' and target.is_dir():
+                    raise AppFilesError('No se puede reemplazar una carpeta local con un archivo.', 'app-files:local-path')
             staged = temp_root / f'item-{index}'
             if progress:
                 progress(min(99, round(done_bytes * 100 / total_bytes)), 100, f'Exportando {index + 1} de {len(files)}: {local_rel.name}')
@@ -472,8 +540,15 @@ async def export_entries(afc, relative_paths, destination_folder, progress=None)
             if staged.stat().st_size != size:
                 raise AppFilesError('El archivo exportado no coincide con el tamaño original.', 'app-files:export-size')
             if target.exists():
-                skipped += 1
-                continue
+                if policy == 'replace' and not target.is_dir():
+                    os.replace(str(staged), str(target))
+                    exported += 1
+                    continue
+                elif policy == 'rename':
+                    target = _unique_local_path(target)
+                else:
+                    skipped += 1
+                    continue
             shutil.move(str(staged), str(target))
             exported += 1
     if progress:
@@ -529,13 +604,26 @@ async def _run_action_async(action, bundle_id=None, relative='', payload=None, p
             created = await create_folder(afc, relative, payload)
             entries = await list_folder(afc, relative)
             return {'action': 'create_folder', 'bundle_id': bundle_id, 'relative': normalize_relative(relative), 'created': created, 'entries': entries}
+        if action == 'rename':
+            item_rel, new_name = payload
+            renamed = await rename_entry(afc, item_rel, new_name)
+            entries = await list_folder(afc, relative)
+            return {'action': 'rename', 'bundle_id': bundle_id, 'relative': normalize_relative(relative), 'renamed': renamed, 'entries': entries}
         if action == 'upload':
-            summary = await upload_paths(afc, relative, payload or [], progress=progress)
+            if isinstance(payload, dict):
+                paths, policy = payload.get('paths') or [], payload.get('conflict_policy', 'skip')
+            else:
+                paths, policy = payload or [], 'skip'
+            summary = await upload_paths(afc, relative, paths, progress=progress, conflict_policy=policy)
             entries = None if summary.get('cancelled') else await list_folder(afc, relative)
             return {'action': 'upload', 'bundle_id': bundle_id, 'relative': normalize_relative(relative), 'entries': entries, **summary}
         if action == 'export':
-            items, destination = payload
-            summary = await export_entries(afc, items, destination, progress=progress)
+            if isinstance(payload, dict):
+                items, destination, policy = payload.get('items') or [], payload.get('destination'), payload.get('conflict_policy', 'skip')
+            else:
+                items, destination = payload
+                policy = 'skip'
+            summary = await export_entries(afc, items, destination, progress=progress, conflict_policy=policy)
             return {'action': 'export', 'bundle_id': bundle_id, 'relative': normalize_relative(relative), **summary}
         if action == 'delete':
             summary = await delete_entries(afc, payload or [], progress=progress)

@@ -57,7 +57,7 @@ def format_diagnostics(diagnostics):
     return f'TUPAQ {VERSION}\nDiagnóstico de lectura:\n'+json.dumps(diagnostics, ensure_ascii=True, sort_keys=True, indent=2)
 
 
-def read_catalogue(path, diagnostics=None):
+def read_catalogue(path, diagnostics=None, playlists_out=None):
     """Query the local snapshot only, accepting the documented item/extra schema."""
     try:
         wal_path = Path(str(path)+'-wal')
@@ -113,6 +113,7 @@ def read_catalogue(path, diagnostics=None):
             extra_fields += ', st.has_non_purgeable_subscription_protected_local_asset' if protected_local else ', NULL'
             playback_timing = playback_schema and {'duration','sample_rate'} <= playback_columns
             extra_fields += ', pb.duration, pb.sample_rate' if playback_timing else ', NULL, NULL'
+            extra_fields += ', i.track_number' if 'track_number' in layout['item'] else ', NULL'
             metadata_joins = (' LEFT JOIN item_state st ON st.item_pid=i.item_pid' if state_schema else '')
             metadata_joins += ' LEFT JOIN item_playback pb ON pb.item_pid=i.item_pid' if playback_schema else ''
             rows = db.execute('''SELECT i.item_pid, e.title, a.item_artist, b.album, e.total_time_ms'''+paths+', i.album_pid'+extra_fields+'''
@@ -136,7 +137,7 @@ def read_catalogue(path, diagnostics=None):
             artwork = catalogue_artwork(db)
             from .lyrics import catalogue_lyrics
             lyrics=catalogue_lyrics(db)
-            for pid, title, artist, album, ms, base, leaf, album_pid, size, placeholder, added, asset, codec, protected, frames, rate in rows:
+            for pid, title, artist, album, ms, base, leaf, album_pid, size, placeholder, added, asset, codec, protected, frames, rate, track_num in rows:
                 if any(value is not None and not isinstance(value, str) for value in [title, artist, album]):
                     raise LibraryError('El catálogo contiene metadatos de un tipo no admitido.')
                 duration = float(ms or 0)/1000
@@ -144,6 +145,8 @@ def read_catalogue(path, diagnostics=None):
                     raise LibraryError('El catálogo contiene una duración no válida.')
                 tracks.append({'id': str(pid), 'title': title or 'Sin título', 'artist': artist or 'Sin artista',
                                'album': album or 'Sin álbum', 'duration': max(0, duration),**binding})
+                if type(track_num) is int and 0 < track_num <= 65535:
+                    tracks[-1]['track_number'] = track_num
                 if lyrics is not None:tracks[-1].update(lyrics.get(str(pid),{'lyrics_registered':False,'lyrics_online_available':False}))
                 if str(pid) in wire_map:tracks[-1]['library_wire']=wire_map[str(pid)]
                 if duration<=0 and type(frames) in (int,float) and type(rate) in (int,float) and frames>0 and rate>0:
@@ -169,6 +172,9 @@ def read_catalogue(path, diagnostics=None):
                 covers = [artwork[key] for key in ((str(pid),0),) if key in artwork]
                 if covers:
                     tracks[-1]['artwork_paths'] = list(dict.fromkeys(covers))
+            if playlists_out is not None:
+                from .playlists import read_playlists
+                playlists_out.extend(read_playlists(db))
             if diagnostics is not None:
                 from .lyrics import checksum_probe
                 diagnostics['lyrics_checksum_probe']=checksum_probe(db)
@@ -183,7 +189,7 @@ def read_catalogue(path, diagnostics=None):
         raise LibraryError('No se pudo leer una copia válida de la biblioteca de Música.') from error
 
 
-async def _copy_catalogue_once(afc, directory, missing_errors=(FileNotFoundError,), diagnostics=None):
+async def _copy_catalogue_once(afc, directory, missing_errors=(FileNotFoundError,), diagnostics=None, playlists_out=None):
     """Two consecutive identical db+WAL reads, always opening AFC in mode 'r'."""
     directory = Path(directory)
     fingerprints = []
@@ -227,10 +233,10 @@ async def _copy_catalogue_once(afc, directory, missing_errors=(FileNotFoundError
         fingerprints.append(current)
     if fingerprints[0] != fingerprints[1]:
         raise CatalogueChanging()
-    return read_catalogue(directory/'1'/'MediaLibrary.sqlitedb', diagnostics)
+    return read_catalogue(directory/'1'/'MediaLibrary.sqlitedb', diagnostics, playlists_out=playlists_out)
 
 
-async def copy_catalogue(afc,directory,missing_errors=(FileNotFoundError,),diagnostics=None):
+async def copy_catalogue(afc,directory,missing_errors=(FileNotFoundError,),diagnostics=None,playlists_out=None):
     import shutil
     import uuid
     from .cancellation import checkpoint
@@ -241,7 +247,9 @@ async def copy_catalogue(afc,directory,missing_errors=(FileNotFoundError,),diagn
         checkpoint()
         work=directory/('.reading-'+uuid.uuid4().hex);work.mkdir(mode=0o700)
         try:
-            tracks=await _copy_catalogue_once(afc,work,missing_errors,diagnostics)
+            if playlists_out is not None:
+                playlists_out.clear()
+            tracks=await _copy_catalogue_once(afc,work,missing_errors,diagnostics,playlists_out=playlists_out)
             # Both reads matched. Retain one coherent copy, not two identical archives.
             (work/'1').rename(directory/'1')
             if diagnostics is not None:diagnostics['catalogue_attempts']=attempt+1
@@ -305,6 +313,14 @@ async def _read_phone(diagnostics=None, device_info=None):
             # sends StartSession again and iOS responds with SessionActive.
             if not lockdown.paired or not lockdown.session_id:
                 raise LibraryError('No se encontró una autorización de confianza válida para TUPAQ. No restablezcas la confianza ni la biblioteca; copia el diagnóstico para revisarlo.', 'trust:missing-record')
+            if device_info is not None:
+                try:
+                    from .battery import read_battery
+                    battery = await asyncio.wait_for(read_battery(lockdown), timeout=5)
+                    if battery:
+                        device_info['battery'] = battery
+                except Exception:
+                    pass
             stage = 'afc'
             async with AfcService(lockdown) as afc:
                 if device_info is not None:
@@ -316,7 +332,10 @@ async def _read_phone(diagnostics=None, device_info=None):
                     except Exception:pass # Optional capacity data must not break catalogue reading.
                 stage = 'catalogue'
                 with tempfile.TemporaryDirectory(prefix='importios-library-') as directory:
-                    tracks=await copy_catalogue(afc, directory, (FileNotFoundError, AfcFileNotFoundError), diagnostics=diagnostics)
+                    playlists = [] if device_info is not None else None
+                    tracks=await copy_catalogue(afc, directory, (FileNotFoundError, AfcFileNotFoundError), diagnostics=diagnostics, playlists_out=playlists)
+                    if device_info is not None and playlists is not None:
+                        device_info['_playlists'] = playlists
                     from .presence import probe_files
                     from .devices import device_token
                     if device_info is not None:device_info['_device_token']=device_token(devices[0].serial)
