@@ -2,132 +2,200 @@
 
 <img src="importios/assets/tupaq.png" alt="TUPAQ · Encuentro" width="88">
 
-Gestiona por USB la música del iPhone desde Windows o macOS: importa canciones
-del ordenador, exporta originales y elimina canciones seleccionadas de Música.
-Aplicación nativa, con ventana propia, sin navegador ni necesidad de instalar Python.
+Gestiona por USB la música y los archivos compartidos del iPhone desde Windows o
+macOS: importa canciones del ordenador, exporta originales (planos u organizados
+por artista y álbum), elimina canciones de Música, explora la carpeta `/Documents`
+de apps compatibles y consulta diagnósticos reales del dispositivo (incluida la
+salud de la batería). Aplicación de escritorio nativa, con ventana propia, sin
+navegador ni necesidad de instalar Python.
 
-La **0.3.0-preview.30** implementa el envío USB de letras de texto incrustadas en
-canciones nuevas, con comprobación del texto y checksum registrados en el catálogo.
-La ruta procede del análisis estático de AMPDevicesAgent; el usuario ha confirmado
-la visualización de la letra de texto en Música de su iPhone con preview.30.
-**El karaoke no funciona en los ensayos actuales**: tanto LRC como la variante
-TTML Line se muestran como letra estática; no avanzan ni permiten saltar al tocar
-una línea. Las herramientas TTML son experimentos de investigación, no una solución.
-[Implementación, pruebas y límites](docs/LETRAS-INVESTIGACION.md).
+La versión actual (**0.3.0-preview.36**) incorpora las cinco vistas con coherencia
+visual en tema claro y oscuro, aviso opcional de actualizaciones desde GitHub
+Releases, mejoras en **Archivos de apps** (buscador, renombrar con `F2` y
+política de conflictos), telemetría real de **Batería** en Diagnóstico y
+herramientas avanzadas de música: conversión opcional de FLAC/OGG/Opus/WMA con
+`ffmpeg`, exportación organizada e incremental sin límite de 1.000 canciones,
+detector de duplicados, editor no destructivo de metadatos y portada antes de
+importar, lectura y exportación `.m3u8` de playlists, vista por **Álbumes /
+Artistas** y vista previa de audio.
 
-Desde la 0.3.0-preview.25, TUPAQ adopta las referencias claras y oscuras: navegación lateral,
-superficies marfil o verde oscuro, selección verde azulado y acentos naranjas.
-**Windows y Mac usan siempre la fuente de su sistema**; no hay selector ni carga
-de fuentes. Los controles y columnas reservan el ancho real del texto, sin comprimirlo.
+**Windows y macOS usan siempre la fuente nativa de su sistema**; no hay selector
+ni carga manual de fuentes. Los controles y columnas reservan el ancho real del
+texto en español e inglés, sin recortes.
 
 ![Biblioteca clara de TUPAQ, datos sintéticos](docs/diseno-25/biblioteca-claro.png)
 
 ![Biblioteca oscura de TUPAQ, datos sintéticos](docs/diseno-25/biblioteca-oscuro.png)
 
-[Ver las cuatro pantallas en ambos temas](docs/DISENO-25.md).
+[Ver las cinco pantallas en ambos temas](docs/DISENO-25.md).
 Las capturas del repositorio usan datos sintéticos y la fuente nativa del entorno
 que las renderiza. GitHub Actions guarda también capturas por plataforma.
 
 ## Descargar y abrir
 
-[Versiones descargables](https://github.com/SRJW/TUPAQ/releases) ·
+[Última versión (v0.3.0-preview.36)](https://github.com/SRJW/TUPAQ/releases/tag/v0.3.0-preview.36) ·
+[Todas las versiones](https://github.com/SRJW/TUPAQ/releases) ·
 [Cómo descargar](DESCARGAR.md)
 
-- **Windows x64:** abre `TUPAQ.exe`.
-- **Mac Apple Silicon:** abre `TUPAQ-macOS-arm64.dmg` y copia TUPAQ a Aplicaciones.
-- **Mac Intel:** utiliza `TUPAQ-macOS-x86_64.dmg`.
+- **Windows 11 (x64):** abre `TUPAQ.exe`.
+- **macOS Apple Silicon (M1/M2/M3/M4):** abre `TUPAQ-macOS-arm64.dmg` y copia TUPAQ a Aplicaciones.
+- **macOS Intel (x86_64):** utiliza `TUPAQ-macOS-x86_64.dmg`.
 
-Cada descarga aparece cuando su plataforma termina de compilarse y verificarse.
-Windows necesita el servicio/controlador USB de Apple que permite acceder al iPhone;
-no es necesario abrir iTunes ni 3uTools. Los paquetes todavía no llevan firma de
-Windows ni notarización de Apple.
+Cada descarga se publica cuando su plataforma termina de compilarse y pasa sus
+pruebas en GitHub Actions. Windows necesita el servicio/controlador USB de Apple
+para detectar el iPhone; no es necesario abrir iTunes ni 3uTools. Los paquetes
+todavía no llevan firma de Windows ni notarización de Apple.
 
-## Las cuatro vistas
+Desde **Preferencias → Sincronización**, TUPAQ puede comprobar si existe una
+versión más reciente en GitHub Releases y mostrar un aviso con enlace a la página
+oficial de descarga; nunca descarga ni ejecuta binarios automáticamente.
 
-**Biblioteca:** lectura automática al conectar el iPhone, miniaturas, selección con
-casillas, búsqueda por título/artista/álbum/formato y filtros por formato, portada
-o letra. Las cabeceras ordenan por canción, artista, álbum, formato, duración y
-tamaño. Las marcas y la posición se conservan al navegar y actualizar. Exportar
-usa las casillas; Eliminar pide confirmación y comprueba el resultado.
+## Las cinco vistas
 
-**Importar:** elegir archivos o carpetas completas, arrastrar y soltar, preparar la
-cola, ver el estado por canción y el progreso real. Importa MP3, WAV, M4A con AAC
-/ALAC y AIFF. FLAC no se incluye. La cola permite quitar, vaciar y exportar CSV.
-Hay historial privado de operaciones y pausa/reanudación entre lotes o archivos.
-Cancelar espera a terminar el lote nativo que ya empezó a modificar Música.
+### Biblioteca
+- Lectura automática por USB al conectar el iPhone, miniaturas de carátula,
+  insignias de formato y selección persistente con casillas.
+- Conmutador **Canciones / Álbumes / Artistas** para explorar como tabla o en
+  cuadrícula de discos y artistas (permite marcar álbumes o artistas completos de
+  un clic y hacer doble clic para filtrar sus canciones).
+- Búsqueda por título, artista, álbum o formato y filtros por **Formato**
+  (`M4A`, `MP3`, `AAC`, `ALAC`, `WAV`, `AIFF`), **Contenido** (con carátula, con
+  letra o **Posibles duplicados**) y **Playlists** leídas de `MediaLibrary.sqlitedb`.
+- El filtro de formato verifica extensión y cabecera real del audio también
+  durante la exportación para que no se cuele ningún formato distinto.
+- Selección rápida contextual (**Seleccionar todo**, **Seleccionar todos los MP3**,
+  **Seleccionar resultados**), ordenación por columnas y eliminación con confirmación.
+- Panel **Detalles** con carátula original al 100%, letra incluida, propiedades
+  técnicas del audio y botón **Escuchar vista previa** para reproducir la canción
+  (tanto local en la cola como desde el iPhone por USB).
 
-**Diagnóstico:** nombre, modelo y versión de iOS cuando el iPhone los comunica;
-conexión USB, catálogo y permisos de lectura comprobados; capacidad y espacio libre
-del volumen de datos por AFC. Comprobar selección/todo lee los audios completos
-sin modificar el dispositivo. Compara SHA-256 cuando existe un recibo anterior de
-TUPAQ; sin recibo no afirma haber autenticado el archivo. Los datos desconocidos
-quedan pendientes, sin inventar velocidad USB ni estados de salud.
+### Importar
+- Elegir archivos o carpetas completas, o arrastrar y soltar directamente sobre la
+  ventana, con progreso real y estado por canción.
+- **Formatos nativos:** `MP3`, `WAV`, `M4A (AAC / ALAC)` y `AIFF`.
+- **Conversión automática opcional (FLAC y otros):** activable en Preferencias
+  usando `ffmpeg` para convertir `.flac`, `.ogg`, `.oga`, `.opus`, `.wma`, `.mka`
+  y `.webm` al vuelo a **M4A · ALAC** (sin pérdida) o **M4A · AAC (256 kbps)** en
+  una copia temporal, conservando metadatos, portada y letra sin modificar los
+  archivos originales.
+- **Detector de duplicados antes de importar:** señala con estado `Ya en el iPhone`
+  las canciones de la cola que ya existen en la biblioteca del dispositivo y ofrece
+  el botón **Quitar repetidas**.
+- **Editor de metadatos y portada antes de importar:** botón **Editar** para
+  ajustar título, artista, álbum, artista del álbum, género, año, número de pista/disco
+  o portada personalizada únicamente para el envío al iPhone, dejando intactos los
+  archivos originales del ordenador.
+- Exportación de la cola a CSV, historial privado agregado de operaciones, pausa y
+  reanudación entre lotes o archivos, y cancelación segura (espera a terminar un
+  lote ATC que ya empezó a escribir).
 
-**Preferencias:** apariencia Claro/Oscuro/Sistema, acento naranja opcional, reducir
-transparencia/movimiento, carpeta inicial para elegir/exportar música, política de
-títulos, envío de carátulas, carátulas en copias exportadas, idioma Español/English
-y sincronización. La fuente del sistema se aplica a toda la interfaz.
+### Archivos de apps
+- Explora y gestiona la carpeta `/Documents` de las aplicaciones instaladas en el
+  iPhone con intercambio de archivos habilitado en iOS (`InstallationProxy` +
+  `HouseArrestService`), para cualquier tipo de archivo.
+- Barra de migas de pan clicables (`Documentos › …`), navegación por subcarpetas,
+  arrastrar y soltar archivos o carpetas, crear nuevas carpetas, exportar y
+  eliminar con confirmación.
+- **Buscador** en vivo dentro de la carpeta actual, botón y atajo **`F2` para
+  renombrar** archivos o carpetas, y selector de política de conflictos
+  (**Si existe: Omitir / Renombrar / Reemplazar**) para subidas y exportaciones,
+  con verificación de integridad SHA-256.
 
-La **importación automática es opcional y está desactivada inicialmente**. Solo
-se inicia después de preparar archivos con el mismo iPhone conectado y la biblioteca
-leída; el dispositivo se vuelve a comprobar antes de escribir. La actualización
-opcional detecta cambios del catálogo cada 30 segundos mediante dos consultas de
-atributos; relee la biblioteca solo cuando cambia y conserva la vista anterior.
-Se suspende durante preparación, transferencias y lecturas que compiten por USB.
+### Diagnóstico
+- Muestra nombre, modelo y versión de iOS comunicados por el dispositivo, volumen
+  de almacenamiento de datos por AFC y estado de las comprobaciones de conexión,
+  base de datos, permisos de catálogo e integridad con recibos propios.
+- **Tarjeta de Batería:** consulta de solo lectura vía `DiagnosticsService`
+  (`IOPMPowerSource`) con salud real en %, ciclos de carga, capacidad máxima real
+  frente a capacidad de diseño (mAh), carga actual, temperatura (°C) y voltaje (V).
+  Si el dispositivo no entrega algún dato, queda como pendiente sin inventar cifras.
+- **Comprobar lectura de audios / Comprobar selección:** lee los audios completos
+  sin modificar el iPhone y contrasta SHA-256 contra recibos previos de TUPAQ.
+- Opciones avanzadas de recuperación ocultas por defecto (revisar operación
+  pendiente, completar importación pendiente, actualizar portadas y fecha, abrir
+  respaldos del catálogo).
 
-## Música y comprobaciones
+### Preferencias
+- **Apariencia:** Claro / Oscuro / Sistema (con miniatura partida), acento naranja
+  opcional de TUPAQ, reducir transparencia y reducir movimiento.
+- **Rutas de biblioteca y exportación:** carpeta inicial, organización al exportar
+  (**Todo en la misma carpeta** u **Organizar por Artista / Álbum** como
+  `Artista/Álbum/01 - Canción.ext`) y **modo respaldo incremental** (omite lo ya
+  exportado sin crear duplicados `(2)`). Al exportar una playlist filtrada guarda
+  también su archivo `.m3u8`.
+- **Metadatos:** envío de letras incrustadas, política de título (conservar
+  etiquetas o usar nombre de archivo), activación de conversión automática de FLAC
+  y otros formatos, selector de códec (`ALAC` / `AAC 256 kbps`) y ruta opcional de
+  `ffmpeg` (con detección automática).
+- **Carátulas:** envío de carátulas al catálogo e incrustación opcional en copias
+  exportadas sin modificar el audio del iPhone.
+- **Idioma:** cambio inmediato entre Español e English conservando la vista, la
+  cola y la selección.
+- **Sincronización y actualizaciones:** detección automática del iPhone,
+  importación automática opcional (desactivada inicialmente y sujeta a coincidencia
+  del mismo dispositivo), actualización periódica al detectar cambios en el
+  catálogo cada 30 segundos y comprobación de actualizaciones en GitHub Releases.
 
-Los originales del ordenador se conservan. La numeración opcional incoherente
-(`0/12`, `9/3`) no bloquea la importación: se conserva la posición válida y se
-omite el total incoherente en los metadatos enviados. Se verifican los audios,
-metadatos, portada y resultado del catálogo según las operaciones implementadas.
+## Música, letras y comprobaciones
 
-Hasta **50.000 canciones por selección**, divididas en lotes nativos de hasta
-49 canciones/2 GiB para importar o 100 para eliminar. Máximo 256 MiB por archivo
-importado y 100.000 registros en el catálogo admitido. Exportar conserva su límite
-independiente de 1.000 archivos. Un fallo detiene los siguientes lotes.
+Los originales del ordenador nunca se modifican (ni al importar, ni al editar
+metadatos/portada en la cola, ni al convertir FLAC a una copia temporal). La
+numeración opcional incoherente (`0/12`, `9/3`) no bloquea la importación: se
+conserva la posición válida y se omite el total incoherente.
 
-La exportación normalmente conserva los bytes originales. La opción de incrustar
-carátulas completa solo las copias exportadas que no tengan portada, después de
-verificar el audio original por USB. No sobrescribe carátulas existentes ni archivos
-previos. Solo se importan y exportan MP3, WAV, M4A (AAC/ALAC) y AIFF.
-
-Se conserva el catálogo antes de cada cambio. **Esa copia no incluye todos los
-audios** y no es una restauración automática. Los recibos permiten comprobar
-operaciones interrumpidas sin reenviar música a ciegas. El historial es agregado
-(fecha, operación, estado y recuentos), separado de los respaldos de recuperación.
-
-Las letras incrustadas se detectan, se conservan y se pueden consultar. **Su aparición
-en Música del iPhone todavía no está garantizada**: falta validar el contrato nativo
-separado. Se recuperó el cálculo de checksum del host y se preparó su contraste
-de solo lectura; la entrega USB todavía está pendiente.
-[Avances de investigación](docs/LETRAS-INVESTIGACION.md) · [Letras](docs/LETRAS.md) · [Transferencias y límites](docs/TRANSFERENCIAS.md).
+- **Límites operativos:** hasta **50.000 canciones por selección** para importar,
+  exportar o eliminar; la importación se divide en lotes nativos de hasta 49
+  canciones / 2 GiB y la eliminación en lotes de hasta 100. Máximo 256 MiB por
+  archivo nativo (512 MiB de origen para conversión con `ffmpeg`) y 100.000
+  registros en el catálogo admitido. Un fallo detiene los lotes restantes.
+- **Exportación fiel:** conserva los bytes originales y verifica el hash tras la
+  lectura USB. Con *Incrustar carátulas* completa solo copias locales que no
+  tengan portada; con *Respaldo incremental* omite archivos ya presentes en el
+  destino; con una playlist activa conserva su orden y escribe `<Playlist>.m3u8`.
+- **Respaldo y recibos:** se guarda una copia del catálogo antes de cada cambio.
+  **Esa copia no incluye todos los audios** ni es una restauración automática;
+  sirve junto a los recibos para verificar o completar operaciones interrumpidas
+  sin reenviar canciones a ciegas.
+- **Letras incrustadas:** desde `0.3.0-preview.30` se envían letras de texto plano
+  incrustadas en canciones nuevas con verificación de texto y checksum en el
+  catálogo (confirmado por el usuario en Música del iPhone). **El karaoke
+  sincronizado no funciona en los ensayos actuales**: tanto LRC como TTML Line se
+  muestran como letra estática en Música.
+  [Implementación, pruebas y límites de letras](docs/LETRAS-INVESTIGACION.md) ·
+  [Letras](docs/LETRAS.md) · [Transferencias y límites](docs/TRANSFERENCIAS.md).
 
 ## Validación y desarrollo
 
-**215 pruebas automáticas** en la revisión 25, incluidas preferencias reales,
-exportación con carátulas, diagnóstico de corrupción, cambio de teléfono y pausa
-entre transacciones. Se prepararon 10.000 archivos en la interfaz nueva. Las pruebas
-previas importaron y eliminaron 10.000 canciones en un iPhone simulado, conservando
-el audio ajeno a la selección. [Informe reproducible](docs/ESTRES.md).
+La revisión **0.3.0-preview.36** cuenta con **294 pruebas automáticas** que
+cubren lectura de catálogo y playlists, conversión real de FLAC → ALAC/AAC con
+`ffmpeg`, exportación organizada e incremental con `.m3u8`, editor no destructivo
+de metadatos y carátula, detección de duplicados, telemetría de batería, aviso de
+actualizaciones, operaciones de **Archivos de apps** (renombrar, buscar y
+políticas de conflicto), traducciones ES/EN y coherencia visual en claro y oscuro.
+Las pruebas de estrés previas validaron 10.000 canciones en la cola y en un
+iPhone simulado ([informe reproducible](docs/ESTRES.md)).
 
-Los resultados simulados no sustituyen la prueba física por USB. El usuario ha
-confirmado lectura e importación con metadatos y carátula en versiones anteriores.
-GitHub prueba los ejecutables nativos de Windows y ambos Mac antes de publicarlos;
-verifica y monta los DMG. Los artefactos de compilación y capturas se conservan
-30 días en Actions. Los pushes a `main` compilan; las etiquetas `v…` publican.
+Los resultados simulados no sustituyen la prueba física por USB con un iPhone
+real. GitHub Actions ejecuta la suite, renderiza capturas y compila/verifica los
+ejecutables reales de Windows y ambos macOS (incluyendo montaje y prueba del DMG)
+antes de publicar. Los pushes a `main` compilan; las etiquetas `v…` publican en
+Releases.
 
 ```bash
 python -m venv .venv
 .venv/bin/python -m pip install -r requirements-build.txt
-QT_QPA_PLATFORM=offscreen .venv/bin/python -m unittest discover -s tests -v
+QT_QPA_PLATFORM=offscreen .venv/bin/python scripts/run_tests.py
 .venv/bin/python -m importios.native
+QT_QPA_PLATFORM=offscreen .venv/bin/python scripts/preview_desktop.py --output /tmp/tupaq-preview
 .venv/bin/python scripts/build_desktop.py
 ```
 
 En Windows utiliza `.venv\Scripts\python.exe` y omite `QT_QPA_PLATFORM=offscreen`
-para abrir la ventana. El nombre interno del módulo sigue siendo `importios`;
-el repositorio y la aplicación se llaman TUPAQ.
+para abrir la ventana. Para la conversión opcional de FLAC/OGG/Opus/WMA en tu
+equipo necesitas `ffmpeg` en el `PATH` (por ejemplo `winget install Gyan.FFmpeg`
+en Windows o `brew install ffmpeg` en macOS) o indicar su ruta en Preferencias.
+El nombre interno del paquete Python sigue siendo `importios`; el repositorio y
+la aplicación se llaman **TUPAQ**.
 
 ## Investigación y atribución
 

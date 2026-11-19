@@ -1,4 +1,4 @@
-# Diseño claro y oscuro · 0.3.0-preview.25
+# Diseño claro y oscuro · TUPAQ (actualizado en 0.3.0-preview.36)
 
 Capturas de los widgets reales de la aplicación con datos sintéticos. No son
 maquetas generadas ni una conexión a un teléfono real. Se renderizaron en Linux;
@@ -9,23 +9,19 @@ como preferencia de la aplicación.
 | --- | --- | --- |
 | Biblioteca | ![Biblioteca clara](diseno-25/biblioteca-claro.png) | ![Biblioteca oscura](diseno-25/biblioteca-oscuro.png) |
 | Importar | ![Importar claro](diseno-25/importar-claro.png) | ![Importar oscuro](diseno-25/importar-oscuro.png) |
+| Archivos de apps | ![Archivos de apps claro](diseno-25/apps-claro.png) | ![Archivos de apps oscuro](diseno-25/apps-oscuro.png) |
 | Diagnóstico | ![Diagnóstico claro](diseno-25/diagnostico-claro.png) | ![Diagnóstico oscuro](diseno-25/diagnostico-oscuro.png) |
 | Preferencias | ![Preferencias claras](diseno-25/preferencias-claro.png) | ![Preferencias oscuras](diseno-25/preferencias-oscuro.png) |
 
-## Funciones de las referencias
+## Funciones en las cinco vistas
 
-- Archivos o carpetas, cola, miniaturas, estados por canción y progreso real.
-- Historial agregado de las últimas operaciones, sin nombres de canciones ni IDs.
-- Importar, exportar, seleccionar y eliminar; filtros de formato, portada y letra.
-- Claro/Oscuro/Sistema, acento opcional, reducir transparencia y movimiento.
-- Carpeta inicial de música, política de títulos y opciones de carátula.
-- Activación opcional de importación automática y actualización por cambios.
-- Diagnóstico con nombre/modelo/iOS conocidos, almacenamiento de datos comunicado
-  por AFC y comprobaciones de conexión, catálogo, lectura y hashes conocidos.
-- Pausa/reanudación entre lotes o archivos y cancelación segura.
+- **Biblioteca:** tabla y cuadrícula de **Álbumes / Artistas**, playlists de `MediaLibrary.sqlitedb`, búsqueda, filtros estrictos de formato, portada, letra y **Posibles duplicados**, insignias de formato, selección contextual y panel **Detalles** con vista previa de audio.
+- **Importar:** archivos o carpetas, editor no destructivo de metadatos y portada antes de importar, detector de canciones ya presentes en el iPhone (`Quitar repetidas`), conversión opcional de FLAC/OGG/Opus/WMA con `ffmpeg`, historial agregado, pausa/reanudación y cancelación segura.
+- **Archivos de apps:** exploración de `/Documents` con migas de pan clicables, subir archivos/carpetas (o arrastrar y soltar), nueva carpeta, buscador, renombrar (`F2`), exportar, eliminar y política de conflictos (`Omitir / Renombrar / Reemplazar`).
+- **Diagnóstico:** nombre/modelo/iOS, almacenamiento de datos AFC, tarjeta **Batería** (`DiagnosticsService`), comprobaciones de conexión/catálogo/permisos/hashes y herramientas avanzadas de recuperación.
+- **Preferencias:** Claro/Oscuro/Sistema (miniatura partida), acento opcional, transparencia y movimiento, carpeta inicial, organización al exportar (`Artista/Álbum`) y respaldo incremental, conversión FLAC (`ALAC` / `AAC`), carátulas, idioma ES/EN y aviso de actualizaciones desde GitHub Releases.
 
-Formatos: MP3, WAV, M4A con AAC/ALAC y AIFF. **FLAC se excluye** por indicación
-del usuario. Los chips AAC/ALAC indican códecs dentro del contenedor M4A.
+Formatos nativos para Música: `MP3`, `WAV`, `M4A (AAC/ALAC)` y `AIFF` (más conversión opcional de `FLAC`, `OGG`, `Opus`, `WMA`, `MKA` y `WebM` a `M4A` mediante `ffmpeg` sin alterar originales). En **Archivos de apps** se admite cualquier tipo de archivo dentro de `/Documents`.
 
 ## Alcance de los controles
 
