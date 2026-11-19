@@ -339,6 +339,7 @@ class Window(QMainWindow):
         if self.background_enabled and self.auto_read.isChecked():
             self.device_timer.start()
             QTimer.singleShot(150,self.poll_device)
+        self.rebuild_app_breadcrumbs()
         self.update_buttons()
 
     def update_buttons(self):
@@ -379,7 +380,38 @@ class Window(QMainWindow):
             self.app_new_folder.setEnabled(not phone_busy and has_app)
             self.app_export.setEnabled(not phone_busy and has_app and bool(selected_app))
             self.app_delete.setEnabled(not phone_busy and has_app and bool(selected_app))
+            if self.app_entries:
+                if selected_app:
+                    self.app_entries_count.setText(tr(f'{len(self.app_entries)} elementos · {len(selected_app)} seleccionados'))
+                else:
+                    self.app_entries_count.setText(tr(f'{len(self.app_entries)} elementos'))
+            else:
+                self.app_entries_count.setText('')
         self.update_diagnostics()
+
+    def update_context_status(self):
+        if (self.worker is not None or self.transfer_worker is not None or self.app_worker is not None
+                or self.library_worker is not None or self.activity_message):
+            return
+        page = self.pages.currentIndex()
+        if page == 0:
+            from .library_fields import local_tracks
+            local = local_tracks(self.phone_tracks)
+            if self.phone_tracks:
+                self.status.setText(tr(f'{len(local)} canciones en el iPhone · {len(self.tracks)} para importar'))
+            else:
+                self.status.setText(tr('Conecta tu iPhone por USB o añade canciones para importar.'))
+        elif page == 2:
+            self.status.setText(tr(f'{len(self.tracks)} canciones en la cola de importación.') if self.tracks else tr('Sin canciones para importar.'))
+        elif page == 4:
+            if self.app_entries:
+                self.status.setText(tr(f'{len(self.app_entries)} elementos en la carpeta.'))
+            else:
+                self.status.setText(tr('Explora y gestiona los archivos compartidos de tus apps por USB.'))
+        elif page == 3:
+            self.status.setText(tr('iPhone conectado por USB · Solo lectura.' if self.usb_connected else 'Sin conexión USB · Conecta tu iPhone para comprobar el estado.'))
+        elif page == 1:
+            self.status.setText(tr('Los cambios de apariencia, idioma y sincronización se aplican al instante.'))
 
     def navigate(self, number):
         if number not in (0,1,2,3,4):return
@@ -389,6 +421,7 @@ class Window(QMainWindow):
         for nav in self.nav_buttons:nav.setIcon(line_icon(nav.property('iconKind'),'#ffffff' if nav.isChecked() else colors['text'],18))
         self.motion.navigate(self.pages,number)
         self.update_buttons()
+        self.update_context_status()
         self.schedule_artwork()
         self.library_empty.refresh()
         if (number==4 and self.background_enabled and (self.usb_connected or self.connection_token is not None)
@@ -419,6 +452,7 @@ class Window(QMainWindow):
                         if item is not None and hasattr(item,'retranslate'):item.retranslate()
             finally:table.setSortingEnabled(sorting)
         if hasattr(self,'preview_track'):self.request_preview(self.preview_track)
+        self.rebuild_app_breadcrumbs()
         self.library_empty.refresh()
         from .interface import fit_controls,set_column_metrics
         fit_controls(self);set_column_metrics(self);self.update_diagnostics()
@@ -586,6 +620,8 @@ class Window(QMainWindow):
         info=self.device_details
         self.diagnostic_model.setText(' · '.join(v for v in (info.get('model'),('iOS '+info['version']) if info.get('version') else '') if v) or tr('Información pendiente de lectura.'))
         self.diagnostic_fields['connection'].setText(tr('Conectado por USB' if self.usb_connected else 'Sin conexión USB'))
+        if 'connection_detail' in self.diagnostic_fields:
+            self.diagnostic_fields['connection_detail'].setText(tr('AFC · Lectura de catálogo y archivos por USB' if self.usb_connected else 'Conecta el iPhone y desbloquéalo para leer el catálogo.'))
         self.diagnostic_fields['library'].setText(tr(f'{len(tracks)} canciones') if self.library_ready else tr('Pendiente'))
         total=info.get('total_bytes');free=info.get('free_bytes')
         if type(total) is int and total>0 and type(free) is int and 0<=free<=total:
@@ -771,7 +807,8 @@ class Window(QMainWindow):
             return
         image = QPixmap()
         if image.loadFromData(data):
-            self.library_model.set_icon(identifier,QIcon(image))
+            from .visuals import table_cover
+            self.library_model.set_icon(identifier,table_cover(image,28))
             self.artwork_attempted.discard(identifier)
             self.library_selection_changed()
 
@@ -1277,15 +1314,21 @@ class Window(QMainWindow):
                   (f"M4A · {track['format']}" if track.get('container') == 'M4A' else track['format']), duration_label(track.get('duration')), byte_label(track['size']),tr('Preparada')]
         for column, value in enumerate(values):
             item = SortableItem(value)
-            if column == 4:item.setData(SORT_ROLE,track['duration'])
-            elif column == 5:item.setData(SORT_ROLE,track['size'])
+            if column == 3:item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            elif column == 4:
+                item.setData(SORT_ROLE,track['duration'])
+                item.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
+            elif column == 5:
+                item.setData(SORT_ROLE,track['size'])
+                item.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
             if column == 0:
                 item.setData(Qt.ItemDataRole.UserRole, track['id'])
                 from .lyrics import state,label
                 from .models import LYRICS_ROLE
                 item.setData(LYRICS_ROLE,state(track));item.setToolTip(track['filename']+'\n'+label(track))
                 if not picture.isNull():
-                    item.setIcon(QIcon(picture))
+                    from .visuals import table_cover
+                    item.setIcon(table_cover(picture,28))
                 else:
                     item.setIcon(self.default_music_icon)
             self.table.setItem(row, column, item)
@@ -1360,6 +1403,7 @@ class Window(QMainWindow):
         self.app_selector.blockSignals(False)
         self.app_table.setRowCount(0)
         self.app_path_label.setText('/Documents')
+        self.rebuild_app_breadcrumbs()
         self.app_entries_count.setText('')
         self.app_status.setText(tr('Conecta tu iPhone y pulsa Actualizar para ver las apps con archivos compartidos.'))
         self.update_buttons()
@@ -1628,9 +1672,39 @@ class Window(QMainWindow):
             if entry is not None:
                 item.setIcon(self.default_folder_icon if entry.get('kind') == 'dir' else self.default_file_icon)
 
+    def rebuild_app_breadcrumbs(self):
+        if not hasattr(self,'app_breadcrumbs'):return
+        from PySide6.QtWidgets import QPushButton as RawButton
+        while self.app_breadcrumbs.count():
+            child = self.app_breadcrumbs.takeAt(0)
+            widget = child.widget()
+            if widget is not None:
+                widget.deleteLater()
+        parts = [part for part in self.app_current_path.split('/') if part]
+        segments = [(str(tr('Documentos')), '')]
+        acc = []
+        for part in parts:
+            acc.append(part)
+            segments.append((part, '/'.join(acc)))
+        for idx, (label, target) in enumerate(segments):
+            if idx:
+                sep = QLabel('›')
+                sep.setObjectName('muted')
+                self.app_breadcrumbs.addWidget(sep)
+            crumb = RawButton(label)
+            crumb.setObjectName('crumb')
+            crumb.setCursor(Qt.CursorShape.PointingHandCursor)
+            is_current = idx == len(segments) - 1
+            crumb.setProperty('current', is_current)
+            crumb.setEnabled(bool(self.app_current_bundle) and not is_current)
+            if not is_current:
+                crumb.clicked.connect(lambda _=False, dest=target: self.load_app_folder(dest))
+            self.app_breadcrumbs.addWidget(crumb)
+
     def populate_app_table(self):
         if not hasattr(self,'app_table'):return
         self.app_path_label.setText(documents_path(self.app_current_path))
+        self.rebuild_app_breadcrumbs()
         self.app_entries_count.setText(tr(f'{len(self.app_entries)} elementos') if self.app_entries else '')
         sorting = self.app_table.isSortingEnabled()
         self.app_table.setSortingEnabled(False)
@@ -1651,8 +1725,10 @@ class Window(QMainWindow):
                 kind_item = SortableItem(kind_label)
                 size_item = SortableItem('—' if size is None else byte_label(size))
                 size_item.setData(SORT_ROLE, -1 if size is None else size)
+                size_item.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
                 mod_item = SortableItem(modified.strftime('%Y-%m-%d %H:%M') if modified is not None else '—')
                 mod_item.setData(SORT_ROLE, modified.timestamp() if modified is not None else 0)
+                mod_item.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
                 for col, item in enumerate((name_item, kind_item, size_item, mod_item)):
                     self.app_table.setItem(row, col, item)
                 self.app_table.setRowHeight(row, max(40, QFontMetrics(self.app_table.font()).height() + 14))

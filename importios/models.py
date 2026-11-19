@@ -82,6 +82,47 @@ class SelectionDelegate(QStyledItemDelegate):
         painter.restore()
 
 
+class FormatBadgeDelegate(QStyledItemDelegate):
+    """Render audio format labels as subtle, theme-coherent pills."""
+    def paint(self,painter,option,index):
+        option=QStyleOptionViewItem(option);self.initStyleOption(option,index)
+        text=(option.text or '').strip()
+        option.text=''
+        style=option.widget.style() if option.widget else QApplication.style()
+        style.drawControl(QStyle.ControlElement.CE_ItemViewItem,option,painter,option.widget)
+        if not text:return
+        dark=bool(option.widget and option.widget.property('darkTheme'))
+        painter.save();painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        if text=='—':
+            painter.setPen(option.palette.color(QPalette.ColorRole.Mid))
+            painter.drawText(option.rect,Qt.AlignmentFlag.AlignCenter,text)
+            painter.restore();return
+        upper=text.upper()
+        if 'ALAC' in upper:
+            bg,border,fg=('#3d2c1e','#785231','#ffbe85') if dark else ('#fdf0e4','#eac8a8','#9a4200')
+        elif 'WAV' in upper or 'AIFF' in upper:
+            bg,border,fg=('#183b36','#2e6b62','#8ce0c5') if dark else ('#e6f4ee','#b7decf','#175f49')
+        elif 'M4P' in upper or 'PROTEGIDO' in upper:
+            bg,border,fg=('#3d2728','#75474a','#f2a3a7') if dark else ('#fae9ea','#e5bec1','#8f2d34')
+        elif 'MP3' in upper:
+            bg,border,fg=('#1d3a44','#345d6b','#b7dce8') if dark else ('#e8f1f5','#c2d8e1','#1f5266')
+        else:
+            bg,border,fg=('#1b3c3f','#326166','#b2e2e0') if dark else ('#e4f1f0','#bcd9d7','#19595c')
+        font=option.font;font.setPointSizeF(max(8.0,font.pointSizeF()-.7));font.setWeight(font.Weight.DemiBold)
+        painter.setFont(font)
+        metrics=painter.fontMetrics()
+        pill_w=min(option.rect.width()-10,metrics.horizontalAdvance(text)+18)
+        pill_h=min(option.rect.height()-10,max(22,metrics.height()+6))
+        from PySide6.QtCore import QRectF
+        rect=QRectF(option.rect.x()+(option.rect.width()-pill_w)/2,option.rect.y()+(option.rect.height()-pill_h)/2,pill_w,pill_h)
+        painter.setPen(QPen(QColor(border),1))
+        painter.setBrush(QColor(bg))
+        painter.drawRoundedRect(rect,6,6)
+        painter.setPen(QColor(fg))
+        painter.drawText(rect,Qt.AlignmentFlag.AlignCenter,metrics.elidedText(text,Qt.TextElideMode.ElideRight,int(pill_w-10)))
+        painter.restore()
+
+
 class LibraryModel(QAbstractTableModel):
     checkedChanged=Signal()
     def __init__(self,parent=None):
@@ -171,11 +212,20 @@ class LibraryModel(QAbstractTableModel):
         return 0 if parent is not None and parent.isValid() else len(HEADERS)
 
     def headerData(self,section,orientation,role=Qt.ItemDataRole.DisplayRole):
-        if role==Qt.ItemDataRole.DisplayRole and orientation==Qt.Orientation.Horizontal and 0<=section<len(HEADERS):return str(tr(HEADERS[section]))
+        if orientation==Qt.Orientation.Horizontal and 0<=section<len(HEADERS):
+            if role==Qt.ItemDataRole.DisplayRole:return str(tr(HEADERS[section]))
+            if role==Qt.ItemDataRole.TextAlignmentRole:
+                if section==3:return int(Qt.AlignmentFlag.AlignCenter)
+                if section in (4,5):return int(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
+                return int(Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignVCenter)
 
     def data(self,index,role=Qt.ItemDataRole.DisplayRole):
         if not index.isValid() or not 0<=index.row()<len(self.tracks):return None
         track=self.tracks[index.row()];column=index.column()
+        if role==Qt.ItemDataRole.TextAlignmentRole:
+            if column==3:return int(Qt.AlignmentFlag.AlignCenter)
+            if column in (4,5):return int(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
+            return int(Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignVCenter)
         if column==0 and role==LYRICS_ROLE:
             from .lyrics import state
             return state(track)

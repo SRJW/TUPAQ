@@ -1228,5 +1228,17 @@ EN.update({
     '{count} seleccionadas ({format})':'{count} selected ({format})',
     '{count} archivos exportados y comprobados. {skipped} omitidos por formato distinto.':'{count} files exported and verified. {skipped} skipped due to different format.',
     'Omitida por formato distinto: {title}':'Skipped due to different format: {title}',
+    'Tu música en el iPhone, lista para explorar o exportar.':'Your iPhone music, ready to browse or export.',
+    'Conecta el iPhone y desbloquéalo para leer el catálogo.':'Connect and unlock your iPhone to read its catalogue.',
+    'AFC · Lectura de catálogo y archivos por USB':'AFC · USB catalogue and file access',
+    'Documentos':'Documents',
+    '{count} elementos · {selected} seleccionados':'{count} items · {selected} selected',
+    'Conecta tu iPhone por USB o añade canciones para importar.':'Connect your iPhone by USB or add songs to import.',
+    '{count} canciones en la cola de importación.':'{count} songs in the import queue.',
+    'Explora y gestiona los archivos compartidos de tus apps por USB.':'Browse and manage your apps’ shared files over USB.',
+    'iPhone conectado por USB · Solo lectura.':'iPhone connected by USB · Read-only checks.',
+    'Sin conexión USB · Conecta tu iPhone para comprobar el estado.':'Not connected by USB · Connect your iPhone to check status.',
+    'Los cambios de apariencia, idioma y sincronización se aplican al instante.':'Appearance, language and sync settings apply immediately.',
+    '{count} canciones en el iPhone · {queued} para importar':'{count} songs on iPhone · {queued} to import',
 })
 

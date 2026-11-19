@@ -22,10 +22,10 @@ for n,(title,artist,album,fmt) in enumerate([('Órbita','Lina del Sol','Horizont
  ext={'MP3':'.mp3','WAV':'.wav','AIFF':'.aif'}.get(fmt,'.m4a')
  rows.append({'id':str(n),'title':title,'artist':artist,'album':album,'format_label':fmt,'duration':180+n*17,'size':(n+8)*1024**2,'is_local':True,'usb_exists':True,'afc_path':f'iTunes_Control/Music/F00/{n:04}{ext}','has_artwork':True})
 w.connection_token='synthetic-preview';w.show_library(rows);w.device_name.setText('iPhone de prueba');w.device_details={'model':'iPhone14,2','version':'27.0','total_bytes':256*10**9,'free_bytes':137*10**9};w.update_diagnostics()
+from importios.visuals import table_cover
 for n in range(len(rows)):
  picture=QPixmap(96,96);p=QPainter(picture);g=QLinearGradient(0,0,96,96);g.setColorAt(0,QColor.fromHsv((n*37)%360,150,180));g.setColorAt(1,QColor.fromHsv((n*37+55)%360,180,70));p.fillRect(picture.rect(),g);p.setPen(QColor('#ffffff'));p.drawEllipse(18+n%3*3,17,58,58);p.drawLine(8,75,85,38);p.end()
- from PySide6.QtGui import QIcon
- w.library_model.set_icon(str(n),QIcon(picture))
+ w.library_model.set_icon(str(n),table_cover(picture,28))
 w.library_model.checked.add('0');w.checks_changed()
 for n,fixture in enumerate(('sample.mp3','covered-aac.m4a','sample.wav')):
  path=ROOT/'tests'/'fixtures'/fixture;track=inspect_audio(path,fixture);track['path']=str(path);from importios.artwork import thumbnail

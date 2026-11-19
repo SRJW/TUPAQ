@@ -16,14 +16,15 @@ def main():
     if subprocess.run(view, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         with tempfile.TemporaryDirectory() as directory:
             notes = Path(directory)/'notes.md'
-            notes.write_text('''TUPAQ 0.3.0-preview.34: exportación estricta por formato sin archivos colados y selector de selección más claro.
+            notes.write_text('''TUPAQ 0.3.0-preview.35: pase completo de coherencia visual en las cinco pantallas (claro y oscuro).
 
-- Impide que al exportar con un formato seleccionado (`MP3`, `M4A`, `AAC`, `ALAC`, `WAV` o `AIFF`) se cuelen canciones de otro formato:
-  - El lector del catálogo (`library_fields.format_label`) y el filtro (`search.format_aliases`) ya no confían en códigos `audio_format` del catálogo cuando contradicen la extensión real del archivo en el iPhone.
-  - Al pulsar **Exportar** con un filtro de formato activo, TUPAQ solo exporta canciones marcadas de ese formato y nunca arrastra canciones ocultas marcadas previamente de otros formatos.
-  - Durante la exportación (`export_selected`), TUPAQ comprueba tanto la extensión como la cabecera y los bytes reales del audio (diferenciando incluso `AAC` frente a `ALAC` dentro de `.m4a` y archivos con extensión engañosa) antes de guardar cada copia; si un archivo no coincide con el formato seleccionado, se omite sin escribirse en la carpeta de destino y se actualiza su formato real en la tabla.
-- Renombra la casilla «Seleccionar visibles» a una etiqueta clara y contextual: «Seleccionar todo» sin filtros, «Seleccionar todos los MP3» (o el formato activo) al filtrar por formato, y «Seleccionar resultados» al buscar o filtrar por carátula/letra, con traducción al inglés y texto de ayuda.
-- Verificado con pruebas automatizadas sin dispositivo físico; la prueba con un iPhone real conectado por USB queda pendiente en el equipo del usuario.
+- **Importar:** corrige el recorte del título «Formatos compatibles» y del chip `ALAC`, y alinea con el mismo ancho calculado las dos tarjetas de la columna derecha («Formatos compatibles» y «Sincronización») en español e inglés.
+- **Navegación y temas:** unifica el estado activo del menú lateral y del submenú de Preferencias en modo claro y oscuro (fondo petróleo coherente + indicador lateral en el acento de TUPAQ), y actualiza la miniatura del tema «Sistema» a una vista partida mitad clara / mitad oscura.
+- **Cabeceras y Diagnóstico:** añade subtítulo coherente a Biblioteca, elimina el botón redundante de Diagnóstico en su barra superior, compacta la píldora de estado USB en Diagnóstico y añade el detalle de transporte en la tarjeta de Conexión USB.
+- **Tablas coherentes:** añade insignias de formato tipo chip (`FormatBadgeDelegate`) en Biblioteca y Cola de importación, esquinas redondeadas en miniaturas de carátulas, icono contenedor suave cuando falta portada y alineación tipográfica consistente (formatos centrados; duración, tamaño y fecha alineados a la derecha).
+- **Archivos de apps:** incorpora barra de migas de pan clicables (`Documentos › …`), icono de flecha arriba en «Subir nivel» y contador de elementos/selección integrado en la barra de ruta.
+- **Barra de estado contextual:** adapta el mensaje inferior a la sección abierta cuando no hay ninguna transferencia activa.
+- Verificado con pruebas automatizadas y renderizado de vistas en ambos temas sin dispositivo físico; la prueba con un iPhone real conectado por USB queda pendiente en el equipo del usuario.
 
 MP3, WAV, M4A (AAC/ALAC) y AIFF para Música; cualquier formato dentro de `/Documents` de apps compatibles. Windows necesita el servicio/controlador USB de Apple. Paquetes sin firma ni notarización. No se distribuyen fuentes ni DLL de Apple o 3uTools.
 ''', encoding='utf-8')

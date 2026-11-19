@@ -65,6 +65,9 @@ def line_icon(kind, color='#52576d', size=22):
         p.drawRoundedRect(QRectF(8,7,12,14),2,2);p.drawPolyline([QPointF(5,16),QPointF(3,16),QPointF(3,3),QPointF(15,3)])
     elif kind == 'folder':
         p.drawPolyline([QPointF(3,7),QPointF(3,4),QPointF(10,4),QPointF(12,7),QPointF(21,7),QPointF(21,20),QPointF(3,20),QPointF(3,7),QPointF(21,7)])
+    elif kind == 'up':
+        p.drawLine(12,19,12,5)
+        p.drawPolyline([QPointF(6,11),QPointF(12,5),QPointF(18,11)])
     elif kind == 'trash':
         p.drawLine(4,6,20,6);p.drawRect(QRectF(7,6,10,15));p.drawLine(9,3,15,3);p.drawLine(10,10,10,17);p.drawLine(14,10,14,17)
     elif kind == 'close':
@@ -76,10 +79,26 @@ def line_icon(kind, color='#52576d', size=22):
     return QIcon(image)
 
 
-def rounded_cover(source,size=120):
+def rounded_cover(source,size=120,radius=14):
     output=QPixmap(size*2,size*2);output.setDevicePixelRatio(2);output.fill(Qt.GlobalColor.transparent)
     painter=QPainter(output);painter.setRenderHint(QPainter.RenderHint.Antialiasing);painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-    clip=QPainterPath();clip.addRoundedRect(QRectF(0,0,size,size),14,14);painter.setClipPath(clip)
+    clip=QPainterPath();clip.addRoundedRect(QRectF(0,0,size,size),radius,radius);painter.setClipPath(clip)
     edge=min(source.width(),source.height())
     painter.drawPixmap(QRectF(0,0,size,size),source,QRectF((source.width()-edge)/2,(source.height()-edge)/2,edge,edge))
     painter.end();return output
+
+
+def table_cover(source,size=28):
+    return QIcon(rounded_cover(source,size=size,radius=6))
+
+
+def music_placeholder_icon(background,border,foreground,size=28):
+    output=QPixmap(size*2,size*2);output.setDevicePixelRatio(2);output.fill(Qt.GlobalColor.transparent)
+    painter=QPainter(output);painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    painter.setPen(QPen(QColor(border),1))
+    painter.setBrush(QColor(background))
+    painter.drawRoundedRect(QRectF(.5,.5,size-1,size-1),6,6)
+    painter.setPen(QColor(foreground))
+    font=QFont();font.setPixelSize(round(size*.56));painter.setFont(font)
+    painter.drawText(QRectF(0,0,size,size),Qt.AlignmentFlag.AlignCenter,'♪')
+    painter.end();return QIcon(output)
