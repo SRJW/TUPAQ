@@ -4,12 +4,18 @@ from pathlib import PurePosixPath
 
 def format_label(code, path=None):
     suffix = PurePosixPath(path or '').suffix.lower()
-    if suffix == '.m4p' and code in (502,508,509,1001):
-        return 'M4P · protegido'
-    if code in (301,302,303):return 'MP3'
-    if code == 601:return 'M4A · ALAC'
-    if code in (502,508,509,1001):return 'M4A · AAC' if suffix in ('.m4a','.alac') else 'AAC'
-    if code == 701:return {'.wav':'WAV','.aif':'AIFF','.aiff':'AIFF'}.get(suffix,'PCM')
+    if suffix == '.m4p':
+        return 'M4P · protegido' if code in (502,508,509,1001) else None
+    if code in (301,302,303):
+        return 'MP3' if suffix in ('','.mp3') else None
+    if code == 601:
+        return 'M4A · ALAC' if suffix in ('','.m4a','.alac') else None
+    if code in (502,508,509,1001):
+        if suffix in ('.m4a','.alac'):
+            return 'M4A · AAC'
+        return 'AAC' if suffix in ('','.aac') else None
+    if code == 701:
+        return {'':'PCM','.wav':'WAV','.aif':'AIFF','.aiff':'AIFF'}.get(suffix)
     return None
 
 

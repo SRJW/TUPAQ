@@ -127,8 +127,14 @@ async def export_selected(selected, folder, progress):
     folder = Path(folder).resolve()
     require(folder.is_dir() and 1 <= len(selected) <= 1000, 'export-selection')
     from .audio import EXTENSIONS
+    from .search import FORMAT_EXTENSIONS, matches_format, suffix_matches_format
+    from .remote_details import audio_details, detect_file_format_label
     require(all(PurePosixPath(t.get('afc_path') or '').suffix.casefold() in EXTENSIONS for t in selected),'export-format')
-    result = [];covers_embedded=0
+    for chosen in selected:
+        expected = chosen.get('expected_format')
+        if expected is not None:
+            require(isinstance(expected,str) and expected.strip().lstrip('.').casefold() in FORMAT_EXTENSIONS,'export-format')
+    result = [];covers_embedded=0;skipped_format=0;format_updates={}
     async with device() as (_, afc):
         with tempfile.TemporaryDirectory(prefix='.tupaq-export-',dir=folder) as temporary:
             catalogue = Path(temporary)/'catalogue'
@@ -148,6 +154,26 @@ async def export_selected(selected, folder, progress):
                 await wait_if_paused(progress)
                 checkpoint()
                 track = fresh[chosen['id']]
+                expected_format = chosen.get('expected_format')
+                if expected_format:
+                    if not suffix_matches_format(track['afc_path'],expected_format):
+                        if hasattr(afc,'fseek'):
+                            info = await audio_details(afc,track)
+                            if info.get('format_source') == 'header':
+                                format_updates[track['id']] = {'format_label':info.get('format_label'),'format_source':'header'}
+                        skipped_format += 1
+                        progress((index+1)*100,len(selected)*100,'Omitida por formato distinto: '+track['title'])
+                        continue
+                    if hasattr(afc,'fseek'):
+                        info = await audio_details(afc,track)
+                        if info.get('format_source') == 'header':
+                            detected = info.get('format_label')
+                            defer_m4a_codec = detected == 'M4A' and expected_format.strip().lstrip('.').casefold() in ('aac','alac')
+                            if not defer_m4a_codec and not matches_format({'format_label':detected,'format_source':'header','afc_path':track['afc_path']},expected_format):
+                                format_updates[track['id']] = {'format_label':detected,'format_source':'header'}
+                                skipped_format += 1
+                                progress((index+1)*100,len(selected)*100,'Omitida por formato distinto: '+track['title'])
+                                continue
                 destination_name = export_name(track)
                 temporary_audio = Path(temporary)/'audio.part'
                 def bytes_progress(done,total):
@@ -158,6 +184,14 @@ async def export_selected(selected, folder, progress):
                 _, check, check_size = await read_remote(afc,track['afc_path'])
                 require(size == check_size and digest == check == local_hash(temporary_audio), 'export-hash')
                 checkpoint()
+                if expected_format:
+                    actual_label = detect_file_format_label(temporary_audio)
+                    if not matches_format({'format_label':actual_label,'format_source':'header','afc_path':track['afc_path']},expected_format):
+                        format_updates[track['id']] = {'format_label':actual_label,'format_source':'header'}
+                        temporary_audio.unlink(missing_ok=True)
+                        skipped_format += 1
+                        progress((index+1)*100,len(selected)*100,'Omitida por formato distinto: '+track['title'])
+                        continue
                 if chosen.get('embed_artwork'):
                     from .remote_artwork import cover_for_track
                     from .export_artwork import embed
@@ -170,7 +204,12 @@ async def export_selected(selected, folder, progress):
                 if control is not None:control.files=list(result)
                 temporary_audio.unlink()
                 progress((index+1)*100,len(selected)*100,'Exportada: '+track['title'])
-    return {'exported':len(result),'files':result,'covers_embedded':covers_embedded}
+    summary = {'exported':len(result),'files':result,'covers_embedded':covers_embedded}
+    if skipped_format:
+        summary['skipped_format'] = skipped_format
+    if format_updates:
+        summary['format_updates'] = format_updates
+    return summary
 
 
 def save_receipt(directory, receipt):

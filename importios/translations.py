@@ -1221,5 +1221,12 @@ EN.update({
     'No se pudo confirmar la eliminación del elemento en el iPhone.':'Could not confirm deletion of the item on the iPhone.',
     'Acción de archivos de aplicación no reconocida.':'Unrecognized app files action.',
     'No se pudo completar la operación en los archivos de la aplicación.':'Could not complete the operation on the app files.',
+    'Seleccionar todo':'Select all',
+    'Seleccionar todos los {format}':'Select all {format}',
+    'Seleccionar resultados':'Select all results',
+    'Marcar o desmarcar todas las canciones de la lista actual.':'Check or uncheck all songs in the current list.',
+    '{count} seleccionadas ({format})':'{count} selected ({format})',
+    '{count} archivos exportados y comprobados. {skipped} omitidos por formato distinto.':'{count} files exported and verified. {skipped} skipped due to different format.',
+    'Omitida por formato distinto: {title}':'Skipped due to different format: {title}',
 })
 

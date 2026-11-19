@@ -352,7 +352,8 @@ class Window(QMainWindow):
         self.library_button.setEnabled(not phone_busy)
         self.import_phone.setEnabled(not phone_busy and bool(self.tracks))
         selected=self.marked_tracks()
-        self.export_phone.setEnabled(not phone_busy and bool(selected) and all(t.get('afc_path') for t in selected[:100]))
+        exportable=self.exportable_tracks()
+        self.export_phone.setEnabled(not phone_busy and bool(exportable) and all(t.get('afc_path') for t in exportable[:100]))
         self.delete_phone.setEnabled(not phone_busy and bool(selected))
         self.verify_import.setEnabled(not phone_busy and self.backup_root.exists())
         self.resume_import.setEnabled(not phone_busy and self.backup_root.exists())
@@ -433,6 +434,28 @@ class Window(QMainWindow):
         for control in (self.search,self.format_filter,self.content_filter):control.blockSignals(False)
         self.filter_library()
 
+    def active_format_filter(self):
+        return self.format_filter.currentText() if self.format_filter.currentIndex() else None
+
+    def exportable_tracks(self):
+        selected = self.marked_tracks()
+        fmt = self.active_format_filter()
+        if fmt:
+            from .search import matches_format, suffix_matches_format
+            selected = [t for t in selected if matches_format(t, fmt) and suffix_matches_format(t.get('afc_path'), fmt)]
+        return selected
+
+    def update_select_all_label(self):
+        has_search = bool(self.search.text().strip())
+        has_content = bool(self.content_filter.currentIndex())
+        fmt = self.active_format_filter()
+        if has_search or has_content:
+            self.select_visible.setText(tr('Seleccionar resultados'))
+        elif fmt:
+            self.select_visible.setText(tr(f'Seleccionar todos los {fmt}'))
+        else:
+            self.select_visible.setText(tr('Seleccionar todo'))
+
     def track_matches_filters(self, track):
         from .search import matches, matches_format
         if self.format_filter.currentIndex() and not matches_format(track, self.format_filter.currentText()):
@@ -492,6 +515,7 @@ class Window(QMainWindow):
         if self.worker is None and self.transfer_worker is None and not self.activity_message:
             self.status.setText(tr(f"{len(local)} {'canciones' if known else 'canciones disponibles'} · {len(self.tracks)} para importar"))
         if not self.library_table.selectionModel().selectedRows() and not self.table.selectionModel().selectedRows() and self.transfer_worker is None:self.clear_inspector()
+        self.update_select_all_label()
         self.library_selection_changed()
         self.update_library_summary()
         self.checks_changed()
@@ -890,7 +914,16 @@ class Window(QMainWindow):
         return [dict(track) for track in local_tracks(self.phone_tracks) if track['id'] in self.library_model.checked]
 
     def checks_changed(self):
-        count=len(self.marked_tracks());self.selection_count.setText(tr(f'{count} seleccionadas' if count else ''))
+        marked=self.marked_tracks()
+        fmt=self.active_format_filter()
+        if fmt:
+            exportable=self.exportable_tracks()
+            if len(exportable)!=len(marked):
+                self.selection_count.setText(tr(f'{len(exportable)} seleccionadas ({fmt})') if exportable or marked else '')
+            else:
+                self.selection_count.setText(tr(f'{len(marked)} seleccionadas' if marked else ''))
+        else:
+            count=len(marked);self.selection_count.setText(tr(f'{count} seleccionadas' if count else ''))
         visible={track['id'] for track in self.library_model.tracks};checked=visible & self.library_model.checked
         self.select_visible.blockSignals(True)
         self.select_visible.setCheckState(Qt.CheckState.Checked if visible and checked==visible else Qt.CheckState.PartiallyChecked if checked else Qt.CheckState.Unchecked)
@@ -912,12 +945,14 @@ class Window(QMainWindow):
         if dialog.exec()==QMessageBox.StandardButton.Yes:self.start_transfer('delete',selected,self.backup_root)
 
     def export_songs(self):
-        selected=self.marked_tracks()
+        selected=self.exportable_tracks()
         if not selected:
             return
+        fmt=self.active_format_filter()
         folder = QFileDialog.getExistingDirectory(self,tr('Guardar audio del iPhone en…'),self.library_path.text())
         if folder:
-            self.start_transfer('export',[dict(t,embed_artwork=self.embed_artwork.isChecked()) for t in selected],Path(folder))
+            items=[dict(t,embed_artwork=self.embed_artwork.isChecked(),**({'expected_format':fmt} if fmt else {})) for t in selected]
+            self.start_transfer('export',items,Path(folder))
 
     def start_transfer(self, mode, selected, destination):
         if self.transfer_worker is not None or self.worker is not None or self.library_worker is not None or self.device_worker is not None or self.app_worker is not None:
@@ -989,7 +1024,7 @@ class Window(QMainWindow):
         if not (control and control.event.is_set()):self.status.setText(tr(label));self.transfer_stage.setText(tr(label))
         phase_label=label.partition(' · ')[2] if label.startswith('Lote ') else label
         if phase_label.startswith(('Importando:','Exportando:','Enviando metadatos')):self.transfer_phase=1
-        elif phase_label.startswith(('Comprobando las canciones','Esperando la actualización','Importación comprobada','Exportada:')):self.transfer_phase=2
+        elif phase_label.startswith(('Comprobando las canciones','Esperando la actualización','Importación comprobada','Exportada:','Omitida por formato distinto:')):self.transfer_phase=2
         elif phase_label.startswith(('Leyendo el estado','Preparando el envío','Comprobando operaciones','Buscando canciones')):self.transfer_phase=0
         self.paint_transfer_stages()
         if identifier and identifier != self.progress_track_id and identifier in self.tracks:
@@ -1024,7 +1059,11 @@ class Window(QMainWindow):
             self.status.setText(tr(f"{result['deleted']} canciones eliminadas de la biblioteca."))
             self.library_model.checked.difference_update(result.get('item_ids',[]))
         elif 'exported' in result:
-            self.status.setText(tr(f"{result['exported']} archivos exportados y comprobados."))
+            skipped_format = result.get('skipped_format',0)
+            if skipped_format:
+                self.status.setText(tr(f"{result['exported']} archivos exportados y comprobados. {skipped_format} omitidos por formato distinto."))
+            else:
+                self.status.setText(tr(f"{result['exported']} archivos exportados y comprobados."))
             if result.get('covers_embedded'):self.status.setText(self.status.text()+' '+tr(f"{result['covers_embedded']} carátulas incrustadas en las copias."))
         elif 'reconciled' in result and 'imported' not in result:
             self.status.setText(tr(f"{result.get('verified',0)} audios comprobados · {result.get('metadata_unverified',0)} con metadatos por revisar · {result.get('retired',0)} retirados por el iPhone · {result.get('removed',0)} eliminaciones comprobadas"))
@@ -1065,6 +1104,12 @@ class Window(QMainWindow):
         if self.transfer_outcome and self.transfer_outcome.get('deleted'):
             removed=set(self.transfer_outcome.get('item_ids',[]));self.phone_tracks=[t for t in self.phone_tracks if t['id'] not in removed]
             self.library_model.checked.difference_update(removed);self.filter_library()
+        elif self.transfer_outcome and self.transfer_outcome.get('format_updates'):
+            updates=self.transfer_outcome['format_updates']
+            for track in self.phone_tracks:
+                if track['id'] in updates:
+                    track.update(updates[track['id']])
+            self.filter_library()
         self.update_buttons()
         if self.refresh_after_transfer.isChecked() and self.transfer_outcome and any(key in self.transfer_outcome for key in ('imported','verified','updated','deleted')):
             self.load_library()

@@ -113,7 +113,7 @@ def build(window):
     window.library_heading=text_label('En el iPhone','muted');window.selection_count=text_label('','muted');collection.addWidget(window.library_heading);collection.addWidget(window.selection_count);collection.addStretch()
     window.delete_phone=button('Eliminar','trash',window.delete_songs);window.delete_phone.setObjectName('destructive')
     window.delete_phone.setToolTip(tr('Eliminar de Música las canciones marcadas; pide confirmación.'));collection.addWidget(window.delete_phone)
-    window.select_visible=QCheckBox(tr('Seleccionar visibles'));window.select_visible.setTristate(True);collection.addWidget(window.select_visible);layout.addLayout(collection)
+    window.select_visible=QCheckBox(tr('Seleccionar todo'));window.select_visible.setToolTip(tr('Marcar o desmarcar todas las canciones de la lista actual.'));window.select_visible.setTristate(True);collection.addWidget(window.select_visible);layout.addLayout(collection)
     window.pages.addWidget(workspace)
 
     settings,settings_layout,_,_=page('Preferencias','Personaliza TUPAQ y la gestión de tu música.')

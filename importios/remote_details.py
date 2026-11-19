@@ -101,9 +101,11 @@ async def audio_details(afc,track):
                 offset=10+sum(byte<<shift for byte,shift in zip(header[6:10],(21,14,7,0)))
             if offset<size:
                 frames=await read(offset,min(65536,size-offset))
-                info=MPEGInfo(HeaderStream(frames,size-offset),offset=0)
-                label='MP3';seconds=info.length
-                result.update(sample_rate=info.sample_rate,channels=info.channels,bit_rate=info.bitrate/1000)
+                if not (frames[:4] in (b'RIFF',b'FORM',b'fLaC',b'OggS') or (len(frames)>=8 and frames[4:8]==b'ftyp')):
+                    info=MPEGInfo(HeaderStream(frames,size-offset),offset=0)
+                    if getattr(info,'layer',None)==3:
+                        label='MP3';seconds=info.length
+                        result.update(sample_rate=info.sample_rate,channels=info.channels,bit_rate=info.bitrate/1000)
     except Exception:
         pass
     finally:
@@ -112,3 +114,39 @@ async def audio_details(afc,track):
     if isinstance(seconds,(int,float)) and math.isfinite(seconds) and 0<seconds<=7*86400:
         result.update(duration=seconds,duration_source='header')
     return result
+
+
+def detect_file_format_label(path):
+    """Detect real audio format from local file bytes regardless of filename extension."""
+    from mutagen.aiff import AIFF
+    from mutagen.mp3 import MP3
+    from mutagen.wave import WAVE
+    try:
+        with open(path,'rb') as stream:
+            header=stream.read(12)
+        if header[:4]==b'RIFF' and header[8:12]==b'WAVE':
+            WAVE(path)
+            return 'WAV'
+        if header[:4]==b'FORM' and header[8:12] in (b'AIFF',b'AIFC'):
+            AIFF(path)
+            return 'AIFF' if header[8:12]==b'AIFF' else 'AIFF-C'
+        if header[:4]==b'fLaC':
+            return 'FLAC'
+        if len(header)>=8 and header[4:8]==b'ftyp':
+            audio=MP4(path)
+            codec=getattr(audio.info,'codec','')
+            return 'M4A · ALAC' if codec=='alac' else 'M4A · AAC' if codec.startswith('mp4a') else 'M4P · protegido' if codec in ('drms','enca') else 'M4A'
+        offset=0
+        if header[:3]==b'ID3' and len(header)>=10 and not any(byte&128 for byte in header[6:10]):
+            offset=10+sum(byte<<shift for byte,shift in zip(header[6:10],(21,14,7,0)))
+        with open(path,'rb') as stream:
+            stream.seek(offset)
+            after=stream.read(12)
+        if after[:4] in (b'RIFF',b'FORM',b'fLaC',b'OggS') or (len(after)>=8 and after[4:8]==b'ftyp'):
+            return None
+        audio=MP3(path)
+        if getattr(audio.info,'layer',None)==3:
+            return 'MP3'
+    except Exception:
+        return None
+    return None
