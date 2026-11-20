@@ -9,15 +9,17 @@ de apps compatibles y consulta diagnósticos reales del dispositivo (incluida la
 salud de la batería). Aplicación de escritorio nativa, con ventana propia, sin
 navegador ni necesidad de instalar Python.
 
-La versión actual (**0.3.0-preview.36**) incorpora las cinco vistas con coherencia
-visual en tema claro y oscuro, aviso opcional de actualizaciones desde GitHub
-Releases, mejoras en **Archivos de apps** (buscador, renombrar con `F2` y
-política de conflictos), telemetría real de **Batería** en Diagnóstico y
-herramientas avanzadas de música: conversión opcional de FLAC/OGG/Opus/WMA con
-`ffmpeg`, exportación organizada e incremental sin límite de 1.000 canciones,
-detector de duplicados, editor no destructivo de metadatos y portada antes de
-importar, lectura y exportación `.m3u8` de playlists, vista por **Álbumes /
-Artistas** y vista previa de audio.
+La versión actual (**0.3.0-preview.37**) estrena un rediseño estético más ligero
+y espacioso en las cinco vistas (cabecera compacta de una fila en *Biblioteca*,
+control segmentado unificado, cuadrícula 2×2 en *Diagnóstico* sin recortes e
+insignias de estado en *Importar*), junto a todas las funciones añadidas: aviso
+opcional de actualizaciones desde GitHub Releases, **Archivos de apps** con
+buscador, renombrado (`F2`) y política de conflictos, telemetría real de
+**Batería**, conversión opcional de FLAC/OGG/Opus/WMA con `ffmpeg`, exportación
+organizada e incremental sin límite de 1.000 canciones, detector de duplicados,
+editor no destructivo de metadatos y portada antes de importar, lectura y
+exportación `.m3u8` de playlists, vista por **Álbumes / Artistas** y vista previa
+de audio.
 
 **Windows y macOS usan siempre la fuente nativa de su sistema**; no hay selector
 ni carga manual de fuentes. Los controles y columnas reservan el ancho real del
@@ -33,7 +35,7 @@ que las renderiza. GitHub Actions guarda también capturas por plataforma.
 
 ## Descargar y abrir
 
-[Última versión (v0.3.0-preview.36)](https://github.com/SRJW/TUPAQ/releases/tag/v0.3.0-preview.36) ·
+[Última versión (v0.3.0-preview.37)](https://github.com/SRJW/TUPAQ/releases/tag/v0.3.0-preview.37) ·
 [Todas las versiones](https://github.com/SRJW/TUPAQ/releases) ·
 [Cómo descargar](DESCARGAR.md)
 
@@ -166,7 +168,7 @@ conserva la posición válida y se omite el total incoherente.
 
 ## Validación y desarrollo
 
-La revisión **0.3.0-preview.36** cuenta con **294 pruebas automáticas** que
+La revisión **0.3.0-preview.37** cuenta con **295 pruebas automáticas** que
 cubren lectura de catálogo y playlists, conversión real de FLAC → ALAC/AAC con
 `ffmpeg`, exportación organizada e incremental con `.m3u8`, editor no destructivo
 de metadatos y carátula, detección de duplicados, telemetría de batería, aviso de

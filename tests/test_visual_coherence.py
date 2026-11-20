@@ -122,3 +122,24 @@ class VisualCoherenceTests(unittest.TestCase):
         self.assertIn('apps', w.status.text().casefold())
         w.navigate(2)
         self.assertEqual(w.status.text(), 'Sin canciones para importar.')
+
+    def test_lightweight_redesign_status_badges_and_single_primary_import_cta(self):
+        from importios.models import StatusBadgeDelegate
+        w = self.window
+        self.assertIsInstance(w.table.itemDelegateForColumn(6), StatusBadgeDelegate)
+        self.assertEqual(w.import_choose.objectName(), 'primary')
+        w.accept_track({
+            'id': 'q1', 'filename': 'a.mp3', 'path': '/tmp/a.mp3',
+            'title': 'Pista', 'artist': 'Artista', 'album': 'Disco',
+            'format': 'MP3', 'duration': 60.0, 'size': 1024,
+        })
+        w.update_buttons()
+        self.assertEqual(w.import_choose.objectName(), '')
+        self.assertEqual(w.import_submit.objectName(), 'primary')
+        w.clear_tracks()
+        self.assertEqual(w.import_choose.objectName(), 'primary')
+        # Diagnostics 2x2 footer stays within 720px height without clipping.
+        w.navigate(3)
+        APP.processEvents()
+        self.assertLessEqual(w.copy_diagnostic.geometry().bottom(), 700)
+

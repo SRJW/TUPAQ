@@ -23,9 +23,9 @@ class Atmosphere(QWidget):
                        ('#fffdfb','#f8f4ee','#f1d9c5','#e3eeeb','#f3e8da')]
             top,bottom,a,b,c=sets[self.mood%4]
             gradient=QLinearGradient(0,0,size.width(),size.height());gradient.setColorAt(0,QColor(top));gradient.setColorAt(1,QColor(bottom));p.fillRect(self.rect(),gradient)
-            for x,y,r,color in ([] if getattr(self,'reduced',False) else [(.02,.1,.85,a),(.94,.2,.72,b),(.25,1,.8,c)]):
+            for x,y,r,color in ([] if getattr(self,'reduced',False) else [(.04,.08,.78,a),(.94,.18,.65,b)]):
                 glow=QRadialGradient(QPointF(size.width()*x,size.height()*y),size.width()*r)
-                center=QColor(color);center.setAlpha(130 if self.dark else 100);edge=QColor(color);edge.setAlpha(0)
+                center=QColor(color);center.setAlpha(48 if self.dark else 38);edge=QColor(color);edge.setAlpha(0)
                 glow.setColorAt(0,center);glow.setColorAt(1,edge);p.fillRect(self.rect(),glow)
-            sheen=QLinearGradient(0,0,0,size.height());sheen.setColorAt(0,QColor(255,255,255,20));sheen.setColorAt(.4,QColor(255,255,255,0));p.fillRect(self.rect(),sheen);p.end()
+            sheen=QLinearGradient(0,0,0,size.height());sheen.setColorAt(0,QColor(255,255,255,10 if self.dark else 16));sheen.setColorAt(.32,QColor(255,255,255,0));p.fillRect(self.rect(),sheen);p.end()
         painter=QPainter(self);painter.drawPixmap(0,0,self.cache)

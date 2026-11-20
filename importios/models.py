@@ -123,11 +123,47 @@ class FormatBadgeDelegate(QStyledItemDelegate):
         painter.restore()
 
 
+class StatusBadgeDelegate(QStyledItemDelegate):
+    """Render import queue status cells as subtle, theme-coherent pills."""
+    def paint(self,painter,option,index):
+        option=QStyleOptionViewItem(option);self.initStyleOption(option,index)
+        text=(option.text or '').strip()
+        option.text=''
+        style=option.widget.style() if option.widget else QApplication.style()
+        style.drawControl(QStyle.ControlElement.CE_ItemViewItem,option,painter,option.widget)
+        if not text:return
+        dark=bool(option.widget and option.widget.property('darkTheme'))
+        painter.save();painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        lower=text.casefold()
+        if 'iphone' in lower or 'already' in lower:
+            bg,border,fg=('#3d2c1e','#785231','#ffbe85') if dark else ('#fdf0e4','#eac8a8','#9a4200')
+        elif 'convert' in lower or 'enviada' in lower or 'sent' in lower:
+            bg,border,fg=('#183b36','#2e6b62','#8ce0c5') if dark else ('#e6f4ee','#b7decf','#175f49')
+        elif 'enviando' in lower or 'sending' in lower:
+            bg,border,fg=('#3a2a1a','#8a5724','#ffc48c') if dark else ('#fff1e6','#f0c49b','#b34a00')
+        else:
+            bg,border,fg=('#1b3639','#2d5054','#b8cfce') if dark else ('#eef3f2','#d4e0de','#395759')
+        font=option.font;font.setPointSizeF(max(8.0,font.pointSizeF()-.7));font.setWeight(font.Weight.Medium)
+        painter.setFont(font)
+        metrics=painter.fontMetrics()
+        pill_w=min(option.rect.width()-10,metrics.horizontalAdvance(text)+18)
+        pill_h=min(option.rect.height()-10,max(22,metrics.height()+6))
+        from PySide6.QtCore import QRectF
+        rect=QRectF(option.rect.x()+4,option.rect.y()+(option.rect.height()-pill_h)/2,pill_w,pill_h)
+        painter.setPen(QPen(QColor(border),1))
+        painter.setBrush(QColor(bg))
+        painter.drawRoundedRect(rect,6,6)
+        painter.setPen(QColor(fg))
+        painter.drawText(rect,Qt.AlignmentFlag.AlignCenter,metrics.elidedText(text,Qt.TextElideMode.ElideRight,int(pill_w-10)))
+        painter.restore()
+
+
 class LibraryModel(QAbstractTableModel):
     checkedChanged=Signal()
     def __init__(self,parent=None):
         super().__init__(parent)
         self.tracks=[];self.icons=OrderedDict();self.default_icon=None
+        self.secondary_color=None
         self.sort_column=0;self.sort_order=Qt.SortOrder.AscendingOrder
         self.rows={};self.checked=set();self.icon_keys={}
 
@@ -222,6 +258,11 @@ class LibraryModel(QAbstractTableModel):
     def data(self,index,role=Qt.ItemDataRole.DisplayRole):
         if not index.isValid() or not 0<=index.row()<len(self.tracks):return None
         track=self.tracks[index.row()];column=index.column()
+        if role==Qt.ItemDataRole.FontRole and column==0:
+            from PySide6.QtGui import QFont
+            font=QApplication.font();font.setWeight(QFont.Weight.Medium);return font
+        if role==Qt.ItemDataRole.ForegroundRole and column in (1,2) and self.secondary_color is not None:
+            return self.secondary_color
         if role==Qt.ItemDataRole.TextAlignmentRole:
             if column==3:return int(Qt.AlignmentFlag.AlignCenter)
             if column in (4,5):return int(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)

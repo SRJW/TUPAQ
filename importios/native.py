@@ -456,6 +456,14 @@ class Window(QMainWindow):
         self.queue_panel.show()
         self.queue_panel.setMinimumHeight(160)
         self.import_choose.setEnabled(not busy);self.folder_choose.setEnabled(not busy);self.import_submit.setEnabled(self.import_phone.isEnabled())
+        wanted_choose = '' if self.tracks else 'primary'
+        if self.import_choose.objectName() != wanted_choose:
+            self.import_choose.setObjectName(wanted_choose)
+            self.import_choose.style().unpolish(self.import_choose);self.import_choose.style().polish(self.import_choose)
+            colors = getattr(self, 'colors', None)
+            if colors:
+                from .visuals import line_icon
+                self.import_choose.setIcon(line_icon('file', colors['primaryText'] if wanted_choose == 'primary' else colors['text'], 17))
         size=sum(t.get('size',0) for t in self.tracks.values() if isinstance(t.get('size'),int))
         self.queue_summary.setText(tr(f'{len(self.tracks)} canciones · {byte_label(size)}'))
         self.diagnostic_refresh.setEnabled(not phone_busy);self.diagnostic_run.setEnabled(not phone_busy and (self.usb_connected or bool(self.phone_tracks)))
