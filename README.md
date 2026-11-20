@@ -9,8 +9,9 @@ de apps compatibles y consulta diagnósticos reales del dispositivo (incluida la
 salud de la batería). Aplicación de escritorio nativa, con ventana propia, sin
 navegador ni necesidad de instalar Python.
 
-La versión actual (**0.3.0-preview.37**) estrena un rediseño estético más ligero
-y espacioso en las cinco vistas (cabecera compacta de una fila en *Biblioteca*,
+La versión actual (**0.3.0-preview.38**) pule las casillas de selección con un
+diseño plano y redondeado sin doble borde en toda la app, sobre el rediseño
+estético ligero de las cinco vistas (cabecera compacta de una fila en *Biblioteca*,
 control segmentado unificado, cuadrícula 2×2 en *Diagnóstico* sin recortes e
 insignias de estado en *Importar*), junto a todas las funciones añadidas: aviso
 opcional de actualizaciones desde GitHub Releases, **Archivos de apps** con
@@ -35,7 +36,7 @@ que las renderiza. GitHub Actions guarda también capturas por plataforma.
 
 ## Descargar y abrir
 
-[Última versión (v0.3.0-preview.37)](https://github.com/SRJW/TUPAQ/releases/tag/v0.3.0-preview.37) ·
+[Última versión (v0.3.0-preview.38)](https://github.com/SRJW/TUPAQ/releases/tag/v0.3.0-preview.38) ·
 [Todas las versiones](https://github.com/SRJW/TUPAQ/releases) ·
 [Cómo descargar](DESCARGAR.md)
 
@@ -168,7 +169,7 @@ conserva la posición válida y se omite el total incoherente.
 
 ## Validación y desarrollo
 
-La revisión **0.3.0-preview.37** cuenta con **295 pruebas automáticas** que
+La revisión **0.3.0-preview.38** cuenta con **295 pruebas automáticas** que
 cubren lectura de catálogo y playlists, conversión real de FLAC → ALAC/AAC con
 `ffmpeg`, exportación organizada e incremental con `.m3u8`, editor no destructivo
 de metadatos y carátula, detección de duplicados, telemetría de batería, aviso de

@@ -68,17 +68,33 @@ class SelectionDelegate(QStyledItemDelegate):
             painter.restore()
         if not option.features & QStyleOptionViewItem.ViewItemFeature.HasCheckIndicator:return
         style=option.widget.style() if option.widget else QApplication.style()
-        rect=style.subElementRect(QStyle.SubElement.SE_ItemViewItemCheckIndicator,option,option.widget).adjusted(0,0,-1,-1)
-        if not rect.isValid():return
+        raw_rect=style.subElementRect(QStyle.SubElement.SE_ItemViewItemCheckIndicator,option,option.widget)
+        if not raw_rect.isValid():return
+        from PySide6.QtCore import QRectF
+        side=min(raw_rect.width(),raw_rect.height(),16)
+        cx,cy=raw_rect.center().x()+.5,raw_rect.center().y()+.5
+        rect=QRectF(cx-side/2,cy-side/2,side,side).adjusted(.75,.75,-.75,-.75)
+        dark=bool(option.widget and option.widget.property('darkTheme'))
+        hovered=bool(option.state & QStyle.StateFlag.State_MouseOver)
+        accent=QColor(option.widget.property('checkAccent')) if option.widget and option.widget.property('checkAccent') else option.palette.color(QPalette.ColorRole.Highlight)
+        fg=QColor(option.widget.property('checkForeground')) if option.widget and option.widget.property('checkForeground') else option.palette.color(QPalette.ColorRole.Text)
         painter.save();painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.setPen(QPen(option.palette.color(QPalette.ColorRole.Mid),1))
-        painter.setBrush(QColor(option.widget.property('checkAccent')) if option.widget and option.widget.property('checkAccent') and option.checkState!=Qt.CheckState.Unchecked else option.palette.color(QPalette.ColorRole.Highlight if option.checkState!=Qt.CheckState.Unchecked else QPalette.ColorRole.Base))
-        painter.drawRoundedRect(rect,3,3)
-        painter.setPen(QPen(QColor(option.widget.property('checkForeground')) if option.widget and option.widget.property('checkForeground') else option.palette.color(QPalette.ColorRole.Text),1.7,Qt.PenStyle.SolidLine,Qt.PenCapStyle.RoundCap,Qt.PenJoinStyle.RoundJoin))
-        x,y,w,h=rect.x(),rect.y(),rect.width(),rect.height()
-        if option.checkState==Qt.CheckState.Checked:
-            path=QPainterPath();path.moveTo(x+w*.22,y+h*.52);path.lineTo(x+w*.43,y+h*.73);path.lineTo(x+w*.8,y+h*.28);painter.drawPath(path)
-        elif option.checkState==Qt.CheckState.PartiallyChecked:painter.drawLine(x+3,y+h//2,x+w-3,y+h//2)
+        if option.checkState==Qt.CheckState.Unchecked:
+            border=QColor('#789b9d' if hovered else '#4e6f72') if dark else QColor('#6d898b' if hovered else '#b4c3c2')
+            fill=QColor(255,255,255,14 if hovered else 6) if dark else QColor(19,49,51,12 if hovered else 4)
+            painter.setPen(QPen(border,1.25))
+            painter.setBrush(fill)
+            painter.drawRoundedRect(rect,4.5,4.5)
+        else:
+            painter.setPen(QPen(accent,1.25))
+            painter.setBrush(accent)
+            painter.drawRoundedRect(rect,4.5,4.5)
+            painter.setPen(QPen(fg,1.8,Qt.PenStyle.SolidLine,Qt.PenCapStyle.RoundCap,Qt.PenJoinStyle.RoundJoin))
+            x,y,w,h=rect.x(),rect.y(),rect.width(),rect.height()
+            if option.checkState==Qt.CheckState.Checked:
+                path=QPainterPath();path.moveTo(x+w*.23,y+h*.52);path.lineTo(x+w*.43,y+h*.72);path.lineTo(x+w*.79,y+h*.30);painter.drawPath(path)
+            elif option.checkState==Qt.CheckState.PartiallyChecked:
+                painter.drawLine(QRectF(x+w*.25,y+h*.5,w*.5,0).topLeft(),QRectF(x+w*.25,y+h*.5,w*.5,0).topRight())
         painter.restore()
 
 

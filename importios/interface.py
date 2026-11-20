@@ -578,12 +578,12 @@ def apply_theme(window):
         QMenu::item:selected {{background:{c['selected']};}}
         QToolTip {{background:{c['card']};color:{c['text']};border:1px solid {c['border']};padding:6px;border-radius:6px;}}
         QPlainTextEdit {{background:{c['card']};color:{c['text']};border:1px solid {c['border']};border-radius:9px;padding:8px;}}
-        QTableView::indicator,QTableWidget::indicator {{width:15px;height:15px;border:1px solid {c['muted']};border-radius:4px;background:{c['card']};}}
-        QTableView::indicator:checked,QTableWidget::indicator:checked {{background:{c['orange']};border-color:{c['orange']};image:url("{check}");}}
+        QTableView::indicator,QTableWidget::indicator {{width:16px;height:16px;border:0;background:transparent;image:none;}}
         QCheckBox {{spacing:8px;padding:4px 0;}}
-        QCheckBox::indicator {{width:16px;height:16px;border:1px solid {c['muted']};border-radius:4px;background:{c['card']};}}
-        QCheckBox::indicator:checked {{background:{c['orange']};border-color:{c['orange']};image:url("{check}");}}
-        QCheckBox::indicator:indeterminate {{background:{c['selected']};border-color:{c['orange']};}}
+        QCheckBox::indicator,QListWidget::indicator {{width:16px;height:16px;border:1px solid {'#4e6f72' if dark else '#b4c3c2'};border-radius:5px;background:transparent;}}
+        QCheckBox::indicator:hover,QListWidget::indicator:hover {{border-color:{'#789b9d' if dark else '#6d898b'};}}
+        QCheckBox::indicator:checked,QListWidget::indicator:checked {{background:{c['orange']};border-color:{c['orange']};image:url("{check}");}}
+        QCheckBox::indicator:indeterminate,QListWidget::indicator:indeterminate {{background:{c['selected']};border-color:{c['orange']};}}
         QFrame#activityBar {{background:{c['side']};border-top:1px solid {c['border']};}}
         QProgressBar {{background:{c['border']};border:0;border-radius:4px;}}
         QProgressBar::chunk {{background:{c['orange']};border-radius:4px;}}
