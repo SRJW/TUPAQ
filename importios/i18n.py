@@ -13,9 +13,12 @@ for source, target in EN.items():
     if '{' not in source:
         continue
     parts = list(Formatter().parse(source))
+    literal_len = sum(len(literal) for literal, _, _, _ in parts)
     pattern = ''.join(re.escape(literal) + (f'(?P<{field}>[^\n]*?)' if field == 'filename' else f'(?P<{field}>.*?)' if field else '')
                       for literal, field, _, _ in parts)
-    _patterns.append((re.compile(r'\A' + pattern + r'\Z', re.DOTALL), target))
+    _patterns.append((literal_len, re.compile(r'\A' + pattern + r'\Z', re.DOTALL), target))
+_patterns.sort(key=lambda item: item[0], reverse=True)
+_patterns = [(pattern, target) for _, pattern, target in _patterns]
 
 
 def language():

@@ -16,13 +16,12 @@ def main():
     if subprocess.run(view, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         with tempfile.TemporaryDirectory() as directory:
             notes = Path(directory)/'notes.md'
-            notes.write_text('''TUPAQ 0.3.0-preview.38: casillas de selección modernas, planas y nítidas en toda la aplicación.
+            notes.write_text('''TUPAQ 0.3.0-preview.39: peso total de la selección y de la biblioteca en el pie de Biblioteca.
 
-- **Corrección visual en tablas (sin doble borde 3D):** elimina el doble pintado que dibujaba el indicador QSS debajo del `SelectionDelegate` y creaba un marco hundido en las casillas de *Biblioteca*, *Importar* y *Archivos de apps*.
-- **Casillas planas con esquinas redondeadas (estilo macOS / Linear):** cuadro de 16×16 px con radio de 4.5–5 px, contorno uniforme y suave con realce al pasar el ratón, relleno terracota sólido sin halo gris al marcar y marca `✓` antialias con puntas redondeadas.
-- **Coherencia en toda la app:** aplica el mismo estilo de casillas a los controles `QCheckBox` (*Seleccionar todo*, *Preferencias*, *Diagnóstico*) y a la vista de tarjetas *Álbumes / Artistas* (`QListWidget`), tanto en modo claro como en modo oscuro.
-- Incluye todo el rediseño ligero de `v0.3.0-preview.37` y las funciones completas de `v0.3.0-preview.36`.
-- Verificado con 295 pruebas automatizadas y renderizado de las 5 vistas en ambos temas sin dispositivo físico; la prueba con un iPhone real conectado por USB queda pendiente en el equipo del usuario.
+- **Resumen de peso en Biblioteca:** al lado del contador de canciones y seleccionadas muestra en tiempo real el tamaño acumulado de la selección y el peso total de la biblioteca del iPhone (`Selección: X · Biblioteca: Y`, o `Biblioteca: Y` si no hay canciones marcadas). Respeta el filtro de formato activo y se actualiza automáticamente si los tamaños llegan desde el iPhone por USB.
+- **Traducción ES / EN completa:** añade la traducción al inglés del resumen de peso (`Selection: X · Library: Y`), corrige la traducción del contador de canciones en la cabecera (`{count} songs`) y ordena las plantillas de `i18n` por especificidad para que ningún patrón genérico intercepte textos con `:`.
+- Conserva todas las mejoras visuales de `v0.3.0-preview.38` (casillas planas redondeadas sin doble borde) y `v0.3.0-preview.37` (rediseño ligero), junto a todas las funciones de `v0.3.0-preview.36`.
+- Verificado con 296 pruebas automatizadas y renderizado de las 5 vistas en ambos temas sin dispositivo físico; la prueba con un iPhone real conectado por USB queda pendiente en el equipo del usuario.
 
 MP3, WAV, M4A (AAC/ALAC) y AIFF nativos para Música (más conversión opcional de FLAC/OGG/Opus/WMA vía `ffmpeg`); cualquier formato dentro de `/Documents` de apps compatibles. Windows necesita el servicio/controlador USB de Apple. Paquetes sin firma ni notarización. No se distribuyen fuentes ni DLL de Apple o 3uTools.
 ''', encoding='utf-8')

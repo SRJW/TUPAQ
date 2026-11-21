@@ -1104,7 +1104,9 @@ class Window(QMainWindow):
             track = self.library_model.tracks[row] if row is not None else None
             if details.get('usb_exists') is False or (track is not None and not self.track_matches_filters(track)):
                 self.filter_library()
-            else:self.library_selection_changed()
+            else:
+                if 'size' in details:self.update_library_size_summary()
+                self.library_selection_changed()
 
     def library_selection_changed(self, *ignored):
         self.update_buttons()
@@ -1321,6 +1323,33 @@ class Window(QMainWindow):
         from .library_fields import local_tracks
         return [dict(track) for track in local_tracks(self.phone_tracks) if track['id'] in self.library_model.checked]
 
+    def update_library_size_summary(self):
+        if not hasattr(self,'library_size_summary'):
+            return
+        from .library_fields import local_tracks
+        local=local_tracks(self.phone_tracks)
+        library_sizes=[t['size'] for t in local if type(t.get('size')) is int and t['size']>=0]
+        if not library_sizes:
+            self.library_size_summary.setText('')
+            self.library_size_summary.setVisible(False)
+            return
+        total_label=byte_label(sum(library_sizes))
+        marked=self.marked_tracks()
+        fmt=self.active_format_filter()
+        active=self.exportable_tracks() if fmt else marked
+        if active:
+            selected_sizes=[t['size'] for t in active if type(t.get('size')) is int and t['size']>=0]
+            if selected_sizes:
+                self.library_size_summary.setText(tr(f'Selección: {byte_label(sum(selected_sizes))} · Biblioteca: {total_label}'))
+                self.library_size_summary.setVisible(True)
+                return
+        elif marked and fmt:
+            self.library_size_summary.setText(tr(f'Selección: {byte_label(0)} · Biblioteca: {total_label}'))
+            self.library_size_summary.setVisible(True)
+            return
+        self.library_size_summary.setText(tr(f'Biblioteca: {total_label}'))
+        self.library_size_summary.setVisible(True)
+
     def checks_changed(self):
         marked=self.marked_tracks()
         fmt=self.active_format_filter()
@@ -1332,6 +1361,8 @@ class Window(QMainWindow):
                 self.selection_count.setText(tr(f'{len(marked)} seleccionadas' if marked else ''))
         else:
             count=len(marked);self.selection_count.setText(tr(f'{count} seleccionadas' if count else ''))
+        self.selection_count.setVisible(bool(self.selection_count.text()))
+        self.update_library_size_summary()
         visible={track['id'] for track in self.library_model.tracks};checked=visible & self.library_model.checked
         self.select_visible.blockSignals(True)
         self.select_visible.setCheckState(Qt.CheckState.Checked if visible and checked==visible else Qt.CheckState.PartiallyChecked if checked else Qt.CheckState.Unchecked)

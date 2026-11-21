@@ -40,6 +40,42 @@ class SelectionTests(unittest.TestCase):
         w=self.window;w.navigate(3);APP.processEvents()
         self.assertFalse(w.verify_import.isVisible());w.advanced.setChecked(True);APP.processEvents();self.assertTrue(w.verify_import.isVisible())
 
+    def test_footer_shows_selection_and_total_library_size(self):
+        from importios.i18n import set_language
+        w=self.window
+        try:
+            sized=[
+                dict(ROWS[0],size=10*1024**2),
+                dict(ROWS[1],size=30*1024**2),
+                {'id':'c','title':'Gamma','artist':'Artist','album':'Album','duration':60,'is_local':True,'usb_exists':True,
+                 'afc_path':'iTunes_Control/Music/F00/CCCC.m4a','format_label':'M4A · ALAC','size':20*1024**2},
+            ]
+            w.show_library(sized);APP.processEvents()
+            # Without selection: show total library size only.
+            self.assertEqual(w.library_size_summary.text(),'Biblioteca: 60.0 MB')
+            self.assertTrue(w.library_size_summary.isVisible())
+            # Select one track: show both selection and total library size.
+            w.library_model.checked.add('a');w.checks_changed()
+            self.assertEqual(w.library_size_summary.text(),'Selección: 10.0 MB · Biblioteca: 60.0 MB')
+            # Filter by ALAC and select visible ALAC tracks: selection reflects ALAC (50 MB), library stays 60 MB.
+            w.library_model.checked.clear()
+            w.format_filter.setCurrentIndex(w.format_filter.findText('ALAC'));APP.processEvents()
+            w.library_model.check_visible(True);APP.processEvents()
+            self.assertEqual(w.library_size_summary.text(),'Selección: 50.0 MB · Biblioteca: 60.0 MB')
+            # Live language switch to English translates both the size summary and header song count.
+            w.language_choice.setCurrentIndex(1);APP.processEvents()
+            self.assertEqual(w.library_size_summary.text(),'Selection: 50.0 MB · Library: 60.0 MB')
+            self.assertEqual(w.device_metric.text(),'3 songs')
+            # Remote details updating size refresh the summary live.
+            w.phone_details_ready(w.library_epoch,'b',{'size':1024**3})
+            self.assertEqual(w.library_size_summary.text(),'Selection: 1.02 GB · Library: 1.03 GB')
+            # Disconnecting clears and hides the size summary.
+            w.devices_found([]);APP.processEvents()
+            self.assertEqual(w.library_size_summary.text(),'')
+            self.assertFalse(w.library_size_summary.isVisible())
+        finally:
+            set_language('es')
+
 class SearchTests(unittest.TestCase):
     def test_extensions_codecs_and_combined_metadata(self):
         self.assertTrue(matches(ROWS[0],'.mp3'));self.assertFalse(matches(ROWS[0],'.m4a'))

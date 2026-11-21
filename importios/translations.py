@@ -1326,6 +1326,9 @@ EN.update({
     'Audio (*.mp3 *.wav *.m4a *.alac *.aif *.aiff *.flac *.ogg *.oga *.opus *.wma *.mka *.webm);;Todos los archivos (*)':'Audio (*.mp3 *.wav *.m4a *.alac *.aif *.aiff *.flac *.ogg *.oga *.opus *.wma *.mka *.webm);;All files (*)',
     'Formato no admitido directamente por Música. Activa la conversión automática en Preferencias.':'Format not directly supported by Music. Enable automatic conversion in Settings.',
     'El archivo está vacío o supera los 512 MB.':'The file is empty or exceeds 512 MB.',
+    'Selección: {selected} · Biblioteca: {total}':'Selection: {selected} · Library: {total}',
+    'Biblioteca: {total}':'Library: {total}',
+    '{count} canciones':'{count} songs',
 })
 
 
