@@ -9,18 +9,18 @@ de apps compatibles y consulta diagnósticos reales del dispositivo (incluida la
 salud de la batería). Aplicación de escritorio nativa, con ventana propia, sin
 navegador ni necesidad de instalar Python.
 
-La versión actual (**0.3.0-preview.41**) corrige el aviso de actualizaciones en
-macOS empaquetando los certificados SSL raíz (`certifi` + `/etc/ssl/cert.pem`) y
-mostrando el banner en todas las pestañas, junto a la copia bidireccional entre
-la app **Música del iPhone** y carpetas de iOS visibles en **Archivos**, el
-resumen de peso total en *Biblioteca*, casillas planas redondeadas, rediseño
-ligero de las cinco vistas y todas las funciones existentes: **Archivos de apps**
-con buscador, renombrado (`F2`) y política de conflictos, telemetría real de
-**Batería**, conversión opcional de FLAC/OGG/Opus/WMA con `ffmpeg`, exportación
-organizada e incremental sin límite de 1.000 canciones, detector de duplicados,
-editor no destructivo de metadatos y portada antes de importar, lectura y
-exportación `.m3u8` de playlists, vista por **Álbumes / Artistas** y vista previa
-de audio.
+La versión actual (**0.3.0-preview.42**) mejora la estabilidad de la copia
+**Música → carpeta del iPhone** con reconexión automática, modo secuencial de un
+solo canal ante cortes USB y escrituras de 256 KB, sobre la corrección de
+certificados SSL en macOS para avisos de actualización, la copia bidireccional
+entre **Música** y carpetas de iOS visibles en **Archivos**, el resumen de peso
+total en *Biblioteca*, las casillas planas redondeadas, el rediseño ligero de las
+cinco vistas y todas las funciones existentes: **Archivos de apps** con buscador,
+renombrado (`F2`) y política de conflictos, telemetría real de **Batería**,
+conversión opcional de FLAC/OGG/Opus/WMA con `ffmpeg`, exportación organizada e
+incremental sin límite de 1.000 canciones, detector de duplicados, editor no
+destructivo de metadatos y portada antes de importar, lectura y exportación
+`.m3u8` de playlists, vista por **Álbumes / Artistas** y vista previa de audio.
 
 **Windows y macOS usan siempre la fuente nativa de su sistema**; no hay selector
 ni carga manual de fuentes. Los controles y columnas reservan el ancho real del
@@ -36,7 +36,7 @@ que las renderiza. GitHub Actions guarda también capturas por plataforma.
 
 ## Descargar y abrir
 
-[Última versión (v0.3.0-preview.41)](https://github.com/SRJW/TUPAQ/releases/tag/v0.3.0-preview.41) ·
+[Última versión (v0.3.0-preview.42)](https://github.com/SRJW/TUPAQ/releases/tag/v0.3.0-preview.42) ·
 [Todas las versiones](https://github.com/SRJW/TUPAQ/releases) ·
 [Cómo descargar](DESCARGAR.md)
 
@@ -177,7 +177,7 @@ conserva la posición válida y se omite el total incoherente.
 
 ## Validación y desarrollo
 
-La revisión **0.3.0-preview.41** cuenta con **302 pruebas automáticas** que
+La revisión **0.3.0-preview.42** cuenta con **303 pruebas automáticas** que
 cubren lectura de catálogo y playlists, conversión real de FLAC → ALAC/AAC con
 `ffmpeg`, exportación organizada e incremental con `.m3u8`, editor no destructivo
 de metadatos y carátula, detección de duplicados, telemetría de batería, aviso de

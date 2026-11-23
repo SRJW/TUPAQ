@@ -1371,6 +1371,8 @@ EN.update({
     'La ruta de destino dentro de la aplicación no es válida.':'The destination path inside the app is not valid.',
     'La carpeta temporal de preparación no existe.':'The temporary staging folder does not exist.',
     'Ruta local de preparación no válida.':'Invalid local staging path.',
+    'Reconectando con el iPhone…':'Reconnecting to iPhone…',
+    'Se perdió la conexión USB con el iPhone durante la copia. Las canciones ya copiadas se conservan; mantén el iPhone desbloqueado y repite con «Omitir» para continuar donde quedó.':'The USB connection to the iPhone dropped during the copy. Already copied songs are kept; keep the iPhone unlocked and run again with "Skip" to resume.',
 })
 
 

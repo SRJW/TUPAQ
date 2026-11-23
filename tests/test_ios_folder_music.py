@@ -107,6 +107,80 @@ class IosFolderMusicTransferTests(unittest.TestCase):
         self.assertEqual(len(app_fs.files), 1)
         self.assertEqual(bytes(next(iter(app_fs.files.values()))), mp3_bytes)
 
+    def test_copy_music_to_ios_app_recovers_from_connection_terminated_error(self):
+        from pymobiledevice3.exceptions import ConnectionTerminatedError
+        from importios.transfers import TransferError
+        mp3_bytes = (FIXTURES / 'sample.mp3').read_bytes()
+        m4a_bytes = (FIXTURES / 'covered-aac.m4a').read_bytes()
+        phone = build_phone([
+            {'title': 'Amanecer', 'location': 'A.mp3', 'audio_format': 301, 'bytes': mp3_bytes},
+            {'title': 'Horizonte', 'location': 'B.m4a', 'audio_format': 502, 'bytes': m4a_bytes},
+        ])
+        tracks = self._catalogue_tracks(phone)
+        app_fs = MemoryAfc()
+        dest = {'bundle_id': 'org.videolan.vlc-ios', 'subfolder': 'Musica', 'structure': 'flat', 'conflict_policy': 'skip'}
+
+        # Simulate ConnectionTerminatedError on the first write in dual mode -> must switch to sequential mode and finish both tracks!
+        write_calls = {'count': 0}
+        real_fwrite = app_fs.fwrite
+
+        async def flaky_fwrite(handle, data):
+            write_calls['count'] += 1
+            if write_calls['count'] == 1:
+                raise ConnectionTerminatedError()
+            return await real_fwrite(handle, data)
+
+        app_fs.fwrite = flaky_fwrite
+        seq_opens = {'count': 0}
+
+        @asynccontextmanager
+        async def fake_app_docs_on_lockdown(_lockdown, _bundle_id):
+            yield app_fs.as_afc()
+
+        @asynccontextmanager
+        async def fake_app_docs_seq(_bundle_id):
+            seq_opens['count'] += 1
+            yield app_fs.as_afc()
+
+        with (
+            patch('importios.transfers.device', phone.device),
+            patch('importios.app_files.app_documents_on_lockdown', fake_app_docs_on_lockdown),
+            patch('importios.app_files.app_documents', fake_app_docs_seq),
+            patch('asyncio.sleep', return_value=None),
+        ):
+            result = run_transfer('export_app', tracks, dest, lambda *args: None)
+        self.assertEqual(result['copied_to_app'], 2)
+        self.assertGreaterEqual(seq_opens['count'], 2)
+        self.assertEqual({bytes(app_fs.files[p]) for p in result['files']}, {mp3_bytes, m4a_bytes})
+        self.assertFalse(any(TEMP_PREFIX in path for path in app_fs.files))
+
+        # Persistent ConnectionTerminatedError across all retries reports stage + helpful guidance.
+        app_fs2 = MemoryAfc()
+
+        async def always_drop(_handle, _data):
+            raise ConnectionTerminatedError()
+
+        app_fs2.fwrite = always_drop
+
+        @asynccontextmanager
+        async def fake_drop_dual(_lockdown, _bundle_id):
+            yield app_fs2.as_afc()
+
+        @asynccontextmanager
+        async def fake_drop_seq(_bundle_id):
+            yield app_fs2.as_afc()
+
+        with (
+            patch('importios.transfers.device', phone.device),
+            patch('importios.app_files.app_documents_on_lockdown', fake_drop_dual),
+            patch('importios.app_files.app_documents', fake_drop_seq),
+            patch('asyncio.sleep', return_value=None),
+        ):
+            with self.assertRaises(TransferError) as ctx:
+                run_transfer('export_app', tracks[:1], dest, lambda *args: None)
+        self.assertEqual(ctx.exception.diagnostic, 'export_app:write_app:ConnectionTerminatedError')
+        self.assertIn('Omitir', str(ctx.exception))
+
     def test_stage_audio_for_import_filters_recursive_audio_and_convertible(self):
         mp3_bytes = (FIXTURES / 'sample.mp3').read_bytes()
         wav_bytes = (FIXTURES / 'sample.wav').read_bytes()

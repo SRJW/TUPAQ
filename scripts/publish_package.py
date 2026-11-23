@@ -16,13 +16,13 @@ def main():
     if subprocess.run(view, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         with tempfile.TemporaryDirectory() as directory:
             notes = Path(directory)/'notes.md'
-            notes.write_text('''TUPAQ 0.3.0-preview.41: corrección del aviso de nuevas versiones en macOS.
+            notes.write_text('''TUPAQ 0.3.0-preview.42: corrección de `export_app:ConnectionTerminatedError` al copiar canciones a carpetas del iPhone.
 
-- **Certificados SSL incluidos en macOS (y Windows):** empaqueta los certificados raíz de `certifi` dentro de `TUPAQ.app` y carga también `/etc/ssl/cert.pem` de macOS en `build_ssl_context()`, corrigiendo el error silencioso `CERTIFICATE_VERIFY_FAILED` que impedía comprobar GitHub Releases desde el paquete compilado de Mac.
-- **Aviso visible en todas las pantallas:** el banner de nueva versión aparece ahora en la parte superior de cualquier pestaña (*Biblioteca*, *Importar*, *Archivos de apps*, *Diagnóstico* o *Preferencias*), no solo en *Biblioteca*.
-- **Verificación en el ejecutable real:** la prueba `smoke` en GitHub Actions valida ahora dentro del `.app` montado de macOS (Apple Silicon e Intel) y del `.exe` de Windows que el almacén de certificados raíz esté cargado (`x509_ca > 0`).
-- Conserva todas las novedades de `v0.3.0-preview.40` (copia bidireccional Música ↔ carpetas de iOS), `v0.3.0-preview.39` (peso total de selección y biblioteca) y el rediseño completo.
-- Verificado con 302 pruebas automatizadas y renderizado de las 5 vistas en ambos temas sin dispositivo físico; la prueba con un iPhone real conectado por USB queda pendiente en el equipo del usuario.
+- **Reconexión automática y modo secuencial de un solo canal:** al copiar canciones de *Música* a `/Documents` de una app de iOS, primero lee el catálogo sin mantener `house_arrest` inactivo; si iOS o el USB cierra un socket (`ConnectionTerminatedError`), cierra limpiamente ambas sesiones, pasa automáticamente a modo de un solo canal secuencial (lee una canción → cierra Música → escribe y verifica en la app → cierra la app) y reintenta la pista hasta 3 veces sin perder lo ya copiado.
+- **Escrituras más estables (256 KB) y sin doble lectura USB:** reduce el tamaño de paquete AFC de escritura de 1 MB a 256 KB para evitar cortes en `house_arrest` (especialmente en Windows) y elimina la doble lectura redundante del audio por USB manteniendo verificación SHA-256 local y remota.
+- **Sin límite artificial de 30 minutos** en exportaciones grandes al PC o a carpetas del iPhone, y diagnóstico detallado por etapa (`catalogue`, `open_app`, `read_audio`, `write_app`) si se desconecta el cable físicamente.
+- Conserva todas las novedades de `v0.3.0-preview.41` (aviso de actualizaciones en macOS con certificados SSL) y anteriores.
+- Verificado con 303 pruebas automatizadas y renderizado de las 5 vistas en ambos temas sin dispositivo físico; la prueba con un iPhone real conectado por USB queda pendiente en el equipo del usuario.
 
 MP3, WAV, M4A (AAC/ALAC) y AIFF nativos para Música (más conversión opcional de FLAC/OGG/Opus/WMA vía `ffmpeg`); cualquier formato dentro de `/Documents` de apps compatibles. Windows necesita el servicio/controlador USB de Apple. Paquetes sin firma ni notarización. No se distribuyen fuentes ni DLL de Apple o 3uTools.
 ''', encoding='utf-8')

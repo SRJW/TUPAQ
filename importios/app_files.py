@@ -16,6 +16,7 @@ from .models import text_key
 
 DOCUMENTS_ROOT = '/Documents'
 CHUNK = 1024 * 1024
+WRITE_CHUNK = 256 * 1024
 MAX_FILE_BYTES = 4 * 1024**3
 MAX_ENTRIES = 10_000
 MAX_UPLOAD_FILES = 2_000
@@ -386,11 +387,12 @@ async def upload_paths(afc, relative, local_paths, progress=None, conflict_polic
             progress(min(99, round(done_bytes * 100 / total_bytes)), 100, f'Copiando {index + 1} de {len(files)}: {source.name}')
         try:
             handle = await afc.fopen(tmp, 'w')
+            write_failed = False
             try:
                 with source.open('rb') as stream:
                     while True:
                         checkpoint()
-                        block = stream.read(CHUNK)
+                        block = stream.read(WRITE_CHUNK)
                         if not block:
                             break
                         await afc.fwrite(handle, block)
@@ -398,8 +400,15 @@ async def upload_paths(afc, relative, local_paths, progress=None, conflict_polic
                         done_bytes += len(block)
                         if progress:
                             progress(min(99, round(done_bytes * 100 / total_bytes)), 100, f'Copiando {index + 1} de {len(files)}: {source.name}')
+            except BaseException:
+                write_failed = True
+                raise
             finally:
-                await afc.fclose(handle)
+                if write_failed:
+                    with suppress(Exception):
+                        await afc.fclose(handle)
+                else:
+                    await afc.fclose(handle)
             if size == 0:
                 done_bytes += 1
             await _verify_remote_file(afc, tmp, size, local_hash.hexdigest())
@@ -644,11 +653,12 @@ async def upload_local_file_to_app(afc, local_file, remote_rel, conflict_policy=
     done = 0
     try:
         handle = await afc.fopen(tmp, 'w')
+        write_failed = False
         try:
             with source.open('rb') as stream:
                 while True:
                     checkpoint()
-                    block = stream.read(CHUNK)
+                    block = stream.read(WRITE_CHUNK)
                     if not block:
                         break
                     await afc.fwrite(handle, block)
@@ -656,8 +666,15 @@ async def upload_local_file_to_app(afc, local_file, remote_rel, conflict_policy=
                     done += len(block)
                     if byte_progress:
                         byte_progress(done, max(1, size))
+        except BaseException:
+            write_failed = True
+            raise
         finally:
-            await afc.fclose(handle)
+            if write_failed:
+                with suppress(Exception):
+                    await afc.fclose(handle)
+            else:
+                await afc.fclose(handle)
         await _verify_remote_file(afc, tmp, size, local_hash.hexdigest())
         current_existing = await _stat_or_none(afc, remote)
         if current_existing is not None:
