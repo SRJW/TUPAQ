@@ -85,7 +85,14 @@ def build(window):
     window.sidebar_dot=text_label('●','connectionDot');window.sidebar_dot.setProperty('connected',False);footer_layout.addWidget(window.sidebar_dot)
     window.sidebar_connection=text_label('Sin conexión USB','small');footer_layout.addWidget(window.sidebar_connection,1);side.addWidget(footer)
     outer.addWidget(sidebar)
-    window.pages=QStackedWidget();outer.addWidget(window.pages,1)
+    content_col=QVBoxLayout();content_col.setContentsMargins(0,0,0,0);content_col.setSpacing(0)
+    window.update_banner=QFrame();window.update_banner.setObjectName('updateBanner')
+    banner_row=QHBoxLayout(window.update_banner);banner_row.setContentsMargins(14,8,14,8);banner_row.setSpacing(10)
+    window.update_banner_label=text_label('Nueva versión disponible','deviceMetric');banner_row.addWidget(window.update_banner_label,1)
+    window.update_banner_open=button('Descargar actualización','download',window.open_update_release);window.update_banner_open.setObjectName('primary');banner_row.addWidget(window.update_banner_open)
+    banner_close=button('','close',window.update_banner.hide);banner_close.setFixedWidth(34);banner_row.addWidget(banner_close)
+    window.update_banner.hide();content_col.addWidget(window.update_banner)
+    window.pages=QStackedWidget();content_col.addWidget(window.pages,1);outer.addLayout(content_col,1)
 
     workspace,layout,toolbar,window.heading=page('Biblioteca');window.local_tools=workspace
     # Compact inline device status pill next to the Library title (replaces tall hero card).
@@ -112,12 +119,6 @@ def build(window):
     layout_transfer_actions(window)
     toolbar.addLayout(window.transfer_actions)
     toolbar.addWidget(window.inspector_toggle)
-    window.update_banner=QFrame();window.update_banner.setObjectName('updateBanner')
-    banner_row=QHBoxLayout(window.update_banner);banner_row.setContentsMargins(14,8,14,8);banner_row.setSpacing(10)
-    window.update_banner_label=text_label('Nueva versión disponible','deviceMetric');banner_row.addWidget(window.update_banner_label,1)
-    window.update_banner_open=button('Descargar actualización','download',window.open_update_release);window.update_banner_open.setObjectName('primary');banner_row.addWidget(window.update_banner_open)
-    banner_close=button('','close',window.update_banner.hide);banner_close.setFixedWidth(34);banner_row.addWidget(banner_close)
-    window.update_banner.hide();layout.addWidget(window.update_banner)
     window.device_status=text_label('Conecta tu iPhone para mostrar su música.','muted',True);window.device_status.setMaximumHeight(54);window.device_status.hide();layout.addWidget(window.device_status)
     # Unified single-row explore toolbar: segmented view pill + search + filters + playlists.
     explore_row=QHBoxLayout();explore_row.setSpacing(10)
@@ -515,7 +516,7 @@ def apply_theme(window):
         QFrame#devicePill {{background:{c['button']};border:1px solid {c['border']};border-radius:15px;}}
         QFrame#settingsMenu {{background:{c['side']};border:1px solid {c['border']};border-radius:12px;}}
         QFrame#pathBar {{background:{c['button']};border:1px solid {c['border']};border-radius:9px;}}
-        QFrame#updateBanner {{background:{'#1b3a3e' if dark else '#fdf1e6'};border:1px solid {c['orange']};border-radius:10px;}}
+        QFrame#updateBanner {{background:{'#1b3a3e' if dark else '#fdf1e6'};border:1px solid {c['orange']};border-radius:10px;margin:14px 24px 0 24px;}}
         QFrame#segmentBar {{background:{c['button']};border:1px solid {c['border']};border-radius:9px;}}
         QPushButton#segment {{background:transparent;border:0;border-radius:6px;padding:3px 11px;color:{c['muted']};font-weight:500;}}
         QPushButton#segment:hover {{color:{c['text']};background:{c['hover']};}}

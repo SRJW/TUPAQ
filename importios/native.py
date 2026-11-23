@@ -424,8 +424,12 @@ class Window(QMainWindow):
         if self.background_enabled and self.auto_read.isChecked():
             self.device_timer.start()
             QTimer.singleShot(150,self.poll_device)
+        self.update_timer = QTimer(self)
+        self.update_timer.setSingleShot(True)
+        self.update_timer.setInterval(1500)
+        self.update_timer.timeout.connect(lambda: self.check_updates(automatic=True))
         if self.background_enabled and self.auto_check_updates.isChecked():
-            QTimer.singleShot(2500, lambda: self.check_updates(automatic=True))
+            self.update_timer.start()
         self.rebuild_app_breadcrumbs()
         self.update_buttons()
 
@@ -785,8 +789,8 @@ class Window(QMainWindow):
             self.ffmpeg_path.setText(path)
             self.save_transfer_preferences()
 
-    def check_updates(self, automatic=False):
-        if self.update_worker is not None:
+    def check_updates(self, _checked=False, *, automatic=False):
+        if getattr(self, 'closing', False) or self.update_worker is not None:
             return
         if hasattr(self, 'check_updates_button'):
             self.check_updates_button.setEnabled(False)
@@ -814,7 +818,7 @@ class Window(QMainWindow):
                 self.update_status_label.setText(tr(f'Ya tienes la última versión publicada ({VERSION}).'))
 
     def update_check_problem(self, message, automatic=False):
-        if not automatic and hasattr(self, 'update_status_label'):
+        if hasattr(self, 'update_status_label'):
             self.update_status_label.setText(tr(message))
 
     def update_check_finished(self):
@@ -2562,6 +2566,8 @@ class Window(QMainWindow):
         self.after_artwork = None
         self.device_timer.stop()
         self.artwork_timer.stop()
+        if hasattr(self, 'update_timer'):
+            self.update_timer.stop()
         if self.thumbnail_worker is not None:
             self.thumbnail_worker.stop()
             self.thumbnail_worker.wait()
@@ -2587,6 +2593,10 @@ def smoke(app, window, fixtures, output=None):
     for name in ('check-light.svg','check-dark.svg'):
         assert not QImage(str(Path(__file__).with_name('assets')/name)).isNull()
     assert window.windowTitle() == f'TUPAQ {VERSION}' and app.applicationName() == 'TUPAQ'
+    # Verify frozen package carries valid root CA certificates for HTTPS update checks on macOS/Windows.
+    from .updates import build_ssl_context
+    ssl_ctx = build_ssl_context()
+    assert ssl_ctx.cert_store_stats().get('x509_ca', 0) > 0
     # Import the USB transport inside the frozen build without opening a device.
     from pymobiledevice3.lockdown import create_using_usbmux
     from pymobiledevice3.services.afc import AfcService

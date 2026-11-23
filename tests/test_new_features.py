@@ -56,6 +56,37 @@ class UpdateCheckerTests(unittest.TestCase):
         same = select_latest_release(releases, current='0.3.0-preview.37')
         self.assertFalse(same['available'])
 
+    def test_ssl_context_loads_ca_bundle_and_is_passed_to_urlopen(self):
+        import io
+        import json
+        import ssl
+        from importios.updates import build_ssl_context, check_for_updates
+
+        ctx = build_ssl_context()
+        self.assertIsInstance(ctx, ssl.SSLContext)
+        self.assertGreater(ctx.cert_store_stats().get('x509_ca', 0), 0)
+
+        captured = {}
+        payload = json.dumps([
+            {'tag_name': 'v0.3.0-preview.99', 'draft': False,
+             'html_url': 'https://github.com/SRJW/TUPAQ/releases/tag/v0.3.0-preview.99'}
+        ]).encode('utf-8')
+
+        class FakeResponse(io.BytesIO):
+            def __enter__(self): return self
+            def __exit__(self, *args): return False
+
+        def fake_urlopen(request, timeout=None, context=None):
+            captured['timeout'] = timeout
+            captured['context'] = context
+            return FakeResponse(payload)
+
+        with patch('urllib.request.urlopen', side_effect=fake_urlopen):
+            found = check_for_updates(current='0.3.0-preview.40')
+        self.assertTrue(found['available'])
+        self.assertIsInstance(captured['context'], ssl.SSLContext)
+        self.assertGreater(captured['context'].cert_store_stats().get('x509_ca', 0), 0)
+
 
 class BatteryTests(unittest.TestCase):
     def test_parse_battery_extracts_bounded_real_metrics_only(self):
@@ -391,6 +422,11 @@ class NewFeaturesUITests(unittest.TestCase):
         w.update_check_result({'available': True, 'version': '0.3.0-preview.99', 'url': 'https://github.com/SRJW/TUPAQ/releases/tag/v0.3.0-preview.99'})
         self.assertTrue(w.update_banner.isVisible())
         self.assertIn('0.3.0-preview.99', w.update_banner_label.text())
+        w.navigate(2); APP.processEvents()
+        self.assertTrue(w.update_banner.isVisible())
+        w.navigate(4); APP.processEvents()
+        self.assertTrue(w.update_banner.isVisible())
+        w.navigate(0); APP.processEvents()
         with patch('importios.native.QDesktopServices.openUrl') as open_url:
             w.open_update_release()
             open_url.assert_called_once()

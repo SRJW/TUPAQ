@@ -1,6 +1,9 @@
 """Check GitHub Releases for newer TUPAQ versions without downloading or running binaries."""
 import json
+from pathlib import Path
 import re
+import ssl
+import sys
 import urllib.error
 import urllib.request
 
@@ -9,6 +12,27 @@ from .version import VERSION
 RELEASES_API = 'https://api.github.com/repos/SRJW/TUPAQ/releases?per_page=15'
 ALLOWED_PREFIX = 'https://github.com/SRJW/TUPAQ/releases/'
 _VERSION_RE = re.compile(r'^v?(\d+)\.(\d+)\.(\d+)(?:-preview\.(\d+))?$')
+
+
+def build_ssl_context():
+    """Return an SSL context with bundled certifi and macOS system CAs for frozen apps."""
+    ctx = ssl.create_default_context()
+    candidates = []
+    try:
+        import certifi
+        cafile = certifi.where()
+        if cafile and Path(cafile).is_file():
+            candidates.append(cafile)
+    except Exception:
+        pass
+    if sys.platform == 'darwin' and Path('/etc/ssl/cert.pem').is_file():
+        candidates.append('/etc/ssl/cert.pem')
+    for cafile in candidates:
+        try:
+            ctx.load_verify_locations(cafile=cafile)
+        except OSError:
+            continue
+    return ctx
 
 
 def parse_version(text):
@@ -62,15 +86,15 @@ def select_latest_release(releases, current=VERSION):
     }
 
 
-def check_for_updates(current=VERSION, timeout=6):
+def check_for_updates(current=VERSION, timeout=10):
     """Query GitHub Releases over HTTPS; never downloads installers automatically."""
     request = urllib.request.Request(
         RELEASES_API,
         headers={'Accept': 'application/vnd.github+json', 'User-Agent': f'TUPAQ/{current}'},
     )
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            payload = json.loads(response.read(512 * 1024).decode('utf-8'))
+        with urllib.request.urlopen(request, timeout=timeout, context=build_ssl_context()) as response:
+            payload = json.loads(response.read(1024 * 1024).decode('utf-8'))
     except (urllib.error.URLError, TimeoutError, OSError, ValueError) as error:
         raise RuntimeError('No se pudo comprobar si hay actualizaciones en GitHub.') from error
     if not isinstance(payload, list):
