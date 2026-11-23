@@ -9,12 +9,14 @@ de apps compatibles y consulta diagnósticos reales del dispositivo (incluida la
 salud de la batería). Aplicación de escritorio nativa, con ventana propia, sin
 navegador ni necesidad de instalar Python.
 
-La versión actual (**0.3.0-preview.39**) añade el resumen en tiempo real del peso
-total de la selección y de la biblioteca en el pie de *Biblioteca* (junto a las
-casillas planas redondeadas y el rediseño ligero de las cinco vistas), además de
-todas las funciones disponibles: aviso opcional de actualizaciones desde GitHub
-Releases, **Archivos de apps** con buscador, renombrado (`F2`) y política de
-conflictos, telemetría real de **Batería**, conversión opcional de
+La versión actual (**0.3.0-preview.40**) añade copia bidireccional entre la app
+**Música del iPhone** y carpetas de iOS visibles en **Archivos** (copiar canciones
+de *Biblioteca* a `/Documents` de apps compatibles y enviar audios o carpetas de
+*Archivos de apps* directo a la cola de *Importar*), junto al resumen de peso
+total en *Biblioteca*, casillas planas redondeadas, rediseño ligero de las cinco
+vistas y todas las funciones existentes: aviso opcional de actualizaciones desde
+GitHub Releases, **Archivos de apps** con buscador, renombrado (`F2`) y política
+de conflictos, telemetría real de **Batería**, conversión opcional de
 FLAC/OGG/Opus/WMA con `ffmpeg`, exportación organizada e incremental sin límite
 de 1.000 canciones, detector de duplicados, editor no destructivo de metadatos y
 portada antes de importar, lectura y exportación `.m3u8` de playlists, vista por
@@ -34,7 +36,7 @@ que las renderiza. GitHub Actions guarda también capturas por plataforma.
 
 ## Descargar y abrir
 
-[Última versión (v0.3.0-preview.39)](https://github.com/SRJW/TUPAQ/releases/tag/v0.3.0-preview.39) ·
+[Última versión (v0.3.0-preview.40)](https://github.com/SRJW/TUPAQ/releases/tag/v0.3.0-preview.40) ·
 [Todas las versiones](https://github.com/SRJW/TUPAQ/releases) ·
 [Cómo descargar](DESCARGAR.md)
 
@@ -65,7 +67,11 @@ oficial de descarga; nunca descarga ni ejecuta binarios automáticamente.
 - El filtro de formato verifica extensión y cabecera real del audio también
   durante la exportación para que no se cuele ningún formato distinto.
 - Selección rápida contextual (**Seleccionar todo**, **Seleccionar todos los MP3**,
-  **Seleccionar resultados**), ordenación por columnas y eliminación con confirmación.
+  **Seleccionar resultados**), resumen en vivo del **peso de la selección y de la
+  biblioteca**, ordenación por columnas y eliminación con confirmación.
+- Menú **Exportar** con dos destinos: **Exportar al ordenador…** o **Copiar a
+  carpeta del iPhone…** (copia canción por canción a `/Documents` de una app
+  compatible visible en la app *Archivos* de iOS, sin guardar copias en tu PC).
 - Panel **Detalles** con carátula original al 100%, letra incluida, propiedades
   técnicas del audio y botón **Escuchar vista previa** para reproducir la canción
   (tanto local en la cola como desde el iPhone por USB).
@@ -97,6 +103,10 @@ oficial de descarga; nunca descarga ni ejecuta binarios automáticamente.
 - Barra de migas de pan clicables (`Documentos › …`), navegación por subcarpetas,
   arrastrar y soltar archivos o carpetas, crear nuevas carpetas, exportar y
   eliminar con confirmación.
+- **Enviar a Música:** selecciona canciones o carpetas dentro de `/Documents` para
+  cargarlas directamente en la cola de *Importar* (con conversión opcional de FLAC,
+  detector de duplicados y editor de metadatos) y enviarlas a la app Música del
+  iPhone sin alterar tus archivos originales ni dejar copias en el PC.
 - **Buscador** en vivo dentro de la carpeta actual, botón y atajo **`F2` para
   renombrar** archivos o carpetas, y selector de política de conflictos
   (**Si existe: Omitir / Renombrar / Reemplazar**) para subidas y exportaciones,
@@ -167,7 +177,7 @@ conserva la posición válida y se omite el total incoherente.
 
 ## Validación y desarrollo
 
-La revisión **0.3.0-preview.39** cuenta con **296 pruebas automáticas** que
+La revisión **0.3.0-preview.40** cuenta con **301 pruebas automáticas** que
 cubren lectura de catálogo y playlists, conversión real de FLAC → ALAC/AAC con
 `ffmpeg`, exportación organizada e incremental con `.m3u8`, editor no destructivo
 de metadatos y carátula, detección de duplicados, telemetría de batería, aviso de

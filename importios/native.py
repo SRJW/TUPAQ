@@ -334,12 +334,15 @@ class Window(QMainWindow):
         self.preview_audio_worker = None
         self.preview_temp_dir = None
         self.converted_temp_dir = None
+        self.app_import_temp_dir = None
         self.app_list = []
         self.app_list_token = None
         self.app_entries = []
         self.app_current_bundle = None
         self.app_current_path = ''
         self.app_pending_refresh = False
+        self.pending_ios_copy = False
+        self.pending_staged_paths = None
         self.transfer_outcome = None
         self.transfer_diagnostic = ''
         self.progress_track_id = None
@@ -479,6 +482,8 @@ class Window(QMainWindow):
             self.app_new_folder.setEnabled(not phone_busy and has_app)
             if hasattr(self,'app_rename'):
                 self.app_rename.setEnabled(not phone_busy and has_app and len(selected_app) == 1)
+            if hasattr(self,'app_send_music'):
+                self.app_send_music.setEnabled(not phone_busy and has_app and bool(selected_app))
             self.app_export.setEnabled(not phone_busy and has_app and bool(selected_app))
             self.app_delete.setEnabled(not phone_busy and has_app and bool(selected_app))
             visible_rows = self.app_table.rowCount()
@@ -923,7 +928,7 @@ class Window(QMainWindow):
         dialog=QDialog(self);dialog.setWindowTitle(tr('Historial de transferencias'));dialog.resize(780,440)
         layout=QVBoxLayout(dialog);rows=recent(self.backup_root.parent)
         table=QTableWidget(len(rows),4);table.setHorizontalHeaderLabels(['Fecha','Operación','Estado','Canciones'])
-        operations={'import':'Importar','export':'Exportar','delete':'Eliminar','verify':'Revisar operación pendiente','resume':'Completar importación pendiente','repair':'Actualizar portadas y fecha','diagnose':'Diagnóstico'}
+        operations={'import':'Importar','export':'Exportar','export_app':'Copiar a carpeta del iPhone','delete':'Eliminar','verify':'Revisar operación pendiente','resume':'Completar importación pendiente','repair':'Actualizar portadas y fecha','diagnose':'Diagnóstico'}
         states={'completed':'Completada','stopped':'Detenida','cancelled':'Cancelada'}
         for row,item in enumerate(rows):
             try:date=datetime.fromisoformat(item['time']).astimezone().strftime('%Y-%m-%d %H:%M')
@@ -1386,6 +1391,20 @@ class Window(QMainWindow):
         dialog.setDefaultButton(QMessageBox.StandardButton.Cancel);dialog.button(QMessageBox.StandardButton.Yes).setText(tr('Eliminar canciones'))
         if dialog.exec()==QMessageBox.StandardButton.Yes:self.start_transfer('delete',selected,self.backup_root)
 
+    def open_export_menu(self):
+        selected=self.exportable_tracks()
+        if not selected:
+            return
+        from PySide6.QtWidgets import QMenu
+        menu=QMenu(self)
+        to_pc=menu.addAction(str(tr('Exportar al ordenador…')))
+        to_ios=menu.addAction(str(tr('Copiar a carpeta del iPhone…')))
+        chosen=menu.exec(self.export_phone.mapToGlobal(QPoint(0,self.export_phone.height()+4)))
+        if chosen is to_pc:
+            self.export_songs()
+        elif chosen is to_ios:
+            self.copy_songs_to_ios_folder()
+
     def export_songs(self):
         selected=self.exportable_tracks()
         if not selected:
@@ -1407,6 +1426,112 @@ class Window(QMainWindow):
             items=[dict(t,embed_artwork=self.embed_artwork.isChecked(),**extra) for t in selected]
             self.start_transfer('export',items,Path(folder))
 
+    def copy_songs_to_ios_folder(self):
+        selected=self.exportable_tracks()
+        if not selected:
+            return
+        if not self.app_list or self.app_list_token != self.connection_token:
+            if self.connection_token:
+                self.pending_ios_copy=True
+                self.start_app_action('list_apps')
+            else:
+                QMessageBox.information(self,tr('Copiar a carpeta del iPhone'),tr('Conecta tu iPhone por USB para ver las apps compatibles con Archivos.'))
+            return
+        self._open_ios_copy_dialog(selected)
+
+    def _continue_pending_ios_copy(self):
+        selected=self.exportable_tracks()
+        if not selected:
+            return
+        if not self.app_list:
+            QMessageBox.information(
+                self,
+                tr('Copiar a carpeta del iPhone'),
+                tr('No se encontraron apps con intercambio de archivos habilitado en este iPhone. Instala una app compatible (como VLC o Documents) para copiar canciones en una carpeta visible desde Archivos.'),
+            )
+            return
+        self._open_ios_copy_dialog(selected)
+
+    def _open_ios_copy_dialog(self, selected):
+        from PySide6.QtWidgets import QFormLayout, QHBoxLayout
+        from .i18n import QComboBox as I18nCombo, QLineEdit as I18nLine, QCheckBox as I18nCheck, QPushButton as I18nButton, QLabel as I18nLabel
+        from .app_files import normalize_relative
+        dialog=QDialog(self)
+        dialog.setWindowTitle(str(tr('Copiar a carpeta del iPhone')))
+        dialog.setMinimumWidth(460)
+        root=QVBoxLayout(dialog);root.setContentsMargins(20,18,20,18);root.setSpacing(14)
+        intro=I18nLabel(tr('Las canciones se copiarán en Documentos de la app elegida y aparecerán en la app Archivos del iPhone.'))
+        intro.setObjectName('muted');intro.setWordWrap(True);root.addWidget(intro)
+        form=QFormLayout();form.setSpacing(10)
+        app_combo=I18nCombo()
+        preselect=0
+        for idx,app in enumerate(self.app_list):
+            label=f"{app['name']} ({app['bundle_id']})" if app['name']!=app['bundle_id'] else app['bundle_id']
+            app_combo.addItem(label,app['bundle_id'])
+            if app['bundle_id']==self.app_current_bundle:
+                preselect=idx
+        app_combo.setCurrentIndex(preselect)
+        form.addRow(I18nLabel(tr('Aplicación en el iPhone')),app_combo)
+        subfolder_input=I18nLine()
+        subfolder_input.setPlaceholderText(tr('Ej.: Música (vacío = raíz de Documentos)'))
+        form.addRow(I18nLabel(tr('Subcarpeta (opcional)')),subfolder_input)
+        structure_combo=I18nCombo()
+        structure_combo.addItem(str(tr('Todo en la misma carpeta')),'flat')
+        structure_combo.addItem(str(tr('Artista / Álbum / 01 - Canción')),'artist_album')
+        if hasattr(self,'export_structure') and self.export_structure.currentIndex()==1:
+            structure_combo.setCurrentIndex(1)
+        form.addRow(I18nLabel(tr('Organización')),structure_combo)
+        conflict_combo=I18nCombo()
+        conflict_combo.addItem(str(tr('Omitir')),'skip')
+        conflict_combo.addItem(str(tr('Renombrar')),'rename')
+        conflict_combo.addItem(str(tr('Reemplazar')),'replace')
+        form.addRow(I18nLabel(tr('Si ya existe')),conflict_combo)
+        embed_check=I18nCheck(tr('Incrustar carátula en cada archivo'))
+        embed_check.setChecked(self.embed_artwork.isChecked())
+        form.addRow('',embed_check)
+        root.addLayout(form)
+        sizes=[t['size'] for t in selected if type(t.get('size')) is int and t['size']>=0]
+        size_note=f" · {byte_label(sum(sizes))}" if sizes else ''
+        space_note=I18nLabel(str(tr(f'{len(selected)} canciones'))+size_note+' — '+str(tr('Las copias ocuparán espacio adicional en el iPhone mientras estén en ambos sitios.')))
+        space_note.setObjectName('muted');space_note.setWordWrap(True);root.addWidget(space_note)
+        buttons=QHBoxLayout();buttons.addStretch()
+        cancel_btn=I18nButton(tr('Cancelar'));cancel_btn.clicked.connect(dialog.reject);buttons.addWidget(cancel_btn)
+        copy_btn=I18nButton(tr('Copiar al iPhone'));copy_btn.setObjectName('primary');copy_btn.setDefault(True)
+        chosen_dest={}
+        def accept_dialog():
+            raw_sub=subfolder_input.text().strip()
+            try:
+                clean_sub=normalize_relative(raw_sub) if raw_sub else ''
+            except AppFilesError as error:
+                QMessageBox.warning(dialog,tr('Subcarpeta no válida'),tr(str(error)))
+                return
+            chosen_dest.update(
+                bundle_id=app_combo.currentData(),
+                subfolder=clean_sub,
+                structure=structure_combo.currentData(),
+                conflict_policy=conflict_combo.currentData(),
+                embed_artwork=embed_check.isChecked(),
+            )
+            dialog.accept()
+        copy_btn.clicked.connect(accept_dialog);buttons.addWidget(copy_btn)
+        root.addLayout(buttons)
+        if dialog.exec()==QDialog.DialogCode.Accepted and chosen_dest.get('bundle_id'):
+            fmt=self.active_format_filter()
+            pl=self.active_playlist()
+            ordered=selected
+            if pl is not None:
+                order={tid:idx for idx,tid in enumerate(pl['track_ids'])}
+                ordered=sorted(selected,key=lambda t:order.get(t['id'],len(order)))
+            extra={'expected_format':fmt} if fmt else {}
+            items=[dict(t,embed_artwork=chosen_dest['embed_artwork'],**extra) for t in ordered]
+            destination={
+                'bundle_id':chosen_dest['bundle_id'],
+                'subfolder':chosen_dest['subfolder'],
+                'structure':chosen_dest['structure'],
+                'conflict_policy':chosen_dest['conflict_policy'],
+            }
+            self.start_transfer('export_app',items,destination)
+
     def start_transfer(self, mode, selected, destination):
         if self.transfer_worker is not None or self.worker is not None or self.library_worker is not None or self.device_worker is not None or self.app_worker is not None:
             return
@@ -1414,7 +1539,7 @@ class Window(QMainWindow):
         if mode=='import':selected=[dict(t,metadata_policy='filename' if self.metadata_choice.currentIndex()==1 else 'keep',send_artwork=self.import_artwork.isChecked(),send_lyrics=self.import_lyrics.isChecked(),required_device_token=self.device_details.get('_device_token')) for t in selected]
         if self.thumbnail_worker is not None:
             self.after_artwork = ('transfer',mode,selected,destination)
-            self.cancel_transfer_button.setText(tr('Cancelar'));self.cancel_transfer_button.setEnabled(True);self.cancel_transfer_button.setVisible(mode in ('import','export','delete','diagnose'))
+            self.cancel_transfer_button.setText(tr('Cancelar'));self.cancel_transfer_button.setEnabled(True);self.cancel_transfer_button.setVisible(mode in ('import','export','export_app','delete','diagnose'))
             self.thumbnail_worker.stop()
             self.update_buttons()
             return
@@ -1439,16 +1564,16 @@ class Window(QMainWindow):
         self.progress.setValue(0)
         self.progress.show();self.import_progress.show()
         self.cancel_transfer_button.setText(tr('Cancelar'));self.cancel_transfer_button.setEnabled(True)
-        self.cancel_transfer_button.setVisible(mode in ('import','export','delete','diagnose'))
+        self.cancel_transfer_button.setVisible(mode in ('import','export','export_app','delete','diagnose'))
         self.pause_transfer_button.setText(tr('Pausar'));self.pause_transfer_button.setEnabled(True)
-        self.pause_transfer_button.setVisible(mode in ('export','diagnose') or mode=='import' and (len(selected)>49 or sum(t.get('size',0) for t in selected)>2*1024**3) or mode=='delete' and len(selected)>100)
+        self.pause_transfer_button.setVisible(mode in ('export','export_app','diagnose') or mode=='import' and (len(selected)>49 or sum(t.get('size',0) for t in selected)>2*1024**3) or mode=='delete' and len(selected)>100)
         self.status.setText(tr('Preparando transferencia…'))
         self.update_buttons()
         self.transfer_worker.start()
 
     def cancel_transfer(self):
         if self.app_worker is not None:
-            if self.app_worker.action not in ('upload','export','delete'):return
+            if self.app_worker.action not in ('upload','export','stage_music','delete'):return
             self.app_worker.cancel()
             self.cancel_transfer_button.setEnabled(False)
             self.cancel_transfer_button.setText(tr('Cancelando…'))
@@ -1457,13 +1582,13 @@ class Window(QMainWindow):
             return
         worker=self.transfer_worker
         if worker is None:
-            if self.after_artwork and self.after_artwork[0]=='app_files' and self.after_artwork[1] in ('upload','export','delete'):
+            if self.after_artwork and self.after_artwork[0]=='app_files' and self.after_artwork[1] in ('upload','export','stage_music','delete'):
                 self.after_artwork=None;self.cancel_transfer_button.hide();self.status.setText(tr('Operación cancelada antes de iniciar el envío.'));self.app_status.setText(tr('Operación cancelada antes de iniciar el envío.'));self.update_buttons()
                 return
-            if self.after_artwork and self.after_artwork[0]=='transfer' and self.after_artwork[1] in ('import','export','delete','diagnose'):
+            if self.after_artwork and self.after_artwork[0]=='transfer' and self.after_artwork[1] in ('import','export','export_app','delete','diagnose'):
                 self.after_artwork=None;self.cancel_transfer_button.hide();self.status.setText(tr('Operación cancelada antes de iniciar el envío.'));self.update_buttons()
             return
-        if worker.mode not in ('import','export','delete','diagnose'):return
+        if worker.mode not in ('import','export','export_app','delete','diagnose'):return
         immediate=worker.cancel()
         self.cancel_transfer_button.setEnabled(False);self.pause_transfer_button.setEnabled(False)
         self.cancel_transfer_button.setText(tr('Cancelando…' if immediate else 'Finalizando…'))
@@ -1476,7 +1601,7 @@ class Window(QMainWindow):
         control=self.transfer_worker.control if self.transfer_worker is not None else None
         if not (control and control.event.is_set()):self.status.setText(tr(label));self.transfer_stage.setText(tr(label))
         phase_label=label.partition(' · ')[2] if label.startswith('Lote ') else label
-        if phase_label.startswith(('Importando:','Exportando:','Enviando metadatos')):self.transfer_phase=1
+        if phase_label.startswith(('Importando:','Exportando:','Leyendo del iPhone:','Copiando a carpeta del iPhone:','Enviando metadatos')):self.transfer_phase=1
         elif phase_label.startswith(('Comprobando las canciones','Esperando la actualización','Importación comprobada','Exportada:','Omitida por formato distinto:','Omitida (ya exportada):')):self.transfer_phase=2
         elif phase_label.startswith(('Leyendo el estado','Preparando el envío','Comprobando operaciones','Buscando canciones')):self.transfer_phase=0
         self.paint_transfer_stages()
@@ -1495,14 +1620,19 @@ class Window(QMainWindow):
 
     def transfer_result(self, result):
         self.transfer_outcome = result
-        if not any(result.get(k) for k in ('cancelled','bulk_stopped','metadata_unverified','files_failed')) and any(k in result for k in ('imported','exported','deleted','diagnosed')):self.transfer_phase=3;self.paint_transfer_stages()
+        if not any(result.get(k) for k in ('cancelled','bulk_stopped','metadata_unverified','files_failed')) and any(k in result for k in ('imported','exported','copied_to_app','deleted','diagnosed')):self.transfer_phase=3;self.paint_transfer_stages()
         if result.get('bulk') and (result.get('cancelled') or result.get('bulk_stopped')):
             self.status.setText(tr(f"Operación detenida: {result['processed']} de {result['requested']} canciones comprobadas."))
             if result.get('diagnostic'):
                 self.transfer_diagnostic=f"TUPAQ {VERSION}\nDiagnóstico: {result['diagnostic']}\nLotes comprobados: {result['batches_completed']}"
                 self.last_diagnostic=self.transfer_diagnostic;self.copy_diagnostic.setEnabled(True)
         elif result.get('cancelled'):
-            self.status.setText(tr(f"Exportación cancelada. Se conservaron {result.get('exported',0)} archivos completos." if 'exported' in result else 'Operación cancelada antes de enviar cambios a Música.'))
+            if 'copied_to_app' in result:
+                self.status.setText(tr(f"Copia cancelada. Se conservaron {result.get('copied_to_app',0)} archivos completos en el iPhone."))
+            elif 'exported' in result:
+                self.status.setText(tr(f"Exportación cancelada. Se conservaron {result.get('exported',0)} archivos completos."))
+            else:
+                self.status.setText(tr('Operación cancelada antes de enviar cambios a Música.'))
         elif 'diagnosed' in result:
             self.diagnostic_result=result
             self.transfer_diagnostic=format_diagnostics(result);self.last_diagnostic=self.transfer_diagnostic;self.copy_diagnostic.setEnabled(True)
@@ -1511,6 +1641,17 @@ class Window(QMainWindow):
         elif 'deleted' in result:
             self.status.setText(tr(f"{result['deleted']} canciones eliminadas de la biblioteca."))
             self.library_model.checked.difference_update(result.get('item_ids',[]))
+        elif 'copied_to_app' in result:
+            skipped_format = result.get('skipped_format',0)
+            skipped_existing = result.get('skipped_existing',0)
+            if skipped_format:
+                self.status.setText(tr(f"{result['copied_to_app']} canciones copiadas en la carpeta del iPhone. {skipped_format} omitidas por formato distinto."))
+            else:
+                self.status.setText(tr(f"{result['copied_to_app']} canciones copiadas y verificadas en la carpeta del iPhone."))
+            if skipped_existing:self.status.setText(self.status.text()+' '+tr(f"{skipped_existing} omitidos (ya existían)."))
+            if result.get('covers_embedded'):self.status.setText(self.status.text()+' '+tr(f"{result['covers_embedded']} carátulas incrustadas en las copias."))
+            if result.get('bundle_id') and result.get('bundle_id') == self.app_current_bundle:
+                self.app_pending_refresh = True
         elif 'exported' in result:
             skipped_format = result.get('skipped_format',0)
             skipped_existing = result.get('skipped_existing',0)
@@ -1545,7 +1686,7 @@ class Window(QMainWindow):
         self.transfer_worker = None
         try:
             from .history import record
-            if isinstance(worker.mode,str) and isinstance(worker.selected,(list,tuple)):record(self.backup_root.parent,worker.mode,len(worker.selected),self.transfer_outcome or ({'exported':len(worker.control.files)} if worker.mode=='export' else {}),self.transfer_diagnostic)
+            if isinstance(worker.mode,str) and isinstance(worker.selected,(list,tuple)):record(self.backup_root.parent,worker.mode,len(worker.selected),self.transfer_outcome or ({'exported':len(worker.control.files)} if worker.mode=='export' else {'copied_to_app':len(worker.control.files)} if worker.mode=='export_app' else {}),self.transfer_diagnostic)
         except OSError:pass # History never changes a verified native operation's result.
         worker.deleteLater()
         self.progress.hide();self.cancel_transfer_button.hide();self.pause_transfer_button.hide();self.import_progress.hide()
@@ -1569,6 +1710,9 @@ class Window(QMainWindow):
         self.update_buttons()
         if self.refresh_after_transfer.isChecked() and self.transfer_outcome and any(key in self.transfer_outcome for key in ('imported','verified','updated','deleted')):
             self.load_library()
+        elif self.app_pending_refresh and self.app_current_bundle:
+            self.app_pending_refresh = False
+            self.load_app_folder(self.app_current_path)
 
     def choose_files(self):
         audio_filter = (
@@ -1937,6 +2081,8 @@ class Window(QMainWindow):
         self.app_current_bundle = None
         self.app_current_path = ''
         self.app_pending_refresh = False
+        self.pending_ios_copy = False
+        self.pending_staged_paths = None
         if not hasattr(self,'app_selector'):return
         self.app_selector.blockSignals(True)
         self.app_selector.clear()
@@ -2063,6 +2209,20 @@ class Window(QMainWindow):
             payload = (items, str(Path(folder))) if policy == 'skip' else {'items': items, 'destination': str(Path(folder)), 'conflict_policy': policy}
             self.start_app_action('export', self.app_current_bundle, self.app_current_path, payload)
 
+    def send_app_entries_to_music(self):
+        selected = self.selected_app_entries()
+        if not selected or not self.app_current_bundle:
+            return
+        if self.app_import_temp_dir is None:
+            self.app_import_temp_dir = Path(tempfile.mkdtemp(prefix='tupaq-ios-import-'))
+        allow_convert = bool(hasattr(self, 'convert_audio') and self.convert_audio.isChecked())
+        payload = {
+            'items': [e['relative'] for e in selected],
+            'destination': str(self.app_import_temp_dir),
+            'allow_convert': allow_convert,
+        }
+        self.start_app_action('stage_music', self.app_current_bundle, self.app_current_path, payload)
+
     def delete_app_entries(self):
         selected = self.selected_app_entries()
         if not selected or not self.app_current_bundle:
@@ -2086,7 +2246,7 @@ class Window(QMainWindow):
         if self.thumbnail_worker is not None:
             self.after_artwork = ('app_files', action, bundle_id, relative, payload)
             self.cancel_transfer_button.setText(tr('Cancelar'));self.cancel_transfer_button.setEnabled(True)
-            self.cancel_transfer_button.setVisible(action in ('upload', 'export', 'delete'))
+            self.cancel_transfer_button.setVisible(action in ('upload', 'export', 'stage_music', 'delete'))
             self.thumbnail_worker.stop()
             self.update_buttons()
             return
@@ -2097,6 +2257,7 @@ class Window(QMainWindow):
             'rename': 'Renombrando elemento en el iPhone…',
             'upload': 'Copiando archivos a la aplicación…',
             'export': 'Exportando archivos de la aplicación…',
+            'stage_music': 'Preparando canciones desde el iPhone…',
             'delete': 'Eliminando archivos de la aplicación…',
         }
         status_label = tr(labels.get(action, 'Leyendo la carpeta de la aplicación…'))
@@ -2108,7 +2269,7 @@ class Window(QMainWindow):
         self.app_worker.result.connect(self.app_action_result)
         self.app_worker.problem.connect(self.app_action_problem)
         self.app_worker.finished.connect(self.app_action_finished)
-        if action in ('upload', 'export', 'delete'):
+        if action in ('upload', 'export', 'stage_music', 'delete'):
             self.progress.setRange(0, 100);self.progress.setValue(0)
             self.cancel_transfer_button.setText(tr('Cancelar'));self.cancel_transfer_button.setEnabled(True);self.cancel_transfer_button.show()
         else:
@@ -2150,7 +2311,8 @@ class Window(QMainWindow):
                 if self.app_current_bundle != previous:
                     self.app_current_path = ''
                     self.app_entries = []
-                self.app_pending_refresh = True
+                if not self.pending_ios_copy or self.pages.currentIndex() == 4:
+                    self.app_pending_refresh = True
                 message = tr(f'{len(apps)} apps con intercambio de archivos disponibles.')
             else:
                 self.app_current_bundle = None
@@ -2204,6 +2366,22 @@ class Window(QMainWindow):
                          else f'Exportación completada. Exportados: {exported} · Omitidos: {skipped}.')
             self.app_status.setText(message)
             self.status.setText(message)
+        elif action == 'stage_music':
+            staged = result.get('staged') or []
+            skipped_conv = result.get('skipped_convertible', 0)
+            if result.get('cancelled'):
+                message = tr(f'Preparación cancelada. Se prepararon {len(staged)} canciones.') if staged else tr('Preparación cancelada.')
+                if staged:
+                    self.pending_staged_paths = list(staged)
+            elif staged:
+                self.pending_staged_paths = list(staged)
+                message = tr(f'{len(staged)} canciones listas para añadir a la cola de Importar.')
+            elif skipped_conv:
+                message = tr('Se encontraron archivos FLAC u otros formatos convertibles. Activa la conversión automática en Preferencias para enviarlos a Música.')
+            else:
+                message = tr('No se encontraron archivos de audio compatibles en la selección.')
+            self.app_status.setText(message)
+            self.status.setText(message)
         elif action == 'delete':
             if result.get('entries') is not None:
                 self.app_entries = result['entries']
@@ -2219,6 +2397,8 @@ class Window(QMainWindow):
         self.update_buttons()
 
     def app_action_problem(self, message):
+        self.pending_ios_copy = False
+        self.pending_staged_paths = None
         self.last_diagnostic = message
         self.copy_diagnostic.setEnabled(True)
         self.app_status.setText(tr(message))
@@ -2234,7 +2414,14 @@ class Window(QMainWindow):
         self.progress.setRange(0, 100)
         self.cancel_transfer_button.hide()
         self.update_buttons()
-        if self.app_pending_refresh and self.app_current_bundle:
+        if self.pending_ios_copy:
+            self.pending_ios_copy = False
+            self._continue_pending_ios_copy()
+        elif self.pending_staged_paths:
+            paths = self.pending_staged_paths
+            self.pending_staged_paths = None
+            self.add_paths(paths)
+        elif self.app_pending_refresh and self.app_current_bundle:
             self.app_pending_refresh = False
             self.load_app_folder(self.app_current_path)
         else:
@@ -2387,11 +2574,12 @@ class Window(QMainWindow):
             self.update_worker.wait()
         if self.preview_audio_worker is not None:
             self.preview_audio_worker.wait()
-        for temp_dir in (self.preview_temp_dir, self.converted_temp_dir):
+        for temp_dir in (self.preview_temp_dir, self.converted_temp_dir, self.app_import_temp_dir):
             if temp_dir is not None:
                 shutil.rmtree(temp_dir, ignore_errors=True)
         self.preview_temp_dir = None
         self.converted_temp_dir = None
+        self.app_import_temp_dir = None
         event.accept()
 
 

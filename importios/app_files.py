@@ -115,24 +115,30 @@ async def lockdown_session():
 
 
 @asynccontextmanager
-async def app_documents(bundle_id):
+async def app_documents_on_lockdown(lockdown, bundle_id):
     valid = validate_bundle_id(bundle_id)
     try:
         from pymobiledevice3.services.house_arrest import HouseArrestService
         from pymobiledevice3.exceptions import AppNotInstalledError
     except Exception as error:
         raise connection_failure(error, 'modules') from error
+    try:
+        service = await HouseArrestService.create(lockdown, valid, documents_only=True)
+    except AppNotInstalledError as error:
+        raise AppFilesError('La aplicación seleccionada ya no está instalada en el iPhone.', 'app-files:not-installed') from error
+    except Exception as error:
+        raise AppFilesError(
+            'iOS no permitió abrir la carpeta Documentos de esta aplicación. Solo las apps con intercambio de archivos habilitado permiten acceso por USB.',
+            f'app-files:house-arrest:{type(error).__name__}',
+        ) from error
+    async with service as afc:
+        yield afc
+
+
+@asynccontextmanager
+async def app_documents(bundle_id):
     async with lockdown_session() as lockdown:
-        try:
-            service = await HouseArrestService.create(lockdown, valid, documents_only=True)
-        except AppNotInstalledError as error:
-            raise AppFilesError('La aplicación seleccionada ya no está instalada en el iPhone.', 'app-files:not-installed') from error
-        except Exception as error:
-            raise AppFilesError(
-                'iOS no permitió abrir la carpeta Documentos de esta aplicación. Solo las apps con intercambio de archivos habilitado permiten acceso por USB.',
-                f'app-files:house-arrest:{type(error).__name__}',
-            ) from error
-        async with service as afc:
+        async with app_documents_on_lockdown(lockdown, bundle_id) as afc:
             yield afc
 
 
@@ -590,6 +596,176 @@ async def delete_entries(afc, relative_paths, progress=None):
     return {'deleted': deleted, 'cancelled': False}
 
 
+async def ensure_remote_dir(afc, relative=''):
+    """Ensure /Documents[/relative] exists as a directory, creating missing parents."""
+    clean = normalize_relative(relative)
+    current = DOCUMENTS_ROOT
+    root_info = await _stat_or_none(afc, current)
+    if not isinstance(root_info, dict) or root_info.get('st_ifmt') != 'S_IFDIR':
+        raise AppFilesError('La carpeta Documentos de la aplicación no está disponible.', 'app-files:dest-missing')
+    if not clean:
+        return current
+    for part in clean.split('/'):
+        checkpoint()
+        current = f'{current}/{part}'
+        info = await _stat_or_none(afc, current)
+        if info is None:
+            await afc.makedirs(current)
+        elif info.get('st_ifmt') != 'S_IFDIR':
+            raise AppFilesError('Ya existe un archivo con el mismo nombre que la carpeta de destino.', 'app-files:dir-collision')
+    return current
+
+
+async def upload_local_file_to_app(afc, local_file, remote_rel, conflict_policy='skip', byte_progress=None):
+    """Upload one local file into /Documents/<remote_rel> with SHA-256 verification."""
+    policy = conflict_policy if conflict_policy in CONFLICT_POLICIES else 'skip'
+    source = Path(local_file)
+    size = source.stat().st_size
+    if size > MAX_FILE_BYTES:
+        raise AppFilesError('Un archivo supera el límite de 4 GB.', 'app-files:file-size')
+    clean = normalize_relative(remote_rel)
+    if not clean:
+        raise AppFilesError('La ruta de destino dentro de la aplicación no es válida.', 'app-files:path')
+    parent_rel = parent_relative(clean)
+    await ensure_remote_dir(afc, parent_rel)
+    remote = documents_path(clean)
+    existing_info = await _stat_or_none(afc, remote)
+    if existing_info is not None:
+        if policy == 'skip':
+            return 'skipped', remote
+        elif policy == 'rename':
+            remote = await _unique_remote_path(afc, remote)
+        elif policy == 'replace':
+            if existing_info.get('st_ifmt') == 'S_IFDIR':
+                raise AppFilesError('No se puede reemplazar una carpeta con un archivo.', 'app-files:dir-collision')
+    remote_parent = str(PurePosixPath(remote).parent)
+    tmp = f'{remote_parent}/{TEMP_PREFIX}{uuid.uuid4().hex}'
+    local_hash = hashlib.sha256()
+    done = 0
+    try:
+        handle = await afc.fopen(tmp, 'w')
+        try:
+            with source.open('rb') as stream:
+                while True:
+                    checkpoint()
+                    block = stream.read(CHUNK)
+                    if not block:
+                        break
+                    await afc.fwrite(handle, block)
+                    local_hash.update(block)
+                    done += len(block)
+                    if byte_progress:
+                        byte_progress(done, max(1, size))
+        finally:
+            await afc.fclose(handle)
+        await _verify_remote_file(afc, tmp, size, local_hash.hexdigest())
+        current_existing = await _stat_or_none(afc, remote)
+        if current_existing is not None:
+            if policy == 'replace' and current_existing.get('st_ifmt') != 'S_IFDIR':
+                await afc.rm_single(remote)
+            elif policy == 'rename':
+                remote = await _unique_remote_path(afc, remote)
+            else:
+                with suppress(Exception):
+                    await afc.rm_single(tmp, force=True)
+                return 'skipped', remote
+        await afc.rename(tmp, remote)
+        return 'uploaded', remote
+    except BaseException:
+        with suppress(Exception):
+            await afc.rm_single(tmp, force=True)
+        raise
+
+
+async def stage_audio_for_import(afc, relative_paths, destination_folder, allow_convert=False, progress=None):
+    """Download supported audio files from /Documents into a local staging folder for the Import queue."""
+    from .audio import EXTENSIONS
+    from .transcode import CONVERTIBLE_EXTENSIONS
+    destination = Path(destination_folder).resolve()
+    if not destination.is_dir():
+        raise AppFilesError('La carpeta temporal de preparación no existe.', 'app-files:local-dest')
+    _, all_files = await _collect_remote_exports(afc, relative_paths)
+    supported = set(EXTENSIONS) | (set(CONVERTIBLE_EXTENSIONS) if allow_convert else set())
+    audio_files = []
+    skipped_non_audio = 0
+    skipped_convertible = 0
+    for remote, local_rel, size in all_files:
+        suffix = local_rel.suffix.casefold()
+        if suffix in supported:
+            audio_files.append((remote, local_rel, size))
+        elif suffix in CONVERTIBLE_EXTENSIONS:
+            skipped_convertible += 1
+        else:
+            skipped_non_audio += 1
+    if not audio_files:
+        return {
+            'staged': [],
+            'skipped_non_audio': skipped_non_audio,
+            'skipped_convertible': skipped_convertible,
+            'cancelled': False,
+        }
+    total_bytes = sum(max(1, size) for _, _, size in audio_files) or 1
+    done_bytes = 0
+    staged_paths = []
+    with tempfile.TemporaryDirectory(prefix='.tupaq-stage-', dir=destination) as temp_dir:
+        temp_root = Path(temp_dir)
+        for index, (remote, local_rel, size) in enumerate(audio_files):
+            try:
+                checkpoint()
+            except TransferCancelled:
+                return {
+                    'staged': staged_paths,
+                    'skipped_non_audio': skipped_non_audio,
+                    'skipped_convertible': skipped_convertible,
+                    'cancelled': True,
+                }
+            target = (destination / local_rel.name).resolve()
+            if target.parent != destination:
+                raise AppFilesError('Ruta local de preparación no válida.', 'app-files:local-path')
+            if target.exists():
+                target = _unique_local_path(target)
+            staged = temp_root / f'audio-{index}'
+            if progress:
+                progress(min(99, round(done_bytes * 100 / total_bytes)), 100, f'Preparando audio {index + 1} de {len(audio_files)}: {local_rel.name}')
+            handle = await afc.fopen(remote, 'r')
+            remaining = size
+            try:
+                with staged.open('wb') as output:
+                    while remaining > 0:
+                        checkpoint()
+                        block = await afc.fread(handle, min(CHUNK, remaining))
+                        if not block or len(block) > remaining:
+                            raise AppFilesError('La lectura del archivo desde el iPhone quedó incompleta.', 'app-files:export-truncated')
+                        output.write(block)
+                        remaining -= len(block)
+                        done_bytes += len(block)
+                        if progress:
+                            progress(min(99, round(done_bytes * 100 / total_bytes)), 100, f'Preparando audio {index + 1} de {len(audio_files)}: {local_rel.name}')
+            except TransferCancelled:
+                return {
+                    'staged': staged_paths,
+                    'skipped_non_audio': skipped_non_audio,
+                    'skipped_convertible': skipped_convertible,
+                    'cancelled': True,
+                }
+            finally:
+                await afc.fclose(handle)
+            if size == 0:
+                done_bytes += 1
+            if staged.stat().st_size != size:
+                raise AppFilesError('El archivo copiado no coincide con el tamaño original.', 'app-files:export-size')
+            shutil.move(str(staged), str(target))
+            staged_paths.append(str(target))
+    if progress:
+        progress(100, 100, 'Audios preparados para importar.')
+    return {
+        'staged': staged_paths,
+        'skipped_non_audio': skipped_non_audio,
+        'skipped_convertible': skipped_convertible,
+        'cancelled': False,
+    }
+
+
 async def _run_action_async(action, bundle_id=None, relative='', payload=None, progress=None):
     if action == 'list_apps':
         from pymobiledevice3.services.installation_proxy import InstallationProxyService
@@ -625,6 +801,12 @@ async def _run_action_async(action, bundle_id=None, relative='', payload=None, p
                 policy = 'skip'
             summary = await export_entries(afc, items, destination, progress=progress, conflict_policy=policy)
             return {'action': 'export', 'bundle_id': bundle_id, 'relative': normalize_relative(relative), **summary}
+        if action == 'stage_music':
+            items = payload.get('items') or []
+            destination = payload.get('destination')
+            allow_convert = bool(payload.get('allow_convert'))
+            summary = await stage_audio_for_import(afc, items, destination, allow_convert=allow_convert, progress=progress)
+            return {'action': 'stage_music', 'bundle_id': bundle_id, 'relative': normalize_relative(relative), **summary}
         if action == 'delete':
             summary = await delete_entries(afc, payload or [], progress=progress)
             entries = None if summary.get('cancelled') else await list_folder(afc, relative)

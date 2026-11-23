@@ -16,12 +16,12 @@ def main():
     if subprocess.run(view, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         with tempfile.TemporaryDirectory() as directory:
             notes = Path(directory)/'notes.md'
-            notes.write_text('''TUPAQ 0.3.0-preview.39: peso total de la selección y de la biblioteca en el pie de Biblioteca.
+            notes.write_text('''TUPAQ 0.3.0-preview.40: copia bidireccional entre la app Música del iPhone y carpetas de iOS (visibles en Archivos).
 
-- **Resumen de peso en Biblioteca:** al lado del contador de canciones y seleccionadas muestra en tiempo real el tamaño acumulado de la selección y el peso total de la biblioteca del iPhone (`Selección: X · Biblioteca: Y`, o `Biblioteca: Y` si no hay canciones marcadas). Respeta el filtro de formato activo y se actualiza automáticamente si los tamaños llegan desde el iPhone por USB.
-- **Traducción ES / EN completa:** añade la traducción al inglés del resumen de peso (`Selection: X · Library: Y`), corrige la traducción del contador de canciones en la cabecera (`{count} songs`) y ordena las plantillas de `i18n` por especificidad para que ningún patrón genérico intercepte textos con `:`.
-- Conserva todas las mejoras visuales de `v0.3.0-preview.38` (casillas planas redondeadas sin doble borde) y `v0.3.0-preview.37` (rediseño ligero), junto a todas las funciones de `v0.3.0-preview.36`.
-- Verificado con 296 pruebas automatizadas y renderizado de las 5 vistas en ambos temas sin dispositivo físico; la prueba con un iPhone real conectado por USB queda pendiente en el equipo del usuario.
+- **Música del iPhone → Carpeta del iPhone (`/Documents`):** en *Biblioteca*, el botón **Exportar** ofrece ahora **Exportar al ordenador…** y **Copiar a carpeta del iPhone…**. Permite elegir la app compatible (VLC, Documents, foobar2000, Pages, etc.), una subcarpeta opcional, organización plana o `Artista / Álbum / 01 - Canción`, política de conflictos (`Omitir` incremental, `Renombrar`, `Reemplazar`) y carátula incrustada. Copia canción por canción sin dejar archivos en tu PC, con pausa, cancelación y verificación SHA-256.
+- **Carpeta del iPhone → Música del iPhone:** en *Archivos de apps*, el nuevo botón **Enviar a Música** toma los archivos de audio o carpetas seleccionadas del iPhone y los carga directamente en la cola de *Importar* (aprovechando conversión automática de FLAC/OGG/Opus/WMA, detección de duplicados y editor de metadatos/carátula), limpiando los temporales al cerrar TUPAQ y sin alterar los archivos originales en iOS.
+- Conserva el resumen de peso en *Biblioteca* (`v0.3.0-preview.39`), casillas planas redondeadas (`v0.3.0-preview.38`) y el rediseño ligero completo.
+- Verificado con 301 pruebas automatizadas y renderizado de las 5 vistas en ambos temas sin dispositivo físico; la prueba con un iPhone real conectado por USB queda pendiente en el equipo del usuario.
 
 MP3, WAV, M4A (AAC/ALAC) y AIFF nativos para Música (más conversión opcional de FLAC/OGG/Opus/WMA vía `ffmpeg`); cualquier formato dentro de `/Documents` de apps compatibles. Windows necesita el servicio/controlador USB de Apple. Paquetes sin firma ni notarización. No se distribuyen fuentes ni DLL de Apple o 3uTools.
 ''', encoding='utf-8')

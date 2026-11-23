@@ -255,6 +255,145 @@ async def export_selected(selected, folder, progress):
     return summary
 
 
+async def export_to_ios_app(selected, destination, progress):
+    """Copy selected iPhone Music tracks into an iOS app's /Documents folder song-by-song."""
+    from .bulk import MAX_SELECTION
+    from .audio import EXTENSIONS
+    from .search import FORMAT_EXTENSIONS, matches_format, suffix_matches_format
+    from .remote_details import audio_details, detect_file_format_label
+    from .app_files import (
+        CONFLICT_POLICIES,
+        app_documents_on_lockdown,
+        documents_path,
+        ensure_remote_dir,
+        normalize_relative,
+        upload_local_file_to_app,
+        validate_bundle_id,
+        validate_name,
+        _stat_or_none,
+    )
+    require(isinstance(destination, dict) and 1 <= len(selected) <= MAX_SELECTION, 'export-selection')
+    bundle_id = validate_bundle_id(destination.get('bundle_id'))
+    subfolder = normalize_relative(destination.get('subfolder') or '')
+    structure = 'artist_album' if destination.get('structure') == 'artist_album' else 'flat'
+    policy = destination.get('conflict_policy') if destination.get('conflict_policy') in CONFLICT_POLICIES else 'skip'
+    require(all(PurePosixPath(t.get('afc_path') or '').suffix.casefold() in EXTENSIONS for t in selected), 'export-format')
+    for chosen in selected:
+        expected = chosen.get('expected_format')
+        if expected is not None:
+            require(isinstance(expected, str) and expected.strip().lstrip('.').casefold() in FORMAT_EXTENSIONS, 'export-format')
+    copied = []
+    covers_embedded = 0
+    skipped_format = 0
+    skipped_existing = 0
+    format_updates = {}
+    async with device() as (lockdown, afc):
+        async with app_documents_on_lockdown(lockdown, bundle_id) as app_afc:
+            await ensure_remote_dir(app_afc, subfolder)
+            with tempfile.TemporaryDirectory(prefix='tupaq-ios-copy-') as temporary:
+                catalogue = Path(temporary) / 'catalogue'
+                catalogue.mkdir()
+                from pymobiledevice3.services.afc import AfcFileNotFoundError
+                tracks = await copy_catalogue(afc, catalogue, (FileNotFoundError, AfcFileNotFoundError))
+                fresh = {t['id']: t for t in tracks}
+                for chosen in selected:
+                    current = fresh.get(chosen.get('id'))
+                    require(current is not None and all(current.get(k) == chosen.get(k) for k in ('title', 'artist', 'afc_path')),
+                            'export-stale-selection')
+                    require(bool(current.get('afc_path')), 'export-no-usb-file')
+                    require(PurePosixPath(current['afc_path']).suffix.casefold() in EXTENSIONS, 'export-format')
+                for index, chosen in enumerate(selected):
+                    from .cancellation import wait_if_paused
+                    await wait_if_paused(progress)
+                    checkpoint()
+                    track = fresh[chosen['id']]
+                    expected_format = chosen.get('expected_format')
+                    if expected_format:
+                        if not suffix_matches_format(track['afc_path'], expected_format):
+                            if hasattr(afc, 'fseek'):
+                                info = await audio_details(afc, track)
+                                if info.get('format_source') == 'header':
+                                    format_updates[track['id']] = {'format_label': info.get('format_label'), 'format_source': 'header'}
+                            skipped_format += 1
+                            progress((index + 1) * 100, len(selected) * 100, 'Omitida por formato distinto: ' + track['title'])
+                            continue
+                        if hasattr(afc, 'fseek'):
+                            info = await audio_details(afc, track)
+                            if info.get('format_source') == 'header':
+                                detected = info.get('format_label')
+                                defer_m4a_codec = detected == 'M4A' and expected_format.strip().lstrip('.').casefold() in ('aac', 'alac')
+                                if not defer_m4a_codec and not matches_format({'format_label': detected, 'format_source': 'header', 'afc_path': track['afc_path']}, expected_format):
+                                    format_updates[track['id']] = {'format_label': detected, 'format_source': 'header'}
+                                    skipped_format += 1
+                                    progress((index + 1) * 100, len(selected) * 100, 'Omitida por formato distinto: ' + track['title'])
+                                    continue
+                    rel_parts = [validate_name(part) for part in export_relative_path(track, structure).parts]
+                    rel_str = '/'.join(rel_parts)
+                    remote_rel = f'{subfolder}/{rel_str}' if subfolder else rel_str
+                    remote_target = documents_path(remote_rel)
+                    if policy == 'skip' and await _stat_or_none(app_afc, remote_target) is not None:
+                        skipped_existing += 1
+                        progress((index + 1) * 100, len(selected) * 100, 'Omitida (ya exportada): ' + track['title'])
+                        continue
+                    temporary_audio = Path(temporary) / 'audio.part'
+                    try:
+                        def read_progress(done, total):
+                            progress(index * 100 + int(done * 45 / total), len(selected) * 100, 'Leyendo del iPhone: ' + track['title'])
+                        with temporary_audio.open('wb') as output:
+                            _, digest, size = await read_remote(afc, track['afc_path'], output=output, progress=read_progress)
+                        require(size > 0, 'export-empty-audio')
+                        _, check, check_size = await read_remote(afc, track['afc_path'])
+                        require(size == check_size and digest == check == local_hash(temporary_audio), 'export-hash')
+                        checkpoint()
+                        if expected_format:
+                            actual_label = detect_file_format_label(temporary_audio)
+                            if not matches_format({'format_label': actual_label, 'format_source': 'header', 'afc_path': track['afc_path']}, expected_format):
+                                format_updates[track['id']] = {'format_label': actual_label, 'format_source': 'header'}
+                                skipped_format += 1
+                                progress((index + 1) * 100, len(selected) * 100, 'Omitida por formato distinto: ' + track['title'])
+                                continue
+                        if chosen.get('embed_artwork'):
+                            from .remote_artwork import cover_for_track
+                            from .export_artwork import embed
+                            picture = await cover_for_track(afc, track, assets=True, catalogue_only=True)
+                            if picture and embed(temporary_audio, picture.get('cover')):
+                                covers_embedded += 1
+                        def write_progress(done, total):
+                            progress(index * 100 + 45 + int(done * 50 / total), len(selected) * 100, 'Copiando a carpeta del iPhone: ' + track['title'])
+                        status, final_remote = await upload_local_file_to_app(
+                            app_afc,
+                            temporary_audio,
+                            remote_rel,
+                            conflict_policy=policy,
+                            byte_progress=write_progress,
+                        )
+                        if status == 'skipped':
+                            skipped_existing += 1
+                            progress((index + 1) * 100, len(selected) * 100, 'Omitida (ya exportada): ' + track['title'])
+                        else:
+                            copied.append(final_remote)
+                            control = CURRENT.get()
+                            if control is not None:
+                                control.files = list(copied)
+                            progress((index + 1) * 100, len(selected) * 100, 'Exportada: ' + track['title'])
+                    finally:
+                        temporary_audio.unlink(missing_ok=True)
+    summary = {
+        'copied_to_app': len(copied),
+        'bundle_id': bundle_id,
+        'subfolder': subfolder,
+        'files': copied,
+        'covers_embedded': covers_embedded,
+    }
+    if skipped_format:
+        summary['skipped_format'] = skipped_format
+    if skipped_existing:
+        summary['skipped_existing'] = skipped_existing
+    if format_updates:
+        summary['format_updates'] = format_updates
+    return summary
+
+
 async def fetch_preview_audio(afc_path, target_path):
     """Read-only download of a single track from the iPhone into a temp file for local preview playback."""
     from .audio import EXTENSIONS
@@ -727,6 +866,10 @@ def transfer_error(error, mode):
         message='La eliminación se detuvo o no pudo verificarse. Actualiza la biblioteca y conserva el registro de la operación.'
     elif mode == 'export':
         message = 'No se completó la exportación. Los archivos ya exportados se conservan; no se modificó el iPhone.'
+    elif mode == 'export_app':
+        if isinstance(error, LibraryError) and str(error):
+            return TransferError(str(error), 'export_app:' + error.diagnostic)
+        message = 'No se completó la copia a la carpeta del iPhone. Las canciones ya copiadas se conservan.'
     elif mode == 'diagnose':
         message='No se completaron las comprobaciones de lectura. No se modificó el iPhone.'
     elif mode == 'repair':
@@ -802,7 +945,7 @@ def run_transfer(mode, selected, destination, progress):
     token=CURRENT.set(control)
     try:
         checkpoint()
-        require(mode in ('import','export','verify','resume','repair','delete','diagnose'), 'transfer-mode')
+        require(mode in ('import','export','export_app','verify','resume','repair','delete','diagnose'), 'transfer-mode')
         from .deletion import delete_selected
         from .recovery import resume_pending
         from .metadata_update import repair_imported
@@ -817,13 +960,16 @@ def run_transfer(mode, selected, destination, progress):
                 import_with_recovery(selected,destination,progress) if mode == 'import' else
                 verify_pending(destination,progress) if mode == 'verify' else
                 repair_imported(destination,selected,progress) if mode == 'repair' else
-                resume_pending(destination,selected,progress) if mode == 'resume' else export_selected(selected,destination,progress))
+                resume_pending(destination,selected,progress) if mode == 'resume' else
+                export_to_ios_app(selected,destination,progress) if mode == 'export_app' else
+                export_selected(selected,destination,progress))
         result=asyncio.run(asyncio.wait_for(work,timeout=1800))
         if control.event.is_set() and control.committed:result['cancel_deferred']=True
         return result
     except TransferCancelled:
         result={'cancelled':True,'before_changes':not control.committed}
         if mode=='export':result.update(exported=len(control.files),files=control.files)
+        elif mode=='export_app':result.update(copied_to_app=len(control.files),files=control.files)
         return result
     except Exception as error:
         raise transfer_error(error,mode) from None

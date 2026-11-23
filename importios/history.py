@@ -8,7 +8,7 @@ from .bulk import save
 
 def record(root,mode,requested,result=None,diagnostic=''):
     result=result or {};folder=Path(root)/'history';folder.mkdir(mode=0o700,parents=True,exist_ok=True)
-    confirmed=sum(result.get(k,0) for k in ('imported','already_imported','deleted','exported','diagnosed','updated','verified'))
+    confirmed=sum(result.get(k,0) for k in ('imported','already_imported','deleted','exported','copied_to_app','diagnosed','updated','verified'))
     status='stopped' if diagnostic or result.get('bulk_stopped') or result.get('metadata_unverified') or result.get('files_failed') else 'cancelled' if result.get('cancelled') else 'completed'
     item={'time':datetime.now(timezone.utc).isoformat(),'operation':mode,'requested':result.get('requested',requested) or confirmed,'confirmed':confirmed,'status':status}
     save(folder/(uuid.uuid4().hex+'.json'),item)
@@ -24,6 +24,6 @@ def recent(root):
     for path in sorted(folder.glob('*.json'),key=lambda path:path.stat().st_mtime,reverse=True)[:200]:
         try:
             item=json.loads(path.read_text(encoding='utf-8'))
-            if isinstance(item,dict) and item.get('operation') in ('import','export','delete','verify','resume','repair','diagnose'):result.append(item)
+            if isinstance(item,dict) and item.get('operation') in ('import','export','export_app','delete','verify','resume','repair','diagnose'):result.append(item)
         except (OSError,ValueError):continue
     return result

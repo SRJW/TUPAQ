@@ -72,6 +72,9 @@ def line_icon(kind, color='#52576d', size=22):
         p.drawLine(4,6,20,6);p.drawRect(QRectF(7,6,10,15));p.drawLine(9,3,15,3);p.drawLine(10,10,10,17);p.drawLine(14,10,14,17)
     elif kind == 'close':
         p.drawLine(6,6,18,18);p.drawLine(6,18,18,6)
+    elif kind == 'music':
+        p.drawLine(9,17,9,6);p.drawLine(9,6,19,4);p.drawLine(19,4,19,15)
+        p.drawEllipse(QRectF(4.5,15,4.5,4));p.drawEllipse(QRectF(14.5,13,4.5,4))
     else:
         font = QFont();font.setPixelSize(21);p.setFont(font)
         p.drawText(QRectF(0,0,24,24),Qt.AlignmentFlag.AlignCenter,'♪')
