@@ -570,6 +570,7 @@ class Window(QMainWindow):
         if hasattr(self,'preview_track'):self.request_preview(self.preview_track)
         self.refresh_playlist_filter()
         self.refresh_collection_grid()
+        self.refresh_app_format_filter()
         self.rebuild_app_breadcrumbs()
         self.library_empty.refresh()
         from .interface import fit_controls,set_column_metrics
@@ -2095,6 +2096,11 @@ class Window(QMainWindow):
             self.app_search.blockSignals(True)
             self.app_search.clear()
             self.app_search.blockSignals(False)
+        if hasattr(self, 'app_format_filter'):
+            self.app_format_filter.blockSignals(True)
+            self.app_format_filter.clear()
+            self.app_format_filter.addItem(str(tr('Todos los tipos')), '')
+            self.app_format_filter.blockSignals(False)
         self.app_table.setRowCount(0)
         self.app_path_label.setText('/Documents')
         self.rebuild_app_breadcrumbs()
@@ -2470,15 +2476,99 @@ class Window(QMainWindow):
                 crumb.clicked.connect(lambda _=False, dest=target: self.load_app_folder(dest))
             self.app_breadcrumbs.addWidget(crumb)
 
+    @staticmethod
+    def _app_entry_extension(entry):
+        if entry.get('kind', 'file') != 'file':
+            return ''
+        ext = Path(entry.get('name', '')).suffix.lstrip('.').strip().upper()
+        return ext if ext and len(ext) <= 16 and ext.isalnum() else ''
+
+    @classmethod
+    def _app_entry_type_label(cls, entry):
+        kind = entry.get('kind', 'file')
+        if kind == 'dir':
+            return tr('Carpeta')
+        if kind == 'link':
+            return tr('Enlace')
+        ext = cls._app_entry_extension(entry)
+        return tr(f'Archivo {ext}') if ext else tr('Archivo')
+
+    @classmethod
+    def _app_entry_matches_filter(cls, entry, filter_value):
+        if not filter_value:
+            return True
+        kind = entry.get('kind', 'file')
+        if filter_value == 'dir':
+            return kind == 'dir'
+        if filter_value == 'audio':
+            if kind != 'file':
+                return False
+            from .audio import EXTENSIONS
+            from .transcode import CONVERTIBLE_EXTENSIONS
+            suffix = Path(entry.get('name', '')).suffix.casefold()
+            return suffix in EXTENSIONS or suffix in CONVERTIBLE_EXTENSIONS
+        if filter_value == 'no_ext':
+            return kind == 'file' and not cls._app_entry_extension(entry)
+        if filter_value.startswith('ext:'):
+            return kind == 'file' and cls._app_entry_extension(entry) == filter_value[4:]
+        return True
+
+    def refresh_app_format_filter(self):
+        if not hasattr(self, 'app_format_filter'):
+            return
+        from .audio import EXTENSIONS
+        from .transcode import CONVERTIBLE_EXTENSIONS
+        audio_exts = {e.casefold() for e in EXTENSIONS} | {e.casefold() for e in CONVERTIBLE_EXTENSIONS}
+        previous = self.app_format_filter.currentData()
+        dir_count = 0
+        audio_count = 0
+        no_ext_count = 0
+        ext_counts = {}
+        for entry in self.app_entries:
+            kind = entry.get('kind', 'file')
+            if kind == 'dir':
+                dir_count += 1
+            elif kind == 'file':
+                suffix = Path(entry.get('name', '')).suffix.casefold()
+                if suffix in audio_exts:
+                    audio_count += 1
+                ext = self._app_entry_extension(entry)
+                if ext:
+                    ext_counts[ext] = ext_counts.get(ext, 0) + 1
+                else:
+                    no_ext_count += 1
+        self.app_format_filter.blockSignals(True)
+        self.app_format_filter.clear()
+        self.app_format_filter.addItem(str(tr('Todos los tipos')), '')
+        if dir_count:
+            self.app_format_filter.addItem(str(tr(f'Carpetas ({dir_count})')), 'dir')
+        if audio_count:
+            self.app_format_filter.addItem(str(tr(f'Audio ({audio_count})')), 'audio')
+        for ext in sorted(ext_counts):
+            self.app_format_filter.addItem(f'{ext} ({ext_counts[ext]})', f'ext:{ext}')
+        if no_ext_count:
+            self.app_format_filter.addItem(str(tr(f'Sin extensión ({no_ext_count})')), 'no_ext')
+        if previous:
+            idx = self.app_format_filter.findData(previous)
+            if idx >= 0:
+                self.app_format_filter.setCurrentIndex(idx)
+        self.app_format_filter.blockSignals(False)
+
     def populate_app_table(self, *ignored):
         if not hasattr(self,'app_table'):return
         self.app_path_label.setText(documents_path(self.app_current_path))
         self.rebuild_app_breadcrumbs()
+        self.refresh_app_format_filter()
         query = self.app_search.text().strip().casefold() if hasattr(self, 'app_search') else ''
-        visible = [e for e in self.app_entries if not query or query in e['name'].casefold()]
+        fmt_filter = self.app_format_filter.currentData() if hasattr(self, 'app_format_filter') else ''
+        visible = [
+            e for e in self.app_entries
+            if (not query or query in e['name'].casefold()) and self._app_entry_matches_filter(e, fmt_filter)
+        ]
         if self.app_entries:
+            filtered = bool(query or fmt_filter)
             self.app_entries_count.setText(
-                tr(f'{len(visible)} de {len(self.app_entries)} elementos') if query else tr(f'{len(self.app_entries)} elementos')
+                tr(f'{len(visible)} de {len(self.app_entries)} elementos') if filtered else tr(f'{len(self.app_entries)} elementos')
             )
         else:
             self.app_entries_count.setText('')
@@ -2489,7 +2579,8 @@ class Window(QMainWindow):
             for row, entry in enumerate(visible):
                 self.app_table.insertRow(row)
                 kind = entry.get('kind', 'file')
-                kind_label = tr('Carpeta' if kind == 'dir' else 'Enlace' if kind == 'link' else 'Archivo')
+                ext = self._app_entry_extension(entry)
+                kind_label = self._app_entry_type_label(entry)
                 size = entry.get('size')
                 modified = entry.get('modified')
                 from .models import text_key
@@ -2499,6 +2590,8 @@ class Window(QMainWindow):
                 if hasattr(self,'default_folder_icon'):
                     name_item.setIcon(self.default_folder_icon if kind == 'dir' else self.default_file_icon)
                 kind_item = SortableItem(kind_label)
+                kind_sort = ('0:' if kind == 'dir' else f'1:{ext.casefold()}:' if kind == 'file' and ext else '1:~:' if kind == 'file' else '2:') + text_key(entry['name'])
+                kind_item.setData(SORT_ROLE, kind_sort)
                 size_item = SortableItem('—' if size is None else byte_label(size))
                 size_item.setData(SORT_ROLE, -1 if size is None else size)
                 size_item.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)

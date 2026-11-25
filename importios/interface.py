@@ -374,6 +374,9 @@ def build(window):
     filter_row=QHBoxLayout();filter_row.setSpacing(10)
     window.app_search=QLineEdit();window.app_search.setPlaceholderText(tr('Buscar archivo o carpeta en esta ruta…'));window.app_search.setClearButtonEnabled(True);window.app_search.setMinimumHeight(34)
     filter_row.addWidget(window.app_search,1)
+    window.app_format_filter=QComboBox();window.app_format_filter.addItems(['Todos los tipos'])
+    window.app_format_filter.setToolTip(tr('Filtrar por formato o tipo de archivo en esta carpeta.'))
+    filter_row.addWidget(window.app_format_filter)
     window.app_conflict=QComboBox();window.app_conflict.addItems(['Si existe: Omitir','Si existe: Renombrar','Si existe: Reemplazar'])
     window.app_conflict.setToolTip(tr('Qué hacer al copiar o exportar si ya existe un archivo con el mismo nombre.'))
     filter_row.addWidget(window.app_conflict)
@@ -445,7 +448,7 @@ def build(window):
     window.library_table.sortByColumn(0,Qt.SortOrder.AscendingOrder);window.table.sortItems(0,Qt.SortOrder.AscendingOrder);window.app_table.sortByColumn(0,Qt.SortOrder.AscendingOrder)
     window.library_table.selectionModel().selectionChanged.connect(window.library_selection_changed);window.table.itemSelectionChanged.connect(window.local_selection_changed)
     window.app_table.itemSelectionChanged.connect(window.update_buttons);window.app_table.cellDoubleClicked.connect(window.app_entry_activated)
-    window.app_search.textChanged.connect(window.populate_app_table)
+    window.app_search.textChanged.connect(window.populate_app_table);window.app_format_filter.currentIndexChanged.connect(window.populate_app_table)
     window.library_table.horizontalHeader().sortIndicatorChanged.connect(window.schedule_artwork);window.search.textChanged.connect(window.filter_library);window.format_filter.currentIndexChanged.connect(window.filter_library);window.content_filter.currentIndexChanged.connect(window.filter_library);window.playlist_filter.currentIndexChanged.connect(window.filter_library)
     window.view_mode_group.idClicked.connect(window.change_library_view_mode)
     window.collection_grid.groupCheckToggled.connect(window.toggle_collection_group)
@@ -467,7 +470,7 @@ def set_column_metrics(window):
             table.setColumnWidth(column,metrics.horizontalAdvance(sample)+32)
     if hasattr(window,'app_table'):
         metrics=QFontMetrics(window.app_table.font())
-        for column,sample in ((1,'Carpeta'),(2,'999.9 MB'),(3,'2026-12-31 23:59')):
+        for column,sample in ((1,'Archivo FLAC'),(2,'999.9 MB'),(3,'2026-12-31 23:59')):
             window.app_table.setColumnWidth(column,metrics.horizontalAdvance(sample)+32)
 
 

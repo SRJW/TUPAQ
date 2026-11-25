@@ -469,6 +469,7 @@ class AppFilesUITests(unittest.TestCase):
             'entries': [
                 {'name': 'CarpetaReal', 'relative': 'CarpetaReal', 'kind': 'dir', 'size': None, 'modified': None},
                 {'name': 'ArchivoReal.pdf', 'relative': 'ArchivoReal.pdf', 'kind': 'file', 'size': 1024, 'modified': None},
+                {'name': 'SinExt', 'relative': 'SinExt', 'kind': 'file', 'size': 128, 'modified': None},
             ],
         })
         w.language_choice.setCurrentIndex(1)
@@ -476,12 +477,78 @@ class AppFilesUITests(unittest.TestCase):
         self.assertEqual(w.app_table.horizontalHeaderItem(0).text(), 'Name')
         self.assertEqual(w.app_table.item(0, 0).text(), 'CarpetaReal')
         self.assertEqual(w.app_table.item(0, 1).text(), 'Folder')
-        self.assertEqual(w.app_table.item(1, 1).text(), 'File')
+        self.assertEqual(w.app_table.item(1, 1).text(), 'PDF file')
+        self.assertEqual(w.app_table.item(2, 1).text(), 'File')
+        self.assertEqual(w.app_format_filter.itemText(0), 'All types')
+        self.assertEqual(w.app_format_filter.itemText(1), 'Folders (1)')
         self.assertEqual(w.app_add_files.text(), 'Add files')
         w.language_choice.setCurrentIndex(0)
         self.assertEqual(w.nav_buttons[4].text(), 'Archivos de apps')
         self.assertEqual(w.app_table.item(0, 1).text(), 'Carpeta')
-        self.assertEqual(w.app_table.item(1, 1).text(), 'Archivo')
+        self.assertEqual(w.app_table.item(1, 1).text(), 'Archivo PDF')
+        self.assertEqual(w.app_table.item(2, 1).text(), 'Archivo')
+        self.assertEqual(w.app_format_filter.itemText(0), 'Todos los tipos')
+        self.assertEqual(w.app_format_filter.itemText(1), 'Carpetas (1)')
+
+    def test_app_files_format_filter_and_type_grouping(self):
+        w = self.window
+        w.navigate(4)
+        w.app_action_result({
+            'action': 'list_folder',
+            'bundle_id': 'org.videolan.vlc-ios',
+            'relative': '',
+            'entries': [
+                {'name': 'Diagnostics', 'relative': 'Diagnostics', 'kind': 'dir', 'size': None, 'modified': None},
+                {'name': 'Alpha.mp3', 'relative': 'Alpha.mp3', 'kind': 'file', 'size': 1700000, 'modified': None},
+                {'name': 'Beta.flac', 'relative': 'Beta.flac', 'kind': 'file', 'size': 9500000, 'modified': None},
+                {'name': 'Gamma.mp3', 'relative': 'Gamma.mp3', 'kind': 'file', 'size': 1600000, 'modified': None},
+                {'name': 'Notas.pdf', 'relative': 'Notas.pdf', 'kind': 'file', 'size': 25000, 'modified': None},
+                {'name': 'README', 'relative': 'README', 'kind': 'file', 'size': 512, 'modified': None},
+            ],
+        })
+        self.assertEqual(w.app_table.rowCount(), 6)
+        self.assertEqual(w.app_entries_count.text(), '6 elementos')
+
+        # Verify dynamic filter options: Todos los tipos, Carpetas (1), Audio (3), FLAC (1), MP3 (2), PDF (1), Sin extensión (1)
+        options = [(w.app_format_filter.itemText(i), w.app_format_filter.itemData(i)) for i in range(w.app_format_filter.count())]
+        self.assertEqual(options, [
+            ('Todos los tipos', ''),
+            ('Carpetas (1)', 'dir'),
+            ('Audio (3)', 'audio'),
+            ('FLAC (1)', 'ext:FLAC'),
+            ('MP3 (2)', 'ext:MP3'),
+            ('PDF (1)', 'ext:PDF'),
+            ('Sin extensión (1)', 'no_ext'),
+        ])
+
+        # Filter by MP3
+        w.app_format_filter.setCurrentIndex(w.app_format_filter.findData('ext:MP3'))
+        self.assertEqual(w.app_table.rowCount(), 2)
+        self.assertEqual([w.app_table.item(r, 0).text() for r in range(w.app_table.rowCount())], ['Alpha.mp3', 'Gamma.mp3'])
+        self.assertEqual(w.app_entries_count.text(), '2 de 6 elementos')
+
+        # Filter by Audio (includes both MP3 and FLAC)
+        w.app_format_filter.setCurrentIndex(w.app_format_filter.findData('audio'))
+        self.assertEqual(w.app_table.rowCount(), 3)
+        self.assertEqual([w.app_table.item(r, 0).text() for r in range(w.app_table.rowCount())], ['Alpha.mp3', 'Beta.flac', 'Gamma.mp3'])
+
+        # Filter by Folders
+        w.app_format_filter.setCurrentIndex(w.app_format_filter.findData('dir'))
+        self.assertEqual(w.app_table.rowCount(), 1)
+        self.assertEqual(w.app_table.item(0, 0).text(), 'Diagnostics')
+
+        # Reset filter and sort by column 1 (Tipo) to group by file type
+        w.app_format_filter.setCurrentIndex(0)
+        w.app_table.sortByColumn(1, Qt.SortOrder.AscendingOrder)
+        grouped = [(w.app_table.item(r, 0).text(), w.app_table.item(r, 1).text()) for r in range(w.app_table.rowCount())]
+        self.assertEqual(grouped, [
+            ('Diagnostics', 'Carpeta'),
+            ('Beta.flac', 'Archivo FLAC'),
+            ('Alpha.mp3', 'Archivo MP3'),
+            ('Gamma.mp3', 'Archivo MP3'),
+            ('Notas.pdf', 'Archivo PDF'),
+            ('README', 'Archivo'),
+        ])
 
     def test_close_is_blocked_while_app_worker_is_running(self):
         w = self.window

@@ -16,13 +16,12 @@ def main():
     if subprocess.run(view, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         with tempfile.TemporaryDirectory() as directory:
             notes = Path(directory)/'notes.md'
-            notes.write_text('''TUPAQ 0.3.0-preview.42: corrección de `export_app:ConnectionTerminatedError` al copiar canciones a carpetas del iPhone.
+            notes.write_text('''TUPAQ 0.3.0-preview.43: filtro por formato/tipo de archivo y agrupación por tipo en **Archivos de apps**.
 
-- **Reconexión automática y modo secuencial de un solo canal:** al copiar canciones de *Música* a `/Documents` de una app de iOS, primero lee el catálogo sin mantener `house_arrest` inactivo; si iOS o el USB cierra un socket (`ConnectionTerminatedError`), cierra limpiamente ambas sesiones, pasa automáticamente a modo de un solo canal secuencial (lee una canción → cierra Música → escribe y verifica en la app → cierra la app) y reintenta la pista hasta 3 veces sin perder lo ya copiado.
-- **Escrituras más estables (256 KB) y sin doble lectura USB:** reduce el tamaño de paquete AFC de escritura de 1 MB a 256 KB para evitar cortes en `house_arrest` (especialmente en Windows) y elimina la doble lectura redundante del audio por USB manteniendo verificación SHA-256 local y remota.
-- **Sin límite artificial de 30 minutos** en exportaciones grandes al PC o a carpetas del iPhone, y diagnóstico detallado por etapa (`catalogue`, `open_app`, `read_audio`, `write_app`) si se desconecta el cable físicamente.
-- Conserva todas las novedades de `v0.3.0-preview.41` (aviso de actualizaciones en macOS con certificados SSL) y anteriores.
-- Verificado con 303 pruebas automatizadas y renderizado de las 5 vistas en ambos temas sin dispositivo físico; la prueba con un iPhone real conectado por USB queda pendiente en el equipo del usuario.
+- **Columna «Tipo» con formato real y agrupación al ordenar:** la tabla de *Archivos de apps* muestra ahora el formato específico de cada elemento (`Archivo MP3`, `Archivo FLAC`, `Archivo PDF`, `Carpeta`, etc.) y permite agrupar todos los archivos por tipo/extensión al pulsar la cabecera **Tipo**.
+- **Selector de filtro por formato/tipo en Archivos de apps:** nuevo desplegable junto al buscador (`Todos los tipos`) que lista dinámicamente las categorías y extensiones presentes en la carpeta abierta con su conteo (`Carpetas (N)`, `Audio (N)`, cada extensión como `MP3 (N)`, `FLAC (N)` y `Sin extensión (N)`), combinable en tiempo real con la búsqueda por texto y con traducción inmediata Español / English.
+- Conserva todas las novedades de `v0.3.0-preview.42` (reconexión automática y modo secuencial de un solo canal al copiar canciones a carpetas del iPhone) y anteriores.
+- Verificado con 304 pruebas automatizadas y renderizado de las 5 vistas en ambos temas sin dispositivo físico; la prueba con un iPhone real conectado por USB queda pendiente en el equipo del usuario.
 
 MP3, WAV, M4A (AAC/ALAC) y AIFF nativos para Música (más conversión opcional de FLAC/OGG/Opus/WMA vía `ffmpeg`); cualquier formato dentro de `/Documents` de apps compatibles. Windows necesita el servicio/controlador USB de Apple. Paquetes sin firma ni notarización. No se distribuyen fuentes ni DLL de Apple o 3uTools.
 ''', encoding='utf-8')

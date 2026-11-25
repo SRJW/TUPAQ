@@ -1373,6 +1373,12 @@ EN.update({
     'Ruta local de preparación no válida.':'Invalid local staging path.',
     'Reconectando con el iPhone…':'Reconnecting to iPhone…',
     'Se perdió la conexión USB con el iPhone durante la copia. Las canciones ya copiadas se conservan; mantén el iPhone desbloqueado y repite con «Omitir» para continuar donde quedó.':'The USB connection to the iPhone dropped during the copy. Already copied songs are kept; keep the iPhone unlocked and run again with "Skip" to resume.',
+    'Todos los tipos':'All types',
+    'Filtrar por formato o tipo de archivo en esta carpeta.':'Filter by file format or type in this folder.',
+    'Archivo {ext}':'{ext} file',
+    'Carpetas ({count})':'Folders ({count})',
+    'Audio ({count})':'Audio ({count})',
+    'Sin extensión ({count})':'No extension ({count})',
 })
 
 
