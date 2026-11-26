@@ -254,6 +254,21 @@ class AppFilesBackendTests(unittest.TestCase):
         self.assertEqual(fs.files, {})
         self.assertTrue(any(TEMP_PREFIX in path for path in fs.removed_single))
 
+    def test_large_files_up_to_128gb_and_skip_full_readback_above_threshold(self):
+        from importios.app_files import MAX_FILE_BYTES
+        self.assertEqual(MAX_FILE_BYTES, 128 * 1024**3)
+        fs = MemoryAfc()
+        afc = fs.as_afc()
+        with tempfile.TemporaryDirectory() as tmp:
+            movie = Path(tmp) / 'movie.mkv'
+            movie.write_bytes(b'MKV-4K-VIDEO-DATA' * 100)
+            with patch('importios.app_files.HASH_VERIFY_MAX_BYTES', 100):
+                summary = asyncio.run(upload_paths(afc, '', [movie]))
+        self.assertEqual(summary['uploaded'], 1)
+        self.assertIn('/Documents/movie.mkv', fs.files)
+        # Above HASH_VERIFY_MAX_BYTES, verification checks exact remote size via stat without re-reading the file over USB
+        afc.fread.assert_not_awaited()
+
     def test_upload_cancellation_cleans_temp_file_and_preserves_partial_count(self):
         fs = MemoryAfc()
         afc = fs.as_afc()

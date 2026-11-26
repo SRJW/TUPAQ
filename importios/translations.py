@@ -1199,6 +1199,7 @@ EN.update({
     'No se pudo verificar la creación de la carpeta en el iPhone.':'Could not verify folder creation on the iPhone.',
     'Uno de los archivos seleccionados ya no existe.':'One of the selected files no longer exists.',
     'Un archivo supera el límite de 4 GB.':'A file exceeds the 4 GB limit.',
+    'Un archivo supera el límite de 128 GB.':'A file exceeds the 128 GB limit.',
     'La selección supera el límite de 500 carpetas.':'The selection exceeds the 500-folder limit.',
     'La selección supera el límite de 2.000 archivos por envío.':'The selection exceeds the 2,000-file limit per upload.',
     'Solo se pueden copiar archivos y carpetas normales.':'Only regular files and folders can be copied.',

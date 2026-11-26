@@ -17,7 +17,8 @@ from .models import text_key
 DOCUMENTS_ROOT = '/Documents'
 CHUNK = 1024 * 1024
 WRITE_CHUNK = 256 * 1024
-MAX_FILE_BYTES = 4 * 1024**3
+MAX_FILE_BYTES = 128 * 1024**3
+HASH_VERIFY_MAX_BYTES = 256 * 1024**2
 MAX_ENTRIES = 10_000
 MAX_UPLOAD_FILES = 2_000
 MAX_FOLDERS = 500
@@ -228,7 +229,7 @@ def _collect_local_uploads(local_paths):
         if source.is_file():
             size = source.stat().st_size
             if size > MAX_FILE_BYTES:
-                raise AppFilesError('Un archivo supera el límite de 4 GB.', 'app-files:file-size')
+                raise AppFilesError('Un archivo supera el límite de 128 GB.', 'app-files:file-size')
             files.append((source, name, size))
         elif source.is_dir() and not source.is_symlink():
             pending = [(source, name)]
@@ -254,7 +255,7 @@ def _collect_local_uploads(local_paths):
                     elif entry.is_file(follow_symlinks=False):
                         size = entry.stat(follow_symlinks=False).st_size
                         if size > MAX_FILE_BYTES:
-                            raise AppFilesError('Un archivo supera el límite de 4 GB.', 'app-files:file-size')
+                            raise AppFilesError('Un archivo supera el límite de 128 GB.', 'app-files:file-size')
                         files.append((Path(entry.path), child_rel, size))
                         if len(files) > MAX_UPLOAD_FILES:
                             raise AppFilesError('La selección supera el límite de 2.000 archivos por envío.', 'app-files:too-many-files')
@@ -269,6 +270,8 @@ async def _verify_remote_file(afc, remote_path, expected_size, expected_digest):
     info = await _stat_or_none(afc, remote_path)
     if not isinstance(info, dict) or info.get('st_ifmt') != 'S_IFREG' or info.get('st_size') != expected_size:
         raise AppFilesError('El archivo copiado no coincide con el tamaño esperado.', 'app-files:upload-size')
+    if expected_size > HASH_VERIFY_MAX_BYTES:
+        return
     digest = hashlib.sha256()
     handle = await afc.fopen(remote_path, 'r')
     remaining = expected_size
@@ -631,7 +634,7 @@ async def upload_local_file_to_app(afc, local_file, remote_rel, conflict_policy=
     source = Path(local_file)
     size = source.stat().st_size
     if size > MAX_FILE_BYTES:
-        raise AppFilesError('Un archivo supera el límite de 4 GB.', 'app-files:file-size')
+        raise AppFilesError('Un archivo supera el límite de 128 GB.', 'app-files:file-size')
     clean = normalize_relative(remote_rel)
     if not clean:
         raise AppFilesError('La ruta de destino dentro de la aplicación no es válida.', 'app-files:path')
