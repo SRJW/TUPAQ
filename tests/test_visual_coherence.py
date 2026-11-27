@@ -143,3 +143,37 @@ class VisualCoherenceTests(unittest.TestCase):
         APP.processEvents()
         self.assertLessEqual(w.copy_diagnostic.geometry().bottom(), 700)
 
+    def test_apple_music_visual_style_applies_palette_thumbnails_and_persists(self):
+        w = self.window
+        self.assertEqual(w.style_choice.currentIndex(), 0)
+        self.assertEqual(w.colors['orange'], '#f27620')
+
+        # Switch to Apple Music visual style in dark and light modes
+        w.style_choice.setCurrentIndex(1)
+        APP.processEvents()
+        self.assertEqual(w.colors['orange'], '#fa233b')
+        self.assertEqual(w.colors['card'], '#1c1c1e')
+        self.assertTrue(w.library_table.property('appleMusic'))
+        self.assertTrue(w.use_accent.isHidden())
+
+        w.theme_choice.setCurrentIndex(1)  # Claro
+        APP.processEvents()
+        self.assertEqual(w.colors['orange'], '#fa233b')
+        self.assertEqual(w.colors['bg'], '#f5f5f7')
+        self.assertEqual(w.colors['card'], '#ffffff')
+        self.assertTrue(w.library_table.property('appleMusic'))
+
+        # Verify thumbnails differ between TUPAQ and Apple Music styles
+        tupaq_thumb = theme_thumbnail('dark', 'tupaq').toImage()
+        apple_thumb = theme_thumbnail('dark', 'apple_music').toImage()
+        self.assertNotEqual(tupaq_thumb, apple_thumb)
+
+        # Switch back to TUPAQ
+        w.style_choice.setCurrentIndex(0)
+        w.theme_choice.setCurrentIndex(2)
+        APP.processEvents()
+        self.assertEqual(w.colors['orange'], '#f27620')
+        self.assertFalse(w.library_table.property('appleMusic'))
+        self.assertFalse(w.use_accent.isHidden())
+
+

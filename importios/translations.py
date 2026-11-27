@@ -1380,6 +1380,9 @@ EN.update({
     'Carpetas ({count})':'Folders ({count})',
     'Audio ({count})':'Audio ({count})',
     'Sin extensión ({count})':'No extension ({count})',
+    'Estilo visual':'Visual style',
+    'TUPAQ':'TUPAQ',
+    'Apple Music':'Apple Music',
 })
 
 

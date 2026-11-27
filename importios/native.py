@@ -398,6 +398,7 @@ class Window(QMainWindow):
                                    (self.export_incremental,'export_incremental',False),(self.convert_audio,'convert_audio',False),
                                    (self.auto_check_updates,'auto_check_updates',True)]:
             control.blockSignals(True);control.setChecked(settings.value(key,default,type=bool) if auto_connect else default);control.blockSignals(False)
+        self.style_choice.blockSignals(True);self.style_choice.setCurrentIndex(1 if auto_connect and settings.value('visual_style','tupaq')=='apple_music' else 0);self.style_choice.blockSignals(False)
         self.metadata_choice.blockSignals(True);self.metadata_choice.setCurrentIndex(1 if auto_connect and settings.value('metadata_policy','keep')=='filename' else 0);self.metadata_choice.blockSignals(False)
         self.export_structure.blockSignals(True);self.export_structure.setCurrentIndex(1 if auto_connect and settings.value('export_structure','flat')=='artist_album' else 0);self.export_structure.blockSignals(False)
         self.convert_codec.blockSignals(True);self.convert_codec.setCurrentIndex(1 if auto_connect and settings.value('convert_codec','alac')=='aac' else 0);self.convert_codec.blockSignals(False)
@@ -530,8 +531,10 @@ class Window(QMainWindow):
         if number not in (0,1,2,3,4):return
         self.nav_buttons[number].setChecked(True)
         from .visuals import line_icon
-        colors=getattr(self,'colors',{'text':'#ffffff'})
-        for nav in self.nav_buttons:nav.setIcon(line_icon(nav.property('iconKind'),'#ffffff' if nav.isChecked() else colors['text'],18))
+        colors=getattr(self,'colors',{'text':'#ffffff','orange':'#fa233b'})
+        apple_music=bool(hasattr(self,'style_choice') and self.style_choice.currentIndex()==1)
+        inactive=colors.get('orange',colors['text']) if apple_music else colors['text']
+        for nav in self.nav_buttons:nav.setIcon(line_icon(nav.property('iconKind'),'#ffffff' if nav.isChecked() else inactive,18))
         self.motion.navigate(self.pages,number)
         self.update_buttons()
         self.update_context_status()
@@ -849,7 +852,11 @@ class Window(QMainWindow):
         from .interface import apply_theme
         apply_theme(self)
         if getattr(self,'persist_settings',False):
-            QSettings().setValue('use_accent',self.use_accent.isChecked());QSettings().setValue('reduce_transparency',self.reduce_transparency.isChecked())
+            settings = QSettings()
+            settings.setValue('use_accent',self.use_accent.isChecked())
+            settings.setValue('reduce_transparency',self.reduce_transparency.isChecked())
+            if hasattr(self,'style_choice'):
+                settings.setValue('visual_style','apple_music' if self.style_choice.currentIndex()==1 else 'tupaq')
 
     def pause_transfer(self):
         worker=self.transfer_worker

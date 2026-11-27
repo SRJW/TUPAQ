@@ -9,25 +9,25 @@ de apps compatibles y consulta diagnósticos reales del dispositivo (incluida la
 salud de la batería). Aplicación de escritorio nativa, con ventana propia, sin
 navegador ni necesidad de instalar Python.
 
-La versión actual (**0.3.0-preview.44**) amplía el límite por archivo en
-**Archivos de apps** de 4 GB a **128 GB** (con verificación instantánea de tamaño
-para vídeos 4K `.mkv`/`.mp4` de varios gigabytes sin releer el archivo entero por
-USB), e incorpora el selector de **filtro por formato o tipo de archivo**
-(`Carpetas`, `Audio`, extensiones presentes en la carpeta con su conteo y `Sin
-extensión`) y el formato real en la columna **Tipo** (`Archivo MP3`, `Archivo
-MKV`, `Carpeta`…) para **agrupar por tipo de archivo** al ordenar la columna,
-sobre la estabilidad mejorada de la copia **Música → carpeta del iPhone** con
-reconexión automática, modo secuencial de un solo canal ante cortes USB y
-escrituras de 256 KB, la corrección de certificados SSL en macOS para avisos de
-actualización, la copia bidireccional entre **Música** y carpetas de iOS visibles
-en **Archivos**, el resumen de peso total en *Biblioteca*, las casillas planas
-redondeadas, el rediseño ligero de las cinco vistas y todas las funciones
-existentes: **Archivos de apps** con buscador, renombrado (`F2`) y política de
-conflictos, telemetría real de **Batería**, conversión opcional de
-FLAC/OGG/Opus/WMA con `ffmpeg`, exportación organizada e incremental sin límite
-de 1.000 canciones, detector de duplicados, editor no destructivo de metadatos y
-portada antes de importar, lectura y exportación `.m3u8` de playlists, vista por
-**Álbumes / Artistas** y vista previa de audio.
+La versión actual (**0.3.0-preview.45**) incorpora el nuevo **estilo visual
+nativo «Apple Music»** en *Preferencias → Apariencia* (con acento carmesí
+`#FA233B`, fondos grafito `#1C1C1E` / `#121214` en oscuro y blanco/gris perla
+`#FFFFFF` / `#F5F5F7` en claro, barra lateral estilo macOS/iPadOS e insignias
+Lossless/ALAC coherentes, compatible con Claro, Oscuro y Sistema), además del
+límite ampliado a **128 GB** por archivo en **Archivos de apps** (con verificación
+instantánea de tamaño para vídeos 4K `.mkv`/`.mp4`), el selector de **filtro por
+formato o tipo de archivo** y la agrupación por tipo en la columna **Tipo**, la
+estabilidad mejorada de la copia **Música → carpeta del iPhone** con reconexión
+automática y modo secuencial de un solo canal ante cortes USB, la corrección de
+certificados SSL en macOS para avisos de actualización, la copia bidireccional
+entre **Música** y carpetas de iOS visibles en **Archivos**, el resumen de peso
+total en *Biblioteca* y todas las funciones existentes: **Archivos de apps** con
+buscador, renombrado (`F2`) y política de conflictos, telemetría real de
+**Batería**, conversión opcional de FLAC/OGG/Opus/WMA con `ffmpeg`, exportación
+organizada e incremental sin límite de 1.000 canciones, detector de duplicados,
+editor no destructivo de metadatos y portada antes de importar, lectura y
+exportación `.m3u8` de playlists, vista por **Álbumes / Artistas** y vista previa
+de audio.
 
 **Windows y macOS usan siempre la fuente nativa de su sistema**; no hay selector
 ni carga manual de fuentes. Los controles y columnas reservan el ancho real del
@@ -43,7 +43,7 @@ que las renderiza. GitHub Actions guarda también capturas por plataforma.
 
 ## Descargar y abrir
 
-[Última versión (v0.3.0-preview.44)](https://github.com/SRJW/TUPAQ/releases/tag/v0.3.0-preview.44) ·
+[Última versión (v0.3.0-preview.45)](https://github.com/SRJW/TUPAQ/releases/tag/v0.3.0-preview.45) ·
 [Todas las versiones](https://github.com/SRJW/TUPAQ/releases) ·
 [Cómo descargar](DESCARGAR.md)
 
@@ -139,8 +139,10 @@ oficial de descarga; nunca descarga ni ejecuta binarios automáticamente.
   respaldos del catálogo).
 
 ### Preferencias
-- **Apariencia:** Claro / Oscuro / Sistema (con miniatura partida), acento naranja
-  opcional de TUPAQ, reducir transparencia y reducir movimiento.
+- **Apariencia:** Claro / Oscuro / Sistema (con miniatura partida), selector de
+  **Estilo visual** (**TUPAQ** o **Apple Music** nativo con acento `#FA233B` y
+  superficies grafito/blanco perla), acento naranja opcional de TUPAQ, reducir
+  transparencia y reducir movimiento.
 - **Rutas de biblioteca y exportación:** carpeta inicial, organización al exportar
   (**Todo en la misma carpeta** u **Organizar por Artista / Álbum** como
   `Artista/Álbum/01 - Canción.ext`) y **modo respaldo incremental** (omite lo ya
@@ -189,13 +191,13 @@ conserva la posición válida y se omite el total incoherente.
 
 ## Validación y desarrollo
 
-La revisión **0.3.0-preview.44** cuenta con **305 pruebas automáticas** que
+La revisión **0.3.0-preview.45** cuenta con **306 pruebas automáticas** que
 cubren lectura de catálogo y playlists, conversión real de FLAC → ALAC/AAC con
 `ffmpeg`, exportación organizada e incremental con `.m3u8`, editor no destructivo
 de metadatos y carátula, detección de duplicados, telemetría de batería, aviso de
 actualizaciones, operaciones de **Archivos de apps** (renombrar, buscar, filtrar
 por formato/tipo, agrupar por tipo y políticas de conflicto), traducciones ES/EN y
-coherencia visual en claro y oscuro.
+coherencia visual en claro y oscuro (incluyendo el tema **Apple Music**).
 Las pruebas de estrés previas validaron 10.000 canciones en la cola y en un
 iPhone simulado ([informe reproducible](docs/ESTRES.md)).
 

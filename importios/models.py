@@ -75,13 +75,18 @@ class SelectionDelegate(QStyledItemDelegate):
         cx,cy=raw_rect.center().x()+.5,raw_rect.center().y()+.5
         rect=QRectF(cx-side/2,cy-side/2,side,side).adjusted(.75,.75,-.75,-.75)
         dark=bool(option.widget and option.widget.property('darkTheme'))
+        apple_music=bool(option.widget and option.widget.property('appleMusic'))
         hovered=bool(option.state & QStyle.StateFlag.State_MouseOver)
         accent=QColor(option.widget.property('checkAccent')) if option.widget and option.widget.property('checkAccent') else option.palette.color(QPalette.ColorRole.Highlight)
         fg=QColor(option.widget.property('checkForeground')) if option.widget and option.widget.property('checkForeground') else option.palette.color(QPalette.ColorRole.Text)
         painter.save();painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         if option.checkState==Qt.CheckState.Unchecked:
-            border=QColor('#789b9d' if hovered else '#4e6f72') if dark else QColor('#6d898b' if hovered else '#b4c3c2')
-            fill=QColor(255,255,255,14 if hovered else 6) if dark else QColor(19,49,51,12 if hovered else 4)
+            if apple_music:
+                border=QColor('#8e8e93' if hovered else '#545458') if dark else QColor('#8e8e93' if hovered else '#c7c7cc')
+                fill=QColor(255,255,255,14 if hovered else 6) if dark else QColor(0,0,0,10 if hovered else 4)
+            else:
+                border=QColor('#789b9d' if hovered else '#4e6f72') if dark else QColor('#6d898b' if hovered else '#b4c3c2')
+                fill=QColor(255,255,255,14 if hovered else 6) if dark else QColor(19,49,51,12 if hovered else 4)
             painter.setPen(QPen(border,1.25))
             painter.setBrush(fill)
             painter.drawRoundedRect(rect,4.5,4.5)
@@ -108,13 +113,23 @@ class FormatBadgeDelegate(QStyledItemDelegate):
         style.drawControl(QStyle.ControlElement.CE_ItemViewItem,option,painter,option.widget)
         if not text:return
         dark=bool(option.widget and option.widget.property('darkTheme'))
+        apple_music=bool(option.widget and option.widget.property('appleMusic'))
         painter.save();painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         if text=='—':
             painter.setPen(option.palette.color(QPalette.ColorRole.Mid))
             painter.drawText(option.rect,Qt.AlignmentFlag.AlignCenter,text)
             painter.restore();return
         upper=text.upper()
-        if 'ALAC' in upper:
+        if apple_music:
+            if 'ALAC' in upper:
+                bg,border,fg=('#3a1922','#7d293b','#ff7a8d') if dark else ('#fff0f2','#f7b7c1','#d70022')
+            elif 'WAV' in upper or 'AIFF' in upper:
+                bg,border,fg=('#2c2c2e','#48484a','#e5e5ea') if dark else ('#f2f2f7','#d1d1d6','#3a3a3c')
+            elif 'M4P' in upper or 'PROTEGIDO' in upper:
+                bg,border,fg=('#3d2224','#753c40','#ff9f9f') if dark else ('#fae9ea','#e5bec1','#8f2d34')
+            else:
+                bg,border,fg=('#262629','#3a3a3c','#c7c7cc') if dark else ('#f5f5f7','#dcdce0','#48484a')
+        elif 'ALAC' in upper:
             bg,border,fg=('#3d2c1e','#785231','#ffbe85') if dark else ('#fdf0e4','#eac8a8','#9a4200')
         elif 'WAV' in upper or 'AIFF' in upper:
             bg,border,fg=('#183b36','#2e6b62','#8ce0c5') if dark else ('#e6f4ee','#b7decf','#175f49')
@@ -149,16 +164,26 @@ class StatusBadgeDelegate(QStyledItemDelegate):
         style.drawControl(QStyle.ControlElement.CE_ItemViewItem,option,painter,option.widget)
         if not text:return
         dark=bool(option.widget and option.widget.property('darkTheme'))
+        apple_music=bool(option.widget and option.widget.property('appleMusic'))
         painter.save();painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         lower=text.casefold()
         if 'iphone' in lower or 'already' in lower:
-            bg,border,fg=('#3d2c1e','#785231','#ffbe85') if dark else ('#fdf0e4','#eac8a8','#9a4200')
+            if apple_music:
+                bg,border,fg=('#3a1922','#7d293b','#ff7a8d') if dark else ('#fff0f2','#f7b7c1','#d70022')
+            else:
+                bg,border,fg=('#3d2c1e','#785231','#ffbe85') if dark else ('#fdf0e4','#eac8a8','#9a4200')
         elif 'convert' in lower or 'enviada' in lower or 'sent' in lower:
             bg,border,fg=('#183b36','#2e6b62','#8ce0c5') if dark else ('#e6f4ee','#b7decf','#175f49')
         elif 'enviando' in lower or 'sending' in lower:
-            bg,border,fg=('#3a2a1a','#8a5724','#ffc48c') if dark else ('#fff1e6','#f0c49b','#b34a00')
+            if apple_music:
+                bg,border,fg=('#3a1922','#8f2d42','#ff8fa0') if dark else ('#fff0f2','#f7b7c1','#d70022')
+            else:
+                bg,border,fg=('#3a2a1a','#8a5724','#ffc48c') if dark else ('#fff1e6','#f0c49b','#b34a00')
         else:
-            bg,border,fg=('#1b3639','#2d5054','#b8cfce') if dark else ('#eef3f2','#d4e0de','#395759')
+            if apple_music:
+                bg,border,fg=('#262629','#3a3a3c','#c7c7cc') if dark else ('#f5f5f7','#dcdce0','#48484a')
+            else:
+                bg,border,fg=('#1b3639','#2d5054','#b8cfce') if dark else ('#eef3f2','#d4e0de','#395759')
         font=option.font;font.setPointSizeF(max(8.0,font.pointSizeF()-.7));font.setWeight(font.Weight.Medium)
         painter.setFont(font)
         metrics=painter.fontMetrics()

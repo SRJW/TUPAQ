@@ -44,26 +44,35 @@ def page(title,description=None):
     return value,layout,header,heading
 
 
-def _paint_theme_preview(painter,dark):
-    painter.setPen(QPen(QColor('#527172' if dark else '#d4deda'),.8));painter.setBrush(QColor('#102326' if dark else '#fbfaf8'));painter.drawRoundedRect(1,1,104,56,6,6)
-    painter.setPen(Qt.PenStyle.NoPen);painter.setBrush(QColor('#233c3e' if dark else '#eeeae4'));painter.drawRoundedRect(3,3,23,52,4,4)
-    painter.setBrush(QColor('#1d484c' if dark else '#246266'));painter.drawRoundedRect(5,17,19,7,2,2)
-    painter.setBrush(QColor('#ed751c'));painter.drawRoundedRect(5,17,2.5,7,1,1)
-    painter.setBrush(QColor('#345657' if dark else '#e4eeeb'));painter.drawRoundedRect(30,8,69,14,3,3)
-    painter.setBrush(QColor('#ed751c'));painter.drawRoundedRect(31,27,20,6,2,2)
-    painter.setPen(QPen(QColor('#466263' if dark else '#d8e2de'),1))
+def _paint_theme_preview(painter,dark,style='tupaq'):
+    apple=style=='apple_music'
+    painter.setPen(QPen(QColor(('#38383a' if dark else '#dcdce0') if apple else ('#527172' if dark else '#d4deda')),.8))
+    painter.setBrush(QColor(('#141416' if dark else '#ffffff') if apple else ('#102326' if dark else '#fbfaf8')))
+    painter.drawRoundedRect(1,1,104,56,6,6)
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setBrush(QColor(('#1c1c1e' if dark else '#f5f5f7') if apple else ('#233c3e' if dark else '#eeeae4')))
+    painter.drawRoundedRect(3,3,23,52,4,4)
+    painter.setBrush(QColor('#fa233b' if apple else ('#1d484c' if dark else '#246266')))
+    painter.drawRoundedRect(5,17,19,7,2,2)
+    painter.setBrush(QColor('#ffffff' if apple else '#ed751c'))
+    painter.drawRoundedRect(5,17,2.5,7,1,1)
+    painter.setBrush(QColor(('#28282c' if dark else '#f2f2f7') if apple else ('#345657' if dark else '#e4eeeb')))
+    painter.drawRoundedRect(30,8,69,14,3,3)
+    painter.setBrush(QColor('#fa233b' if apple else '#ed751c'))
+    painter.drawRoundedRect(31,27,20,6,2,2)
+    painter.setPen(QPen(QColor(('#323236' if dark else '#e5e5ea') if apple else ('#466263' if dark else '#d8e2de')),1))
     for y in (38,44,50):painter.drawLine(31,y,97,y)
 
 
-def theme_thumbnail(mode):
+def theme_thumbnail(mode,style='tupaq'):
     image=QPixmap(212,116);image.setDevicePixelRatio(2);image.fill(Qt.GlobalColor.transparent)
     painter=QPainter(image);painter.setRenderHint(QPainter.RenderHint.Antialiasing)
     if mode=='system':
-        painter.save();painter.setClipRect(0,0,53,58);_paint_theme_preview(painter,False);painter.restore()
-        painter.save();painter.setClipRect(53,0,53,58);_paint_theme_preview(painter,True);painter.restore()
-        painter.setPen(QPen(QColor('#6c898a'),.9));painter.drawLine(53,2,53,56)
+        painter.save();painter.setClipRect(0,0,53,58);_paint_theme_preview(painter,False,style);painter.restore()
+        painter.save();painter.setClipRect(53,0,53,58);_paint_theme_preview(painter,True,style);painter.restore()
+        painter.setPen(QPen(QColor('#6c6c70' if style=='apple_music' else '#6c898a'),.9));painter.drawLine(53,2,53,56)
     else:
-        _paint_theme_preview(painter,mode=='dark' or mode is True)
+        _paint_theme_preview(painter,mode=='dark' or mode is True,style)
     painter.end();return image
 
 
@@ -176,20 +185,26 @@ def build(window):
     window.settings_navigation.idClicked.connect(window.settings_pages.setCurrentIndex);window.settings_buttons[0].setChecked(True)
     window.theme_choice=QComboBox(settings);window.theme_choice.addItems(['Sistema','Claro','Oscuro']);window.theme_choice.setCurrentIndex(2);window.theme_choice.hide()
     window.mood_choice=QComboBox(settings);window.mood_choice.addItems(['Nocturno','Aurora','Atardecer','Tonal']);window.mood_choice.setCurrentIndex(3);window.mood_choice.hide()
-    window.theme_options={};theme_row=QHBoxLayout();theme_row.setSpacing(12)
+    window.theme_options={};window.theme_previews={};theme_row=QHBoxLayout();theme_row.setSpacing(12)
     window.theme_group=QButtonGroup(window)
     for index,title in [(1,'Claro'),(2,'Oscuro'),(0,'Sistema')]:
         option=button('');option.setProperty('themeCard',True);option.setCheckable(True);option.setMinimumSize(126,112);option.setAccessibleName(tr(title))
         inner=QVBoxLayout(option);inner.setContentsMargins(12,14,12,12);inner.setSpacing(9)
         preview=QLabel();preview.setAlignment(Qt.AlignmentFlag.AlignCenter);preview.setPixmap(theme_thumbnail('dark' if index==2 else 'light' if index==1 else 'system'));inner.addWidget(preview)
+        window.theme_previews[index]=preview
         caption=text_label(title);caption.setAlignment(Qt.AlignmentFlag.AlignCenter);inner.addWidget(caption)
         for child in (preview,caption):child.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         window.theme_group.addButton(option,index);theme_row.addWidget(option,1);window.theme_options[index]=option
     window.theme_group.idClicked.connect(window.theme_choice.setCurrentIndex);appearance.addLayout(theme_row)
+    style_row=QHBoxLayout();style_row.setSpacing(10)
+    style_row.addWidget(text_label('Estilo visual','muted'))
+    window.style_choice=QComboBox();window.style_choice.addItems(['TUPAQ','Apple Music']);style_row.addWidget(window.style_choice,1)
+    appearance.addLayout(style_row)
     window.use_accent=QCheckBox(tr('Usar el color naranja de TUPAQ'));window.use_accent.setChecked(True);appearance.addWidget(window.use_accent)
     window.reduce_transparency=QCheckBox(tr('Reducir transparencia'));appearance.addWidget(window.reduce_transparency)
     window.reduce_motion=QCheckBox(tr('Reducir movimiento'));window.reduce_motion.setChecked(not window.motion.enabled);appearance.addWidget(window.reduce_motion)
     window.reduce_motion.toggled.connect(window.change_motion)
+    window.style_choice.currentIndexChanged.connect(window.change_visual_options)
     window.use_accent.toggled.connect(window.change_visual_options);window.reduce_transparency.toggled.connect(window.change_visual_options)
     paths.addWidget(text_label('Carpeta inicial para elegir y exportar música.','muted',True))
     window.library_path=QLineEdit();window.library_path.setReadOnly(True);paths.addWidget(window.library_path)
@@ -485,30 +500,58 @@ def layout_transfer_actions(window):
 def apply_theme(window):
     selection=window.theme_choice.currentIndex()
     dark=selection==2 or selection==0 and QApplication.styleHints().colorScheme()==Qt.ColorScheme.Dark
-    c=({'bg':'#0d191b','side':'#0a1d20','card':'#142d30','cardEnd':'#12292c','text':'#eef5f4','muted':'#99b5b4',
-        'border':'#254043','rowLine':'rgba(255,255,255,0.06)','button':'#193438','hover':'#24464a','selected':'#224447','alternate':'#112629',
-        'orange':'#f27620','primaryText':'#241309','primaryHover':'#ff973d','nav':'#1a4448','navBorder':'#2b6368','settingsActive':'#1a4448','settingsBorder':'#2b6368',
-        'battery':'#3cc894'} if dark else
-       {'bg':'#f9f8f5','side':'#f0eee9','card':'#ffffff','cardEnd':'#faf8f5','text':'#133133','muted':'#5b7274',
-        'border':'#e2e2dc','rowLine':'rgba(19,49,51,0.08)','button':'#ffffff','hover':'#f2eee8','selected':'#e3efed','alternate':'#f7f9f7',
-        'orange':'#c44f08','primaryText':'#ffffff','primaryHover':'#a94104','nav':'#1f5c60','navBorder':'#2a6e72','settingsActive':'#e3efed','settingsBorder':'#bfd8d5',
-        'battery':'#1c8b68'})
-    accent=window.use_accent.isChecked();reduced=window.reduce_transparency.isChecked()
-    if not accent:c.update(orange='#58b9b5' if dark else '#246d70',primaryText='#10292b' if dark else '#ffffff',primaryHover='#7bcbc7' if dark else '#16575b',nav='#24575a' if dark else '#276a6d',navBorder='#367f80')
+    apple_music=bool(hasattr(window,'style_choice') and window.style_choice.currentIndex()==1)
+    style_key='apple_music' if apple_music else 'tupaq'
+    if hasattr(window,'use_accent'):
+        window.use_accent.setVisible(not apple_music)
+    if hasattr(window,'theme_previews'):
+        for idx,preview in window.theme_previews.items():
+            preview.setPixmap(theme_thumbnail('dark' if idx==2 else 'light' if idx==1 else 'system',style_key))
+    if apple_music:
+        c=({'bg':'#121214','side':'#18181b','card':'#1c1c1e','cardEnd':'#1a1a1c','text':'#f5f5f7','muted':'#8e8e93',
+            'border':'#2c2c2e','rowLine':'rgba(255,255,255,0.06)','button':'#242426','hover':'#2c2c2e','selected':'#331b21','alternate':'#17171a',
+            'orange':'#fa233b','primaryText':'#ffffff','primaryHover':'#fb5c74','nav':'#fa233b','navBorder':'#fa233b','settingsActive':'#2c2c2e','settingsBorder':'#3a3a3c',
+            'battery':'#30d158'} if dark else
+           {'bg':'#f5f5f7','side':'#efeff4','card':'#ffffff','cardEnd':'#fbfbfd','text':'#1d1d1f','muted':'#6e6e73',
+            'border':'#e5e5ea','rowLine':'rgba(0,0,0,0.06)','button':'#ffffff','hover':'#f2f2f7','selected':'#ffe8ec','alternate':'#fafafa',
+            'orange':'#fa233b','primaryText':'#ffffff','primaryHover':'#d70022','nav':'#fa233b','navBorder':'#fa233b','settingsActive':'#ffe8ec','settingsBorder':'#f7c5ce',
+            'battery':'#34c759'})
+    else:
+        c=({'bg':'#0d191b','side':'#0a1d20','card':'#142d30','cardEnd':'#12292c','text':'#eef5f4','muted':'#99b5b4',
+            'border':'#254043','rowLine':'rgba(255,255,255,0.06)','button':'#193438','hover':'#24464a','selected':'#224447','alternate':'#112629',
+            'orange':'#f27620','primaryText':'#241309','primaryHover':'#ff973d','nav':'#1a4448','navBorder':'#2b6368','settingsActive':'#1a4448','settingsBorder':'#2b6368',
+            'battery':'#3cc894'} if dark else
+           {'bg':'#f9f8f5','side':'#f0eee9','card':'#ffffff','cardEnd':'#faf8f5','text':'#133133','muted':'#5b7274',
+            'border':'#e2e2dc','rowLine':'rgba(19,49,51,0.08)','button':'#ffffff','hover':'#f2eee8','selected':'#e3efed','alternate':'#f7f9f7',
+            'orange':'#c44f08','primaryText':'#ffffff','primaryHover':'#a94104','nav':'#1f5c60','navBorder':'#2a6e72','settingsActive':'#e3efed','settingsBorder':'#bfd8d5',
+            'battery':'#1c8b68'})
+        accent=window.use_accent.isChecked()
+        if not accent:c.update(orange='#58b9b5' if dark else '#246d70',primaryText='#10292b' if dark else '#ffffff',primaryHover='#7bcbc7' if dark else '#16575b',nav='#24575a' if dark else '#276a6d',navBorder='#367f80')
+    reduced=window.reduce_transparency.isChecked()
     window.colors=c
     palette=QPalette(window.palette())
     for role,key in [(QPalette.ColorRole.Window,'bg'),(QPalette.ColorRole.WindowText,'text'),(QPalette.ColorRole.Base,'bg'),(QPalette.ColorRole.AlternateBase,'alternate'),
                      (QPalette.ColorRole.Text,'text'),(QPalette.ColorRole.Button,'button'),(QPalette.ColorRole.ButtonText,'text'),(QPalette.ColorRole.Mid,'muted'),
                      (QPalette.ColorRole.Dark,'muted'),(QPalette.ColorRole.Shadow,'border'),(QPalette.ColorRole.Light,'hover'),(QPalette.ColorRole.Highlight,'selected'),(QPalette.ColorRole.HighlightedText,'text')]:palette.setColor(role,QColor(c[key]))
     window.setPalette(palette)
-    window.scene.set_scene(dark,3)
+    window.scene.set_scene(dark,4 if apple_music else 3)
     if getattr(window.scene,'reduced',False)!=reduced:window.scene.reduced=reduced;window.scene.cache=None;window.scene.update()
     from .typography import css_family
     app=QApplication.instance();family=css_family(getattr(app,'typography_family',app.font().family()));base=app.font().pointSizeF()
     material=lambda color:'rgba('+','.join(str(v) for v in QColor(color).getRgb()[:3])+',244)'
     panel_bg=c['card'] if reduced else f"qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 {material(c['card'])},stop:1 {material(c['cardEnd'])})"
-    check=(Path(__file__).with_name('assets')/('check-dark.svg' if dark else 'check-light.svg')).as_posix()
+    check=(Path(__file__).with_name('assets')/('check-dark.svg' if dark and not apple_music else 'check-light.svg')).as_posix()
     chevron=(Path(__file__).with_name('assets')/('chevron-dark.svg' if dark else 'chevron-light.svg')).as_posix()
+    nav_checked_border=f"border:1px solid {c['navBorder']};border-radius:9px;" if apple_music else f"border:1px solid {c['navBorder']};border-left:3px solid {c['orange']};"
+    settings_checked_border=f"border:1px solid {c['settingsBorder']};border-left:3px solid {c['orange']};"
+    banner_bg=('#2a151b' if dark else '#fff0f2') if apple_music else ('#1b3a3e' if dark else '#fdf1e6')
+    secondary_bg=('#3a1922' if dark else '#d70022') if apple_music else ('#245e61' if dark else '#276a6d')
+    secondary_border=('#7d293b' if dark else '#b8001d') if apple_music else ('#2f767a' if dark else '#246266')
+    destructive_fg=('#ff453a' if dark else '#d70015') if apple_music else ('#ffb47d' if dark else '#b54200')
+    drop_bg=c['card'] if reduced else (('#1e1518' if dark else '#fff5f7') if apple_music else ('#11292d' if dark else '#fff8f2'))
+    drop_border=c['border'] if dark else ('#f5b5c0' if apple_music else '#e6bda0')
+    ind_border=('#545458' if dark else '#c7c7cc') if apple_music else ('#4e6f72' if dark else '#b4c3c2')
+    ind_hover=('#8e8e93' if dark else '#8e8e93') if apple_music else ('#789b9d' if dark else '#6d898b')
     window.setStyleSheet(f'''
         QWidget {{color:{c['text']};font-family:"{family}";font-size:{base}pt;}}
         QWidget#shell,QStackedWidget {{background:transparent;}}
@@ -519,7 +562,7 @@ def apply_theme(window):
         QFrame#devicePill {{background:{c['button']};border:1px solid {c['border']};border-radius:15px;}}
         QFrame#settingsMenu {{background:{c['side']};border:1px solid {c['border']};border-radius:12px;}}
         QFrame#pathBar {{background:{c['button']};border:1px solid {c['border']};border-radius:9px;}}
-        QFrame#updateBanner {{background:{'#1b3a3e' if dark else '#fdf1e6'};border:1px solid {c['orange']};border-radius:10px;margin:14px 24px 0 24px;}}
+        QFrame#updateBanner {{background:{banner_bg};border:1px solid {c['orange']};border-radius:10px;margin:14px 24px 0 24px;}}
         QFrame#segmentBar {{background:{c['button']};border:1px solid {c['border']};border-radius:9px;}}
         QPushButton#segment {{background:transparent;border:0;border-radius:6px;padding:3px 11px;color:{c['muted']};font-weight:500;}}
         QPushButton#segment:hover {{color:{c['text']};background:{c['hover']};}}
@@ -551,12 +594,12 @@ def apply_theme(window):
         QPushButton:focus {{border:2px solid {c['orange']};}}
         QPushButton#primary {{background:{c['orange']};color:{c['primaryText']};font-weight:600;border:1px solid {c['orange']};}}
         QPushButton#primary:hover {{background:{c['primaryHover']};}}
-        QPushButton#secondaryAccent {{background:{'#245e61' if dark else '#276a6d'};color:#ffffff;border:1px solid {'#2f767a' if dark else '#246266'};}}
-        QPushButton#destructive {{color:{'#ffb47d' if dark else '#b54200'};}}
+        QPushButton#secondaryAccent {{background:{secondary_bg};color:#ffffff;border:1px solid {secondary_border};}}
+        QPushButton#destructive {{color:{destructive_fg};}}
         QPushButton:disabled,QPushButton#primary:disabled {{background:{c['bg']};color:{c['muted']};border:1px solid {c['border']};}}
         QPushButton#nav,QPushButton#settingsNav {{background:transparent;border:1px solid transparent;text-align:left;padding:7px 11px;}}
-        QPushButton#nav:checked {{background:{c['nav']};border:1px solid {c['navBorder']};border-left:3px solid {c['orange']};color:#ffffff;font-weight:600;}}
-        QPushButton#settingsNav:checked {{background:{c['settingsActive']};border:1px solid {c['settingsBorder']};border-left:3px solid {c['orange']};font-weight:600;}}
+        QPushButton#nav:checked {{background:{c['nav']};color:#ffffff;font-weight:600;{nav_checked_border}}}
+        QPushButton#settingsNav:checked {{background:{c['settingsActive']};font-weight:600;{settings_checked_border}}}
         QPushButton#nav:hover,QPushButton#settingsNav:hover {{border-color:{c['border']};}}
         QPushButton#crumb {{background:transparent;border:0;border-radius:6px;padding:3px 7px;color:{c['muted']};font-weight:500;}}
         QPushButton#crumb:hover {{background:{c['hover']};color:{c['text']};}}
@@ -564,7 +607,7 @@ def apply_theme(window):
         QPushButton[themeCard="true"] {{background:{c['bg']};border-radius:12px;padding:0;}}
         QPushButton[themeCard="true"]:checked {{border:2px solid {c['orange']};}}
         QLabel#formatChip {{background:{c['selected']};border:1px solid {c['border']};border-radius:7px;padding:4px 8px;min-width:48px;font-size:{base-1}pt;font-weight:600;}}
-        QFrame#importDrop {{background:{c['card'] if reduced else ('#11292d' if dark else '#fff8f2')};border:1px dashed {c['border'] if dark else '#e6bda0'};border-radius:12px;}}
+        QFrame#importDrop {{background:{drop_bg};border:1px dashed {drop_border};border-radius:12px;}}
         QTableView,QTableWidget {{background:{c['card']};alternate-background-color:{c['alternate']};border:1px solid {c['border']};border-radius:10px;selection-background-color:{c['selected']};selection-color:{c['text']};outline:0;}}
         QTableView::item,QTableWidget::item {{padding:4px 10px;border-bottom:1px solid {c['rowLine']};}}
         QTableView::item:selected,QTableWidget::item:selected {{background:{c['selected']};}}
@@ -589,8 +632,8 @@ def apply_theme(window):
         QPlainTextEdit {{background:{c['card']};color:{c['text']};border:1px solid {c['border']};border-radius:9px;padding:8px;}}
         QTableView::indicator,QTableWidget::indicator {{width:16px;height:16px;border:0;background:transparent;image:none;}}
         QCheckBox {{spacing:8px;padding:4px 0;}}
-        QCheckBox::indicator,QListWidget::indicator {{width:16px;height:16px;border:1px solid {'#4e6f72' if dark else '#b4c3c2'};border-radius:5px;background:transparent;}}
-        QCheckBox::indicator:hover,QListWidget::indicator:hover {{border-color:{'#789b9d' if dark else '#6d898b'};}}
+        QCheckBox::indicator,QListWidget::indicator {{width:16px;height:16px;border:1px solid {ind_border};border-radius:5px;background:transparent;}}
+        QCheckBox::indicator:hover,QListWidget::indicator:hover {{border-color:{ind_hover};}}
         QCheckBox::indicator:checked,QListWidget::indicator:checked {{background:{c['orange']};border-color:{c['orange']};image:url("{check}");}}
         QCheckBox::indicator:indeterminate,QListWidget::indicator:indeterminate {{background:{c['selected']};border-color:{c['orange']};}}
         QFrame#activityBar {{background:{c['side']};border-top:1px solid {c['border']};}}
@@ -620,16 +663,17 @@ def apply_theme(window):
         if isinstance(value,MotionButton):value.tone=QColor(c['orange'])
         kind=value.property('iconKind')
         if kind:
-            color=c['primaryText'] if value.objectName()=='primary' else '#ffffff' if value.objectName()=='secondaryAccent' or value.objectName()=='nav' and value.isChecked() else c['text']
+            color=c['primaryText'] if value.objectName()=='primary' else '#ffffff' if value.objectName()=='secondaryAccent' or value.objectName()=='nav' and value.isChecked() else c['orange'] if apple_music and value.objectName() in ('nav','settingsNav') and not value.isChecked() else c['text']
             value.setIcon(line_icon(kind,color,17))
-    window.device_symbol.setPixmap(line_icon('phone','#a6d7d5' if dark else '#18565a',24).pixmap(24,24))
-    window.diagnostic_symbol.setPixmap(line_icon('phone','#a6d7d5' if dark else '#18565a',42).pixmap(42,52))
+    phone_tone=('#fa233b' if apple_music else ('#a6d7d5' if dark else '#18565a'))
+    window.device_symbol.setPixmap(line_icon('phone',phone_tone,24).pixmap(24,24))
+    window.diagnostic_symbol.setPixmap(line_icon('phone',phone_tone,42).pixmap(42,52))
     window.drop_symbol.setPixmap(line_icon('upload',c['orange'],32).pixmap(32,32))
     for table in (window.library_table,window.table,window.app_table):
-        table.setProperty('checkAccent',c['orange']);table.setProperty('checkForeground',c['primaryText']);table.setProperty('darkTheme',dark)
+        table.setProperty('checkAccent',c['orange']);table.setProperty('checkForeground',c['primaryText']);table.setProperty('darkTheme',dark);table.setProperty('appleMusic',apple_music)
         table.viewport().update()
     window.library_model.secondary_color=QColor(c['muted'])
-    window.default_music_icon=music_placeholder_icon(c['selected'],c['border'],c['muted'],28);window.library_model.default_icon=window.default_music_icon
+    window.default_music_icon=music_placeholder_icon(c['selected'],c['border'],c['orange'] if apple_music else c['muted'],28);window.library_model.default_icon=window.default_music_icon
     window.default_folder_icon=line_icon('folder',c['orange'],22);window.default_file_icon=line_icon('file',c['muted'],22)
     if window.library_model.rowCount():window.library_model.dataChanged.emit(window.library_model.index(0,0),window.library_model.index(window.library_model.rowCount()-1,2),[Qt.ItemDataRole.DecorationRole,Qt.ItemDataRole.ForegroundRole])
     if getattr(window,'tracks',None):
